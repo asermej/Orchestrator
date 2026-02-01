@@ -1,0 +1,65 @@
+---
+description: "ACTIVE: Mapper rules - API to Domain model mapping"
+globs: apps/api/Orchestrator.Api/Mappers/*Mapper.cs
+alwaysApply: false
+---
+
+>>> CONTEXT LOADED: Mapper best practices are now active <<<
+
+# Mapper Best Practices
+
+**Template**: [Mapper.hbs](mdc:docs/technical/templates/api-templates/Mapper.hbs)
+
+## Purpose
+API mappers convert between **Resource models** (API layer) and **Domain models**.
+
+## Requirements
+
+- **Static class**: Stateless transformation logic
+- **ToResource**: Convert domain model to API response
+- **ToDto/ToDomain**: Convert API request to domain model
+- **ToCriteria**: Convert search request to search criteria
+- **Null-safe**: Handle null values gracefully
+
+## Pattern
+
+```csharp
+namespace Orchestrator.Api.Mappers;
+
+public static class FeatureMapper
+{
+    public static FeatureResource ToResource(Feature feature)
+    {
+        return new FeatureResource
+        {
+            Id = feature.Id,
+            Name = feature.Name,
+            CreatedAt = feature.CreatedAt
+        };
+    }
+
+    public static CreateFeatureDto ToDto(CreateFeatureResource resource)
+    {
+        return new CreateFeatureDto
+        {
+            Name = resource.Name
+        };
+    }
+
+    public static SearchFeatureCriteria ToCriteria(SearchFeatureRequest request)
+    {
+        return new SearchFeatureCriteria
+        {
+            Name = request.Name,
+            PageNumber = request.PageNumber,
+            PageSize = request.PageSize
+        };
+    }
+}
+```
+
+## Do NOT
+
+- Add business logic (belongs in Manager)
+- Call database or external services
+- Throw exceptions (let validation handle invalid data)

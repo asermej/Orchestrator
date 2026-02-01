@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="20251107205908-create-persona-topics-table" author="liquibase">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="persona_topics"/>
+            </not>
+        </preConditions>
+        <createTable tableName="persona_topics">
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="persona_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="topic_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="content_url" type="varchar(1000)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="contribution_notes" type="varchar(500)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="updated_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_deleted" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="deleted_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+        
+        <!-- Add foreign key constraints -->
+        <addForeignKeyConstraint 
+            constraintName="fk_persona_topics_persona_id"
+            baseTableName="persona_topics" 
+            baseColumnNames="persona_id"
+            referencedTableName="personas"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        
+        <addForeignKeyConstraint 
+            constraintName="fk_persona_topics_topic_id"
+            baseTableName="persona_topics" 
+            baseColumnNames="topic_id"
+            referencedTableName="topics"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        
+        <!-- Add indexes -->
+        <createIndex tableName="persona_topics" indexName="idx_persona_topics_persona_id">
+            <column name="persona_id"/>
+        </createIndex>
+        <createIndex tableName="persona_topics" indexName="idx_persona_topics_topic_id">
+            <column name="topic_id"/>
+        </createIndex>
+        
+        <!-- Add unique constraint for persona_id + topic_id combination where not deleted -->
+        <createIndex tableName="persona_topics" indexName="idx_persona_topics_unique_persona_topic" unique="true">
+            <column name="persona_id"/>
+            <column name="topic_id"/>
+            <column name="is_deleted"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>
+

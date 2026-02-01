@@ -1,0 +1,52 @@
+---
+description: "ACTIVE: Manager rules - Core business logic implementation"
+globs: apps/api/Orchestrator.Domain/Managers/*Manager.cs
+alwaysApply: false
+---
+
+>>> CONTEXT LOADED: Manager best practices are now active <<<
+
+# Manager Best Practices
+
+**Template**: [Manager.hbs](mdc:docs/technical/templates/domain-templates/Manager.hbs)
+
+## Purpose
+Managers contain **core business logic** for a domain entity. They orchestrate validation and delegate to DataFacade.
+
+## Requirements
+
+- **Internal sealed class**: Managers are internal implementation details
+- **IDisposable**: Implement dispose pattern
+- **ServiceLocator injection**: Receive `ServiceLocatorBase` in constructor
+- **Lazy DataFacade**: Create DataFacade only when needed
+- **Validate before data access**: Call Validator before any DataFacade operations
+- **ConfigureAwait(false)**: Use on all async calls
+
+## Pattern
+
+```csharp
+internal sealed class FeatureManager : IDisposable
+{
+    private readonly ServiceLocatorBase _serviceLocator;
+    private DataFacade? _dataFacade;
+    private DataFacade DataFacade => _dataFacade ??= 
+        new DataFacade(_serviceLocator.CreateConfigurationProvider().GetDbConnectionString());
+
+    public FeatureManager(ServiceLocatorBase serviceLocator)
+    {
+        _serviceLocator = serviceLocator;
+    }
+
+    public async Task<Guid> CreateFeature(Feature feature)
+    {
+        FeatureValidator.Validate(feature);
+        return await DataFacade.AddFeature(feature).ConfigureAwait(false);
+    }
+}
+```
+
+## Do NOT
+
+- Catch and handle exceptions (let them bubble up)
+- Skip validation before data operations
+- Create DataFacade in constructor (use lazy initialization)

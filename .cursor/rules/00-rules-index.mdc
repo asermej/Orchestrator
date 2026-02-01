@@ -1,0 +1,132 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# 🚨 CURSOR RULES INDEX - READ THIS FIRST 🚨
+
+**CRITICAL**: This workspace uses **MANDATORY** templates and workflows. Before starting ANY development work, you MUST follow the established patterns.
+
+## 🛑 STOP - AI Assistant Checklist
+
+Before proceeding with any request, validate:
+
+- [ ] **Rule Discovery**: Have I found all relevant `.cursor/rules/` files?
+- [ ] **Template Discovery**: Have I found all relevant `docs/technical/templates/` files?
+- [ ] **Workflow Selection**: Do I know which workflow to follow?
+- [ ] **Interactive Process**: Am I following the required prompting process?
+
+## 📍 Rule Hierarchy (Check in Priority Order)
+
+### 1. 🏗️ Root Level Rules (Apply to Everything)
+- **Location**: `.cursor/rules/`
+- **[Architecture Principles](mdc:.cursor/rules/cursor_rules.mdc)** - Clean Architecture boundaries, overall structure
+- **[This Index](mdc:.cursor/rules/00-rules-index.mdc)** - Rule discovery guide
+- **Class Type Rules**: `.cursor/rules/class-rules/` - Auto-loaded best practices for specific file types
+  - `domain-class-rules/` - Domain layer classes (Manager, DataFacade, DomainFacade, etc.)
+  - `api-class-rules/` - API layer classes (Controller, Mapper, ResourceModel)
+  - `acceptance-tests-class-rules/` - Test classes (DomainFacadeTests)
+
+### 2. 🔧 API Layer Rules (Backend Development)
+- **Location**: `apps/api/.cursor/`
+- **[Core Principles](docs/technical/reference/core/principles.md)** - Validation, exceptions, facades, domain patterns
+- **[Endpoint Workflow](.cursor/commands/new-endpoint.md)** - 8-phase interactive feature creation process (use `/new-endpoint` command)
+- **[Security & Performance](docs/technical/reference/core/security-performance.md)** - Security standards and performance requirements
+- **Templates**: `docs/technical/templates/domain-templates/`, `docs/technical/templates/api-templates/` - Code generation templates for backend components
+
+### 3. 🗄️ Database Layer Rules (Schema & Migrations)
+- **Location**: `.cursor/rules/database-rules/` (glob-targeted to `apps/api/Orchestrator.Database/**/*`)
+- **[Database Workflow](mdc:.cursor/rules/database-rules/database-workflow.mdc)** - Table creation and migration process
+- **[Liquibase Best Practices](mdc:.cursor/rules/database-rules/liquibase-best-practices.mdc)** - Migration standards and naming
+- **Templates**: `docs/technical/templates/database-templates/` - Liquibase migration templates
+
+### 4. 🧪 Testing Layer Rules (Acceptance Tests)
+- **Location**: `.cursor/rules/acceptance-test-rules/` (glob-targeted to `apps/api/Orchestrator.AcceptanceTests/**/*`)
+- **[Testing Standards](mdc:.cursor/rules/acceptance-test-rules/testing-standards.mdc)** - Custom test doubles, DomainFacade-only testing
+- **CRITICAL**: Only test through DomainFacade interface
+
+### 5. 🌐 Web Layer Rules (Frontend Development)
+- **Location**: `apps/web/Orchestrator.Web/.cursor/` (when applicable)
+- Frontend-specific patterns and components
+
+## 🎯 Quick Task Reference
+
+| User Request | Primary Workflow | Required Templates | Key Rules |
+|--------------|------------------|-------------------|-----------|
+| **"New feature"**, **"Create API"**, **"Build [entity]"** | [Endpoint Workflow](.cursor/commands/new-endpoint.mdc) (or use `/new-endpoint`) | `docs/technical/templates/domain-templates/`, `docs/technical/templates/api-templates/` | [API Principles](docs/technical/reference/core/principles.md) |
+| **"Database"**, **"Table"**, **"Migration"** | [Database Workflow](mdc:.cursor/rules/database-rules/database-workflow.mdc) | `docs/technical/templates/database-templates/` | [Liquibase Practices](mdc:.cursor/rules/database-rules/liquibase-best-practices.mdc) |
+| **"Test"**, **"Testing"** | [Testing Standards](mdc:.cursor/rules/acceptance-test-rules/testing-standards.mdc) | `docs/technical/templates/acceptance-test-templates/DomainFacadeTests.Base.hbs` | **ONLY test DomainFacade** |
+| **"Frontend"**, **"UI"**, **"Component"** | Root architecture | TBD | Clean Architecture boundaries |
+
+## 🚨 CRITICAL TRIGGER PHRASES
+
+When user mentions ANY of these, follow the specified workflow:
+
+### API Development Triggers → Use `/new-endpoint` command or [Endpoint Workflow](.cursor/commands/new-endpoint.mdc)
+- "new feature", "create feature", "build feature"
+- "new endpoint", "create API", "add endpoint"
+- "Customer management", "User profile", "Order system" (any entity)
+- "CRUD operations", "REST API"
+
+### Database Triggers → Use [Database Workflow](mdc:.cursor/rules/database-rules/database-workflow.mdc)
+- "database", "table", "schema"
+- "migration", "liquibase"
+- "create table", "alter table"
+
+### Testing Triggers → Use [Testing Standards](mdc:.cursor/rules/acceptance-test-rules/testing-standards.mdc)
+- "test", "testing", "acceptance test"
+- **CRITICAL**: Only test through DomainFacade interface
+- Never test managers, data managers, or validators directly
+
+## ⚠️ RED FLAGS - Stop and Reassess If:
+
+- ❌ You're creating code without using templates
+- ❌ You're not following the defined workflow phases
+- ❌ You're making up patterns instead of using established ones
+- ❌ You haven't prompted the user for required information
+- ❌ You're inferring from existing code instead of rules
+- ❌ You're creating tests for individual classes instead of testing through DomainFacade only
+
+## 🔄 Standard Workflow Process
+
+1. **Identify Task Type** → Match to workflow above
+2. **Read Complete Workflow** → Don't skip steps
+3. **Follow Interactive Process** → Prompt user at each phase
+4. **Use Templates** → Never generate code from scratch
+5. **Verify Against Templates** → Ensure perfect match
+
+## 📋 Self-Validation Commands
+
+Before starting work, ask yourself:
+
+1. **"What .cursor folders exist in this workspace?"**
+2. **"What type of work am I being asked to do?"**
+3. **"What workflow file should I follow?"**
+4. **"What templates should I use?"**
+5. **"Am I following the interactive process?"**
+
+## 🎓 Example Self-Validation Dialog
+
+```
+User: "I want to create a Customer management feature"
+
+AI: "I see you want to create a Customer feature. Let me validate my approach:
+1. ✅ Found .cursor folders at: root, apps/api
+2. ✅ This is API feature work, so I should use: /new-endpoint command
+3. ✅ I should use templates from: docs/technical/templates/domain-templates/ and docs/technical/templates/api-templates/
+4. ✅ I need to follow the 8-phase interactive process
+5. ✅ I should start with Phase 1: Intelligent Feature Scoping
+
+Ready to begin the interactive workflow?"
+```
+
+## 🔗 Related Documentation
+
+- **Clean Architecture**: See root `.cursor/rules/cursor_rules.mdc`
+- **Testing Strategy**: Custom test doubles, no external mocking frameworks
+- **Exception Handling**: Let exceptions bubble up to middleware
+- **Database Standards**: Timestamp-based naming, audit fields, soft delete
+
+---
+
+**Remember**: The `.cursor` folders contain the **actual blueprint** for how features should be built. Always start here, not with existing code examples.

@@ -1,0 +1,102 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using System.ComponentModel.DataAnnotations;
+
+namespace Orchestrator.Domain;
+
+/// <summary>
+/// Manages business operations for {{featureName}} entities
+/// </summary>
+internal sealed class {{featureName}}Manager : IDisposable
+{
+    private readonly ServiceLocatorBase _serviceLocator;
+    private DataFacade? _dataFacade;
+    private DataFacade DataFacade => _dataFacade ??= new DataFacade(_serviceLocator.CreateConfigurationProvider().GetDbConnectionString());
+
+    public {{featureName}}Manager(ServiceLocatorBase serviceLocator)
+    {
+        _serviceLocator = serviceLocator;
+    }
+
+    {{#if (includes operations "Create")}}
+    /// <summary>
+    /// Creates a new {{featureName}}
+    /// </summary>
+    /// <param name="dto">The data to create the {{featureName}} with</param>
+    /// <returns>The created {{featureName}} ID</returns>
+    public async Task<Guid> Create{{featureName}}(Create{{featureName}}Dto dto)
+    {
+        {{featureName}}Validator.Validate(dto);
+        return await DataFacade.Add{{featureName}}(dto).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Creates multiple {{featureName}}s
+    /// </summary>
+    /// <param name="dtos">The data to create the {{featureName}}s with</param>
+    public async Task Create{{featureName}}s(IEnumerable<Create{{featureName}}Dto> dtos)
+    {
+        foreach (var dto in dtos)
+        {
+            {{featureName}}Validator.Validate(dto);
+        }
+        await DataFacade.Add{{featureName}}s(dtos).ConfigureAwait(false);
+    }
+    {{/if}}
+
+    {{#if (includes operations "GetById")}}
+    /// <summary>
+    /// Gets a {{featureName}} by ID
+    /// </summary>
+    /// <param name="id">The ID of the {{featureName}} to get</param>
+    /// <returns>The {{featureName}} if found, null otherwise</returns>
+    public async Task<{{featureName}}?> Get{{featureName}}ById(Guid id)
+    {
+        return await DataFacade.Get{{featureName}}ById(id).ConfigureAwait(false);
+    }
+    {{/if}}
+
+    {{#if (includes operations "Search")}}
+    /// <summary>
+    /// Searches for {{featureName}}s
+    /// </summary>
+    /// <param name="criteria">The search criteria</param>
+    /// <returns>A paginated list of {{featureName}}s</returns>
+    public async Task<PaginatedResult<{{featureName}}>> Search{{featureName}}s(Search{{featureName}}Criteria criteria)
+    {
+        return await DataFacade.Search{{featureName}}s(criteria).ConfigureAwait(false);
+    }
+    {{/if}}
+
+    {{#if (includes operations "Update")}}
+    /// <summary>
+    /// Updates a {{featureName}}
+    /// </summary>
+    /// <param name="id">The ID of the {{featureName}} to update</param>
+    /// <param name="dto">The data to update the {{featureName}} with</param>
+    /// <returns>The updated {{featureName}}</returns>
+    public async Task<{{featureName}}> Update{{featureName}}(Guid id, Update{{featureName}}Dto dto)
+    {
+        {{featureName}}Validator.Validate(dto);
+        return await DataFacade.Update{{featureName}}(id, dto).ConfigureAwait(false);
+    }
+    {{/if}}
+
+    {{#if (includes operations "Delete")}}
+    /// <summary>
+    /// Deletes a {{featureName}}
+    /// </summary>
+    /// <param name="id">The ID of the {{featureName}} to delete</param>
+    /// <returns>True if the {{featureName}} was deleted, false if not found</returns>
+    public async Task<bool> Delete{{featureName}}(Guid id)
+    {
+        return await DataFacade.Delete{{featureName}}(id).ConfigureAwait(false);
+    }
+    {{/if}}
+
+    public void Dispose()
+    {
+        // DataFacade doesn't implement IDisposable, so no disposal needed
+    }
+} 

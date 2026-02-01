@@ -1,0 +1,55 @@
+---
+description: "ACTIVE: ResourceModel rules - API request/response DTOs"
+globs: apps/api/Orchestrator.Api/ResourcesModels/*Resource.cs
+alwaysApply: false
+---
+
+>>> CONTEXT LOADED: ResourceModel best practices are now active <<<
+
+# ResourceModel Best Practices
+
+**Template**: [ResourceModel.hbs](mdc:docs/technical/templates/api-templates/ResourceModel.hbs)
+
+## Purpose
+Resource models are **DTOs** that define the JSON shape for API requests and responses.
+
+## Requirements
+
+- **Separate classes per operation**: `FeatureResource`, `CreateFeatureResource`, `UpdateFeatureResource`, `SearchFeatureRequest`
+- **Public properties**: Use `{ get; set; }` for serialization
+- **Validation attributes**: Use `[Required]`, `[StringLength]`, etc. for API-layer validation
+- **JsonPropertyName**: Use when JSON name differs from C# property name
+- **No business logic**: Pure data transfer objects
+
+## Pattern
+
+```csharp
+namespace Orchestrator.Api.ResourcesModels;
+
+public class FeatureResource
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+}
+
+public class CreateFeatureResource
+{
+    [Required]
+    [StringLength(255)]
+    public string Name { get; set; } = string.Empty;
+}
+
+public class SearchFeatureRequest
+{
+    public string? Name { get; set; }
+    public int PageNumber { get; set; } = 1;
+    public int PageSize { get; set; } = 10;
+}
+```
+
+## Do NOT
+
+- Include domain logic or validation beyond format
+- Use domain models directly in API (always map)
+- Expose internal fields like `IsDeleted`

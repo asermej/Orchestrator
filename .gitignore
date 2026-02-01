@@ -1,0 +1,178 @@
+# .NET Core
+**/[Bb]in/
+**/[Oo]bj/
+**/*.dll
+**/*.pdb
+**/*.cache
+**/*.txt
+**/*.json
+!appsettings.json
+!appsettings.*.json
+!package.json
+!package-lock.json
+!pnpm-lock.yaml
+# Allow .cursor directory and its files
+.cursor/*
+!.cursor/mcp.json.template
+!.cursor/templates/
+!.cursor/rules/
+!.cursor/**/*.mdc
+!.cursor/**/*.hbs
+*.user
+*.userosscache
+*.suo
+*.userprefs
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+build/
+bld/
+[Oo]ut/
+msbuild.log
+msbuild.err
+msbuild.wrn
+
+# Build-generated files
+*.[Aa]ssemblyInfo.cs
+*.[Aa]ssemblyInfoInputs.cache
+*.AssemblyAttributes.cs
+*.[Gg]enerated[Mm]SBuildEditorConfig.editorconfig
+*.assets.cache
+*.cache
+*.CopyComplete
+*.[Cc]ache
+*.csproj.AssemblyReference.cache
+*.csproj.CoreCompileInputs.cache
+*.csproj.FileListAbsolute.txt
+*.genruntimeconfig.cache
+*.sourcelink.json
+*.nuget.dgspec.json
+*.nuget.g.props
+*.nuget.g.targets
+project.assets.json
+project.nuget.cache
+.config/dotnet-tools.json
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+.history/
+
+# Visual Studio
+.vs/
+*.ncrunch*
+*.dotCover
+*.resharper
+_ReSharper*/
+*.ReSharper
+*.DotSettings.user
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Rider
+.idea/
+*.sln.iml
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# NuGet
+*.nupkg
+*.snupkg
+**/packages/*
+!**/packages/build/
+*.nuget.props
+*.nuget.targets
+
+# Test Results
+TestResults/
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+
+# Liquibase
+liquibase.properties.local
+*.log
+lib/*.jar
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Others
+*.swp
+*.*~
+project.lock.json
+.project
+.classpath
+*.launch
+.settings/
+*.sublime-workspace
+node_modules/
+dist/
+tmp/
+temp/
+
+# Keep specific files
+!.gitignore
+!*.csproj
+!*.sln
+!global.json
+
+# Added by Task Master AI
+# Logs
+logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dev-debug.log
+# Dependency directories
+# Environment variables
+.env
+# Editor directories and files
+.idea
+.vscode
+*.ntvs*
+*.njsproj
+*.sw?
+# OS specific
+#end of taskmaster
+
+# Training data (persona and topic training files)
+apps/api/training-data/**/*.txt
+!apps/api/training-data/README.md

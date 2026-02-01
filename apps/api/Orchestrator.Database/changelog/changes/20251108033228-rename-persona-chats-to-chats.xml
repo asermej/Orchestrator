@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="20251108033228-rename-persona-chats-to-chats" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="persona_chats"/>
+            <not>
+                <tableExists tableName="chats"/>
+            </not>
+        </preConditions>
+        
+        <!-- Rename the table -->
+        <renameTable oldTableName="persona_chats" newTableName="chats"/>
+        
+        <!-- Rename indexes -->
+        <sql>
+            ALTER INDEX IF EXISTS idx_persona_chats_persona_id RENAME TO idx_chats_persona_id;
+            ALTER INDEX IF EXISTS idx_persona_chats_user_id RENAME TO idx_chats_user_id;
+            ALTER INDEX IF EXISTS idx_persona_chats_last_message_at RENAME TO idx_chats_last_message_at;
+        </sql>
+    </changeSet>
+</databaseChangeLog>
+

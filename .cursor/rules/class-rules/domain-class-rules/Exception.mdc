@@ -1,0 +1,61 @@
+---
+description: "ACTIVE: Exception rules - Custom domain exceptions"
+globs: apps/api/Orchestrator.Domain/Managers/Exceptions/*Exception.cs
+alwaysApply: false
+---
+
+>>> CONTEXT LOADED: Exception best practices are now active <<<
+
+# Exception Best Practices
+
+**Templates**: 
+- [ValidationException.hbs](mdc:docs/technical/templates/domain-templates/exceptions/ValidationException.hbs)
+- [NotFoundException.hbs](mdc:docs/technical/templates/domain-templates/exceptions/NotFoundException.hbs)
+- [DuplicateException.hbs](mdc:docs/technical/templates/domain-templates/exceptions/DuplicateException.hbs)
+
+**Related Guides**:
+- [Error Handling](mdc:docs/technical/reference/guides/api-guides/error-handling.md) - Error response patterns and middleware translation
+
+## Purpose
+Custom exceptions provide **typed error handling** that middleware translates to HTTP responses.
+
+## Exception Types
+
+| Base Class | HTTP Status | Use Case |
+|------------|-------------|----------|
+| `BusinessBaseException` | 400 | Validation errors |
+| `NotFoundBaseException` | 404 | Entity not found |
+| `BusinessBaseException` | 409 | Duplicate entity |
+
+## Pattern
+
+```csharp
+namespace Orchestrator.Domain;
+
+public class FeatureValidationException : BusinessBaseException
+{
+    public FeatureValidationException(string message) : base(message) { }
+}
+
+public class FeatureNotFoundException : NotFoundBaseException
+{
+    public FeatureNotFoundException(string message) : base(message) { }
+}
+
+public class FeatureDuplicateException : BusinessBaseException
+{
+    public FeatureDuplicateException(string message) : base(message) { }
+}
+```
+
+## Requirements
+
+- **Inherit from base exceptions**: Enables middleware translation
+- **User-friendly messages**: These appear in API error responses
+- **One per entity per type**: `{Feature}ValidationException`, `{Feature}NotFoundException`
+
+## Do NOT
+
+- Catch these exceptions in domain layer (let them bubble up)
+- Use generic Exception class
+- Include sensitive data in messages

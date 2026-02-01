@@ -1,0 +1,86 @@
+---
+description: Custom test doubles and DomainFacade-only testing standards
+globs: apps/api/Orchestrator.AcceptanceTests/**/*
+alwaysApply: false
+---
+
+# Testing Standards
+
+> **Full Details**: See [acceptance-test-details.md](mdc:docs/technical/reference/acceptance-test-details.md) for comprehensive examples and patterns.
+
+## Critical Testing Boundary
+
+**ONLY TEST THE DomainFacade**: All acceptance tests MUST interact exclusively with `DomainFacade`. Internal implementation remains black-boxed.
+
+```csharp
+// ✅ DO: Test through DomainFacade
+var result = await _domainFacade.CreateCustomer(customer);
+Assert.IsTrue(result.IsSuccess);
+
+// ❌ DON'T: Test managers, data managers, or validators directly
+var manager = new CustomerManager(serviceLocator); // WRONG
+```
+
+## Core Principles
+
+### 1. No External Mocking Frameworks
+- **DON'T**: Use Moq, NSubstitute, or any external mocking library
+- **DO**: Create custom test doubles, stubs, and fakes
+- **Why**: Clean architecture, no external dependencies, full control
+
+### 2. InternalsVisibleTo Pattern
+- Assembly attribute in `Orchestrator.DomainLayer` allows test access to internal members
+- Used for creating custom test doubles only
+
+### 3. Test Double Types
+- **Stubs**: Provide canned answers to calls
+- **Fakes**: Working implementations with shortcuts (e.g., in-memory collections)
+
+## Test Organization
+
+### File Structure
+```
+Orchestrator.AcceptanceTests/
+├── DomainLayer/
+│   └── {Feature}FeatureTests.cs   // Feature-based test files
+├── TestDoubles/
+│   └── Stub{Service}.cs           // Custom test doubles
+└── ServiceLocator/
+    └── ServiceLocatorForAcceptanceTesting.cs
+```
+
+### Naming Convention
+- **Class**: `{FeatureName}FeatureTests.cs`
+- **Method**: `{FeatureName}_{Scenario}_{ExpectedResult}`
+
+### What NOT to Create
+- ❌ `{ClassName}ManagerTests.cs` - Don't test managers directly
+- ❌ `{ClassName}DataManagerTests.cs` - Don't test data managers
+- ❌ `{ClassName}ValidatorTests.cs` - Don't test validators
+- ❌ `DataFacadeTests.cs` - Don't test data facade
+
+## Database Cleanup
+
+- Clean up **before AND after** each test
+- Use direct SQL with pattern-based identification
+- Test data patterns: `@example.com`, `@test.com`, `Test*` prefixes
+
+**Guide**: See [Test Cleanup Guide](mdc:docs/technical/reference/guides/acceptance-test-guides/test-cleanup.md) for comprehensive cleanup patterns and examples.
+
+## Quick Anti-Patterns Checklist
+
+| Anti-Pattern | Why It's Wrong |
+|--------------|----------------|
+| Using Moq/NSubstitute | Adds external dependencies |
+| Testing internal classes | Breaks black box principle |
+| Real external services in tests | Makes tests slow/flaky |
+| Silent assertions | No context on failure |
+| Incomplete cleanup | Tests interfere with each other |
+
+## Templates
+
+- Use `docs/technical/templates/acceptance-test-templates/DomainFacadeTests.Base.hbs` for new test files
+
+---
+
+**Remember**: Tests are first-class citizens. Test only through DomainFacade for maintainable, refactor-friendly tests.

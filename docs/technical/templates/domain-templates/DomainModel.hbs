@@ -1,0 +1,25 @@
+{{!-- 
+Template: Domain Model
+Description: Generates a domain entity class that inherits from Entity base class
+Usage: Used in Phase 3.1 of endpoint-workflow.mdc
+Variables:
+  - featureName: The name of the feature/entity (e.g., "Customer")
+  - tableName: The database table name (e.g., "customers")
+  - properties: Array of property objects with name and type
+Generated File: Orchestrator.DomainLayer/Managers/Models/{featureName}.cs
+--}}
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace Orchestrator.DomainLayer;
+
+/// <summary>
+/// Represents a {{featureName}} in the domain
+/// </summary>
+[Table("{{#snakeCase}}{{tableName}}{{/snakeCase}}")]
+public class {{featureName}} : Entity
+{
+    {{#each properties}}
+    [Column("{{#snakeCase}}{{name}}{{/snakeCase}}")]
+    public {{type}} {{name}} { get; set; }{{#if_eq type "string"}} = string.Empty;{{/if_eq}}
+    {{/each}}
+}

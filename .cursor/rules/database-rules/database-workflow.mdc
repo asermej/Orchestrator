@@ -1,0 +1,112 @@
+---
+description: Standard procedures for creating and updating database tables using Liquibase
+globs: apps/api/Orchestrator.Database/**/*
+alwaysApply: false
+---
+
+# 🗄️ Database Development Workflow
+
+**MANDATORY PROCESS**: This document outlines the standard procedures for creating and updating database tables using Liquibase. It ensures consistency, maintainability, and performance.
+
+**🚨 CRITICAL**: All database changes MUST follow this workflow and use the provided templates.
+
+---
+
+## 1. Creating a New Table
+
+### Prompts for Table Creation
+When creating a new table, you will be prompted for the following:
+- **Table Name**: The name of the table in `snake_case` (e.g., `user_profiles`).
+- **Schema**: The database schema, defaulting to `public`.
+- **Columns**: A list of columns in the format `Name:Type:Constraints` (e.g., `user_id:int:not null, description:text`).
+
+### Liquibase Changeset for Table Creation
+- **Template**: Uses `docs/technical/templates/database-templates/create/Table.hbs`.
+- **Destination**: `Orchestrator.Database/changelog/changes/{{timestamp}}-create-{{tableName}}-table.xml`.
+- **Changeset ID**: Must follow the format `{utc-timestamp}-{kebab-case-description}` (e.g., `20250619050505-create-users-table`).
+- **File Naming**: The XML filename must match the changeset ID.
+
+### Required Table Structure
+- **Primary Key**: An `id` column with `SERIAL` or `BIGSERIAL` type is mandatory.
+- **Audit Fields**: `created_at` and `updated_at` columns (e.g., `TIMESTAMP WITH TIME ZONE`) are required for tracking.
+- **Constraints**: Use `<constraints>` elements within `<column>` tags, not attributes on the `column` tag itself.
+- **Indexes**: Create indexes for foreign keys and frequently queried columns in the same changeset.
+
+### Example: `createTable` Changeset
+```xml
+<changeSet id="20250619050505-create-users-table" author="system">
+    <createTable tableName="users" schemaName="public">
+        <column name="id" type="SERIAL">
+            <constraints primaryKey="true" nullable="false"/>
+        </column>
+        <column name="email" type="VARCHAR(255)">
+            <constraints nullable="false" unique="true"/>
+        </column>
+        <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+            <constraints nullable="false"/>
+        </column>
+        <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+            <constraints nullable="false"/>
+        </column>
+    </createTable>
+    <createIndex tableName="users" indexName="idx_users_email">
+        <column name="email"/>
+    </createIndex>
+</changeSet>
+```
+
+### Triggers and Functions
+- **Separate Changesets**: Complex SQL, such as triggers or functions, must be in separate changesets that run *after* the table creation.
+- **CDATA and Dollar Quotes**: Wrap functions in `<![CDATA[...]]>` and use named dollar quotes (e.g., `$function_name$`) to avoid parsing issues.
+
+---
+
+## 2. Updating an Existing Table
+
+### Prompts for Table Updates
+- **Table Name**: The `snake_case` name of the table to modify.
+- **Schema**: The database schema.
+- **Update Type**: The type of modification (`Add columns`, `Modify columns`, `Add constraints`).
+- **Changes**: The specific changes to apply, formatted according to the update type.
+
+### Liquibase Changeset for Table Updates
+- **Template**: Uses `docs/technical/templates/database-templates/update/AlterTable.hbs`.
+- **Destination**: `Orchestrator.Database/changelog/changes/{{timestamp}}-update-{{tableName}}-table.xml`.
+
+### Common Update Operations
+- **Adding a Column**: Use the `<addColumn>` change type.
+- **Modifying a Column**: Use `<modifyDataType>`.
+- **Adding a Constraint**: Use `<addUniqueConstraint>` or `<addForeignKeyConstraint>`.
+
+### Example: `addColumn` Changeset
+```xml
+<changeSet id="20250620101500-add-phone-to-users" author="system">
+    <addColumn tableName="users" schemaName="public">
+        <column name="phone_number" type="VARCHAR(20)"/>
+    </addColumn>
+</changeSet>
+```
+
+---
+
+## 3. General Database Guidelines
+
+### Performance
+- **Indexing**: Index all foreign keys and columns used in `WHERE`, `JOIN`, and `ORDER BY` clauses.
+- **Query Optimization**: Analyze queries to ensure they are efficient and leverage indexes.
+
+### Validation and Error Handling
+- **Database-Level Validation**: Use `NOT NULL`, `UNIQUE`, `CHECK`, and `FOREIGN KEY` constraints to enforce data integrity at the database level.
+- **Domain-Level Validation**: Business rules should be validated in the domain layer *before* attempting a database operation.
+- **Exception Handling**: Do not catch and swallow database exceptions (e.g., `PostgresException`). Let them bubble up to be handled by the middleware, which will translate them into appropriate technical error responses.
+
+### Anti-Patterns to Avoid
+- **DO NOT** include complex logic (functions, triggers) in the initial table creation changeset.
+- **DO NOT** use attributes for constraints (e.g., `<column ... primaryKey="true">`). Use the `<constraints>` element.
+- **DO NOT** forget audit fields (`created_at`, `updated_at`).
+- **DO NOT** omit indexes on foreign keys or frequently searched columns.
+- **DO NOT** catch database exceptions in the data access layer; let them propagate.
+
+### Related Rules
+- **[Liquibase Best Practices](mdc:.cursor/rules/database-rules/liquibase-best-practices.mdc)** - Naming conventions and migration standards
+- **[Endpoint Workflow](mdc:.cursor/commands/new-endpoint.mdc)** - Full feature development process

@@ -1,0 +1,87 @@
+using System.Text.RegularExpressions;
+
+namespace Orchestrator.Domain;
+
+/// <summary>
+/// Provides validation methods for the <see cref="{{featureName}}"/> entity.
+/// This validator uses conventions based on property names to apply specific format validations.
+/// Only includes regex patterns for properties that actually exist and only validates required fields.
+/// </summary>
+internal static class {{featureName}}Validator
+{
+    {{#each properties}}
+    {{#if_eq name "Email"}}
+    // Regex for email validation.
+    private static readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    {{/if_eq}}
+    {{#if_eq name "Phone"}}
+    // Regex for phone number validation (supports international format).
+    private static readonly Regex PhoneRegex = new(@"^[\+]?[1-9][\d]{0,15}$", RegexOptions.Compiled);
+    {{/if_eq}}
+    {{#if_eq name "Url"}}
+    // Regex for URL validation.
+    private static readonly Regex UrlRegex = new(@"^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    {{/if_eq}}
+    {{/each}}
+
+    /// <summary>
+    /// Validates the specified {{featureName}} instance, applying format checks based on property name conventions.
+    /// Review the generated validation logic and adjust required vs optional field validation as needed.
+    /// </summary>
+    /// <param name="{{camelCase featureName}}">The instance to validate.</param>
+    /// <exception cref="{{featureName}}ValidationException">Thrown when validation fails.</exception>
+    public static void Validate({{featureName}} {{camelCase featureName}})
+    {
+        var errors = new List<string>();
+
+        {{#each properties}}
+        {{#if_eq type "string"}}
+        // --- Validation for {{name}} ---
+        var {{camelCase name}}Value = {{camelCase ../featureName}}.{{name}};
+        
+        // TODO: Review if {{name}} is required or optional based on your database constraints
+        // If required, use ValidatorString.Validate() and add format validation
+        // If optional, only validate format when value is not empty
+        
+        // EXAMPLE for required field:
+        // var validationError = ValidatorString.Validate("{{name}}", {{camelCase name}}Value);
+        // if (validationError != null)
+        // {
+        //     errors.Add(validationError);
+        // }
+        // else
+        // {
+        //     {{#if_eq name "Email"}}
+        //     if (!EmailRegex.IsMatch({{camelCase name}}Value)) { errors.Add("{{name}} has an invalid email format."); }
+        //     {{/if_eq}}
+        //     {{#if_eq name "Phone"}}
+        //     if (!PhoneRegex.IsMatch({{camelCase name}}Value)) { errors.Add("{{name}} has an invalid phone format."); }
+        //     {{/if_eq}}
+        //     {{#if_eq name "Url"}}
+        //     if (!UrlRegex.IsMatch({{camelCase name}}Value)) { errors.Add("{{name}} has an invalid URL format."); }
+        //     {{/if_eq}}
+        // }
+        
+        // EXAMPLE for optional field:
+        // if (!string.IsNullOrWhiteSpace({{camelCase name}}Value))
+        // {
+        //     {{#if_eq name "Email"}}
+        //     if (!EmailRegex.IsMatch({{camelCase name}}Value)) { errors.Add("{{name}} has an invalid email format."); }
+        //     {{/if_eq}}
+        //     {{#if_eq name "Phone"}}
+        //     if (!PhoneRegex.IsMatch({{camelCase name}}Value)) { errors.Add("{{name}} has an invalid phone format."); }
+        //     {{/if_eq}}
+        //     {{#if_eq name "Url"}}
+        //     if (!UrlRegex.IsMatch({{camelCase name}}Value)) { errors.Add("{{name}} has an invalid URL format."); }
+        //     {{/if_eq}}
+        // }
+
+        {{/if_eq}}
+        {{/each}}
+
+        if (errors.Any())
+        {
+            throw new {{featureName}}ValidationException(string.Join("; ", errors));
+        }
+    }
+}

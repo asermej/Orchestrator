@@ -1,0 +1,48 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace Orchestrator.DomainLayer;
+
+public sealed partial class DomainFacade
+{
+    {{#if (includes operations "Create")}}
+    public async Task<Guid> Create{{featureName}}(Create{{featureName}}Dto dto)
+    {
+        return await {{featureName}}Manager.Create{{featureName}}(dto);
+    }
+
+    public async Task Create{{featureName}}s(IEnumerable<Create{{featureName}}Dto> dtos)
+    {
+        await {{featureName}}Manager.Create{{featureName}}s(dtos);
+    }
+    {{/if}}
+
+    {{#if (includes operations "GetById")}}
+    public async Task<{{featureName}}?> Get{{featureName}}ById(Guid id)
+    {
+        return await {{featureName}}Manager.Get{{featureName}}ById(id);
+    }
+    {{/if}}
+
+    {{#if (includes operations "Search")}}
+    public async Task<PaginatedResult<{{featureName}}>> Search{{featureName}}s(Search{{featureName}}Criteria criteria)
+    {
+        return await {{featureName}}Manager.Search{{featureName}}s(criteria);
+    }
+    {{/if}}
+
+    {{#if (includes operations "Update")}}
+    public async Task<{{featureName}}> Update{{featureName}}(Guid id, Update{{featureName}}Dto dto)
+    {
+        return await {{featureName}}Manager.Update{{featureName}}(id, dto);
+    }
+    {{/if}}
+
+    {{#if (includes operations "Delete")}}
+    public async Task<bool> Delete{{featureName}}(Guid id)
+    {
+        return await {{featureName}}Manager.Delete{{featureName}}(id);
+    }
+    {{/if}}
+} 

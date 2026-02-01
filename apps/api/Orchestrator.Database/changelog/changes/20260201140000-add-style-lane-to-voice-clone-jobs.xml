@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="20260201140000-add-style-lane-to-voice-clone-jobs" author="liquibase">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="voice_clone_jobs"/>
+            <not>
+                <columnExists tableName="voice_clone_jobs" columnName="style_lane"/>
+            </not>
+        </preConditions>
+        <comment>Add style_lane to voice_clone_jobs for audit (Conversational, Narration, High-energy)</comment>
+        <addColumn tableName="voice_clone_jobs">
+            <column name="style_lane" type="varchar(50)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>

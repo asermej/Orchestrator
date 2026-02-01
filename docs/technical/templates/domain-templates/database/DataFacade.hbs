@@ -1,0 +1,44 @@
+namespace Orchestrator.Domain;
+
+internal sealed partial class DataFacade
+{
+    private {{featureName}}DataManager {{featureName}}DataManager => new(_dbConnectionString);
+
+    {{#if (includes operations "Create")}}
+    public Task<{{featureName}}> Add{{featureName}}({{featureName}} {{camelCase featureName}})
+    {
+        return {{featureName}}DataManager.Add({{camelCase featureName}});
+    }
+    {{/if}}
+
+    {{#if (includes operations "GetById")}}
+    public async Task<{{featureName}}?> Get{{featureName}}ById(System.Guid id)
+    {
+        return await {{featureName}}DataManager.GetById(id);
+    }
+    {{/if}}
+    
+    {{#if (includes operations "Update")}}
+    public Task<{{featureName}}> Update{{featureName}}({{featureName}} {{camelCase featureName}})
+    {
+        return {{featureName}}DataManager.Update({{camelCase featureName}});
+    }
+    {{/if}}
+
+    {{#if (includes operations "Delete")}}
+    public Task<bool> Delete{{featureName}}(System.Guid id)
+    {
+        return {{featureName}}DataManager.Delete(id);
+    }
+    {{/if}}
+
+    {{#if (includes operations "Search")}}
+    public Task<PaginatedResult<{{featureName}}>> Search{{featureName}}s({{#each searchableFields}}{{type}}? {{camelCase name}}, {{/each}}int pageNumber, int pageSize)
+    {
+        return {{featureName}}DataManager.Search({{#each searchableFields}}{{camelCase name}}, {{/each}}pageNumber, pageSize);
+    }
+    {{/if}}
+}
+
+
+

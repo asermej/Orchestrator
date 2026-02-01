@@ -1,0 +1,187 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Orchestrator.DomainLayer;
+using Orchestrator.Api.ResourcesModels;
+using Orchestrator.Api.Mappers;
+using Orchestrator.Api.Common;
+
+namespace Orchestrator.Api.Controllers;
+
+[ApiController]
+[Route("api/v1/[controller]")]
+[Produces("application/json")]
+public class {{featureName}}Controller : ControllerBase
+{
+    private readonly DomainFacade _domainFacade;
+    private readonly ILogger<{{featureName}}Controller> _logger;
+
+    public {{featureName}}Controller(DomainFacade domainFacade, ILogger<{{featureName}}Controller> logger)
+    {
+        _domainFacade = domainFacade;
+        _logger = logger;
+    }
+
+    {{#if (includes operations "Create")}}
+    /// <summary>
+    /// Creates a new {{featureName}}
+    /// </summary>
+    /// <param name="resource">The {{featureName}} data</param>
+    /// <returns>The created {{featureName}} with its ID</returns>
+    /// <response code="201">Returns the newly created {{featureName}}</response>
+    /// <response code="400">If the resource is invalid</response>
+    [HttpPost]
+    [ProducesResponseType(typeof({{featureName}}Resource), 201)]
+    [ProducesResponseType(typeof(ErrorResponse), 400)]
+    public async Task<ActionResult<{{featureName}}Resource>> Create([FromBody] Create{{featureName}}Resource resource)
+    {
+        _logger.LogInformation("Creating {{featureName}} from request: {@Resource}", resource);
+
+        var dto = {{featureName}}Mapper.ToDto(resource);
+        var id = await _domainFacade.Create{{featureName}}(dto);
+
+        var created{{featureName}} = await _domainFacade.Get{{featureName}}ById(id);
+        if (created{{featureName}} == null)
+        {
+            _logger.LogError("Failed to retrieve created {{featureName}} with ID: {Id}", id);
+            return StatusCode(500, new ErrorResponse { Message = "Failed to retrieve created {{featureName}}" });
+        }
+
+        var response = {{featureName}}Mapper.ToResource(created{{featureName}});
+        _logger.LogInformation("Successfully created {{featureName}} with ID: {Id}", response.Id);
+        
+        return CreatedAtAction(nameof(GetById), new { id = response.Id }, response);
+    }
+
+    /// <summary>
+    /// Creates multiple {{featureName}}s
+    /// </summary>
+    /// <param name="resources">The {{featureName}}s data</param>
+    /// <returns>No content on success</returns>
+    [HttpPost("bulk")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType(typeof(ErrorResponse), 400)]
+    public async Task<ActionResult> CreateBulk([FromBody] IEnumerable<Create{{featureName}}Resource> resources)
+    {
+        _logger.LogInformation("Creating {Count} {{featureName}}s in bulk", resources?.Count() ?? 0);
+
+        var dtos = resources?.Select({{featureName}}Mapper.ToDto);
+        await _domainFacade.Create{{featureName}}s(dtos);
+
+        _logger.LogInformation("Successfully created {Count} {{featureName}}s in bulk", resources?.Count() ?? 0);
+        return NoContent();
+    }
+    {{/if}}
+
+    {{#if (includes operations "GetById")}}
+    /// <summary>
+    /// Gets a {{featureName}} by ID
+    /// </summary>
+    /// <param name="id">The ID of the {{featureName}}</param>
+    /// <returns>The {{featureName}} if found</returns>
+    /// <response code="200">Returns the {{featureName}}</response>
+    /// <response code="404">If the {{featureName}} is not found</response>
+    [HttpGet("{id}")]
+    [ProducesResponseType(typeof({{featureName}}Resource), 200)]
+    [ProducesResponseType(typeof(ErrorResponse), 404)]
+    public async Task<ActionResult<{{featureName}}Resource>> GetById(Guid id)
+    {
+        _logger.LogInformation("Getting {{featureName}} by ID: {Id}", id);
+
+        var {{camelCase featureName}} = await _domainFacade.Get{{featureName}}ById(id);
+        if ({{camelCase featureName}} == null)
+        {
+            _logger.LogWarning("{{featureName}} not found with ID: {Id}", id);
+            return NotFound(new ErrorResponse { Message = "{{featureName}} not found" });
+        }
+
+        var response = {{featureName}}Mapper.ToResource({{camelCase featureName}});
+        _logger.LogInformation("Successfully retrieved {{featureName}} with ID: {Id}", id);
+        
+        return Ok(response);
+    }
+    {{/if}}
+
+    {{#if (includes operations "Search")}}
+    /// <summary>
+    /// Searches for {{featureName}}s
+    /// </summary>
+    /// <param name="criteria">The search criteria</param>
+    /// <returns>A paginated list of {{featureName}}s</returns>
+    /// <response code="200">Returns the paginated results</response>
+    [HttpGet("search")]
+    [ProducesResponseType(typeof(PaginatedResult<{{featureName}}Resource>), 200)]
+    public async Task<ActionResult<PaginatedResult<{{featureName}}Resource>>> Search([FromQuery] Search{{featureName}}Request request)
+    {
+        _logger.LogInformation("Searching {{featureName}}s with criteria: {@Criteria}", request);
+
+        var criteria = {{featureName}}Mapper.ToCriteria(request);
+        var result = await _domainFacade.Search{{featureName}}s(criteria);
+        var response = new PaginatedResult<{{featureName}}Resource>
+        {
+            Items = result.Items.Select({{featureName}}Mapper.ToResource),
+            TotalCount = result.TotalCount,
+            PageNumber = result.PageNumber,
+            PageSize = result.PageSize
+        };
+
+        _logger.LogInformation("Search returned {Count} {{featureName}}s", result.TotalCount);
+        return Ok(response);
+    }
+    {{/if}}
+
+    {{#if (includes operations "Update")}}
+    /// <summary>
+    /// Updates a {{featureName}}
+    /// </summary>
+    /// <param name="id">The ID of the {{featureName}}</param>
+    /// <param name="resource">The updated {{featureName}} data</param>
+    /// <returns>The updated {{featureName}}</returns>
+    /// <response code="200">Returns the updated {{featureName}}</response>
+    /// <response code="404">If the {{featureName}} is not found</response>
+    [HttpPut("{id}")]
+    [ProducesResponseType(typeof({{featureName}}Resource), 200)]
+    [ProducesResponseType(typeof(ErrorResponse), 404)]
+    public async Task<ActionResult<{{featureName}}Resource>> Update(Guid id, [FromBody] Update{{featureName}}Resource resource)
+    {
+        _logger.LogInformation("Updating {{featureName}} with ID: {Id}, data: {@Resource}", id, resource);
+
+        var dto = {{featureName}}Mapper.ToDto(resource);
+        var updated{{featureName}} = await _domainFacade.Update{{featureName}}(id, dto);
+
+        var response = {{featureName}}Mapper.ToResource(updated{{featureName}});
+        _logger.LogInformation("Successfully updated {{featureName}} with ID: {Id}", id);
+        
+        return Ok(response);
+    }
+    {{/if}}
+
+    {{#if (includes operations "Delete")}}
+    /// <summary>
+    /// Deletes a {{featureName}}
+    /// </summary>
+    /// <param name="id">The ID of the {{featureName}}</param>
+    /// <returns>No content on success</returns>
+    /// <response code="204">If the {{featureName}} was deleted</response>
+    /// <response code="404">If the {{featureName}} is not found</response>
+    [HttpDelete("{id}")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType(typeof(ErrorResponse), 404)]
+    public async Task<ActionResult> Delete(Guid id)
+    {
+        _logger.LogInformation("Deleting {{featureName}} with ID: {Id}", id);
+
+        var deleted = await _domainFacade.Delete{{featureName}}(id);
+        if (!deleted)
+        {
+            _logger.LogWarning("{{featureName}} not found for deletion with ID: {Id}", id);
+            return NotFound(new ErrorResponse { Message = "{{featureName}} not found" });
+        }
+
+        _logger.LogInformation("Successfully deleted {{featureName}} with ID: {Id}", id);
+        return NoContent();
+    }
+    {{/if}}
+}

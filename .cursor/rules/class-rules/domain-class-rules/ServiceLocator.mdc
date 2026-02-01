@@ -1,0 +1,51 @@
+---
+description: "ACTIVE: ServiceLocator rules - Dependency resolution"
+globs: apps/api/Orchestrator.Domain/Managers/ServiceLocators/ServiceLocator*.cs
+alwaysApply: false
+---
+
+>>> CONTEXT LOADED: ServiceLocator best practices are now active <<<
+
+# ServiceLocator Best Practices
+
+## Purpose
+ServiceLocator provides **dependency resolution** within the Domain layer without external DI frameworks.
+
+## Requirements
+
+- **Inherit from ServiceLocatorBase**: Override `CreateConfigurationProviderCore()`
+- **Internal sealed class**: Implementation is internal
+- **Single responsibility**: Only create ConfigurationProvider
+- **Test variant**: `ServiceLocatorForAcceptanceTesting` in test project
+
+## Pattern
+
+```csharp
+internal sealed class ServiceLocator : ServiceLocatorBase
+{
+    protected override ConfigurationProviderBase CreateConfigurationProviderCore()
+    {
+        return new ConfigurationProvider();
+    }
+}
+```
+
+## ServiceLocatorBase Pattern
+
+```csharp
+internal abstract class ServiceLocatorBase
+{
+    public ConfigurationProviderBase CreateConfigurationProvider()
+    {
+        return CreateConfigurationProviderCore();
+    }
+
+    protected abstract ConfigurationProviderBase CreateConfigurationProviderCore();
+}
+```
+
+## Do NOT
+
+- Add other factory methods (keep focused on ConfigurationProvider)
+- Make ServiceLocator public
+- Use external DI containers in Domain layer

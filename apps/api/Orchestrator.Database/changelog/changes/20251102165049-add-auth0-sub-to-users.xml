@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="20251102165049-add-auth0-sub-to-users" author="system">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="users" columnName="auth0_sub"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="users">
+            <column name="auth0_sub" type="varchar(255)">
+                <constraints nullable="true" unique="true"/>
+            </column>
+        </addColumn>
+        <createIndex tableName="users" indexName="idx_users_auth0_sub">
+            <column name="auth0_sub"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>
+

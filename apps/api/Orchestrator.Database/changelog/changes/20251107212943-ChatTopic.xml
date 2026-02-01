@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="20251107212943-create-chat-topics-table" author="liquibase">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="chat_topics"/>
+            </not>
+        </preConditions>
+        <createTable tableName="chat_topics">
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="chat_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="topic_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="added_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        
+        <!-- Add foreign key constraints -->
+        <addForeignKeyConstraint 
+            constraintName="fk_chat_topics_chat_id"
+            baseTableName="chat_topics" 
+            baseColumnNames="chat_id"
+            referencedTableName="persona_chats"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        
+        <addForeignKeyConstraint 
+            constraintName="fk_chat_topics_topic_id"
+            baseTableName="chat_topics" 
+            baseColumnNames="topic_id"
+            referencedTableName="topics"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+        
+        <!-- Add indexes -->
+        <createIndex tableName="chat_topics" indexName="idx_chat_topics_chat_id">
+            <column name="chat_id"/>
+        </createIndex>
+        <createIndex tableName="chat_topics" indexName="idx_chat_topics_topic_id">
+            <column name="topic_id"/>
+        </createIndex>
+        
+        <!-- Add unique constraint for chat_id + topic_id combination -->
+        <createIndex tableName="chat_topics" indexName="idx_chat_topics_unique_chat_topic" unique="true">
+            <column name="chat_id"/>
+            <column name="topic_id"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>
+

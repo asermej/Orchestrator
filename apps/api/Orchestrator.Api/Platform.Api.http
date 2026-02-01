@@ -1,0 +1,57 @@
+@Platform_Api_HostAddress = http://localhost:5150
+
+GET {{Platform_Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+# ===== USER ENDPOINTS =====
+
+# Create a new User
+POST {{Platform_Api_HostAddress}}/api/v1/user
+Content-Type: application/json
+
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "email": "john.doe@example.com",
+  "phone": "+1-555-0123"
+}
+
+###
+
+# Get a User by ID (replace with actual ID from create response)
+GET {{Platform_Api_HostAddress}}/api/v1/user/00000000-0000-0000-0000-000000000000
+Accept: application/json
+
+###
+
+# Search Users with pagination
+GET {{Platform_Api_HostAddress}}/api/v1/user?lastName=Doe&pageNumber=1&pageSize=10
+Accept: application/json
+
+###
+
+# Search Users by email
+GET {{Platform_Api_HostAddress}}/api/v1/user?email=john.doe@example.com&pageNumber=1&pageSize=10
+Accept: application/json
+
+###
+
+# Update a User (replace with actual ID)
+PUT {{Platform_Api_HostAddress}}/api/v1/user/00000000-0000-0000-0000-000000000000
+Content-Type: application/json
+
+{
+  "firstName": "John Updated",
+  "lastName": "Doe Updated",
+  "email": "john.updated@example.com",
+  "phone": "+1-555-9999"
+}
+
+###
+
+# Delete a User (replace with actual ID)
+DELETE {{Platform_Api_HostAddress}}/api/v1/user/00000000-0000-0000-0000-000000000000
+
+###

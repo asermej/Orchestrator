@@ -1,0 +1,56 @@
+---
+description: "ACTIVE: DomainModel rules - Domain entity definitions"
+globs: apps/api/Orchestrator.Domain/Managers/Models/*.cs
+alwaysApply: false
+---
+
+>>> CONTEXT LOADED: DomainModel best practices are now active <<<
+
+# DomainModel Best Practices
+
+**Template**: [DomainModel.hbs](mdc:docs/technical/templates/domain-templates/DomainModel.hbs)
+
+## Purpose
+Domain models are **entity classes** that represent business objects. They inherit from `Entity` base class.
+
+## Requirements
+
+- **Inherit from Entity**: Provides `Id`, `CreatedAt`, `UpdatedAt`, `IsDeleted`
+- **Table attribute**: Use `[Table("snake_case_name")]` for Dapper mapping
+- **Column attributes**: Use `[Column("snake_case")]` on all properties
+- **Public class**: Models are public for use across layers
+- **Simple properties**: No business logic in models
+
+## Pattern
+
+```csharp
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace Orchestrator.Domain;
+
+[Table("features")]
+public class Feature : Entity
+{
+    [Column("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [Column("description")]
+    public string? Description { get; set; }
+
+    [Column("is_active")]
+    public bool IsActive { get; set; }
+}
+```
+
+## Entity Base Class Provides
+
+- `Id` (Guid) - Primary key
+- `CreatedAt` (DateTime) - Set by database
+- `UpdatedAt` (DateTime) - Set by database
+- `IsDeleted` (bool) - Soft delete flag
+
+## Do NOT
+
+- Add methods or business logic to models
+- Forget Column attributes (breaks Dapper mapping)
+- Use different naming than snake_case for database columns

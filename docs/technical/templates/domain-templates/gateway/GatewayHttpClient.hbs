@@ -1,0 +1,47 @@
+using System;
+using System.Net.Http;
+
+namespace Orchestrator.Domain;
+
+/// <summary>
+/// HTTP client wrapper for {{integrationName}} integration
+/// Provides configured HttpClient instance for external API calls
+/// </summary>
+internal sealed class {{integrationName}}HttpClient : IDisposable
+{
+    private readonly HttpClient _httpClient;
+    private readonly bool _disposeClient;
+
+    public {{integrationName}}HttpClient(HttpClient httpClient, bool disposeClient = true)
+    {
+        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        _disposeClient = disposeClient;
+    }
+
+    public HttpClient Client => _httpClient;
+
+    public static {{integrationName}}HttpClient Create(ServiceLocatorBase serviceLocator)
+    {
+        var config = serviceLocator.CreateConfigurationProvider();
+        var baseUrl = config.GetGatewayBaseUrl("{{integrationName}}");
+        var timeout = config.GetGatewayTimeout("{{integrationName}}");
+        var httpClient = serviceLocator.CreateHttpClient(baseUrl, timeout);
+        
+        // Set authentication header
+        var apiKey = config.GetGatewayApiKey("{{integrationName}}");
+        {{#if useApiKey}}
+        httpClient.DefaultRequestHeaders.Add("{{apiKeyHeaderName}}", apiKey);
+        {{/if}}
+        
+        return new {{integrationName}}HttpClient(httpClient);
+    }
+
+    public void Dispose()
+    {
+        if (_disposeClient)
+        {
+            _httpClient?.Dispose();
+        }
+    }
+}
+

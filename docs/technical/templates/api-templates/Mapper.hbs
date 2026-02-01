@@ -1,0 +1,174 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Orchestrator.DomainLayer;
+using Orchestrator.Api.ResourcesModels;
+using Orchestrator.Api.Common;
+
+namespace Orchestrator.Api.Mappers;
+
+/// <summary>
+/// Maps between domain models, DTOs, and resource models for {{featureName}}
+/// </summary>
+public static class {{featureName}}Mapper
+{
+    /// <summary>
+    /// Maps a domain model to a resource model
+    /// </summary>
+    /// <param name="domain">The domain model to map</param>
+    /// <returns>The mapped resource model, or null if the input is null</returns>
+    public static {{featureName}}Resource ToResource({{featureName}} domain)
+    {
+        if (domain == null)
+            return null;
+
+        return new {{featureName}}Resource
+        {
+            Id = domain.Id,
+            {{#each responseProperties}}
+            {{#unless (eq name 'Id')}}
+            {{name}} = domain.{{name}},
+            {{/unless}}
+            {{/each}}
+            CreatedAt = domain.CreatedAt,
+            UpdatedAt = domain.UpdatedAt
+        };
+    }
+
+    /// <summary>
+    /// Maps a collection of domain models to resource models
+    /// </summary>
+    /// <param name="domains">The domain models to map</param>
+    /// <returns>A collection of mapped resource models</returns>
+    public static IEnumerable<{{featureName}}Resource> ToResources(IEnumerable<{{featureName}}> domains)
+    {
+        return domains?.Select(ToResource) ?? Enumerable.Empty<{{featureName}}Resource>();
+    }
+
+    /// <summary>
+    /// Maps a create resource model to a create DTO
+    /// </summary>
+    /// <param name="resource">The resource model to map</param>
+    /// <returns>The mapped DTO, or null if the input is null</returns>
+    public static Create{{featureName}}Dto ToDto(Create{{featureName}}Resource resource)
+    {
+        if (resource == null)
+            return null;
+
+        return new Create{{featureName}}Dto
+        {
+            {{#each inputProperties}}
+            {{name}} = resource.{{name}},
+            {{/each}}
+        };
+    }
+
+    /// <summary>
+    /// Maps an update resource model to an update DTO
+    /// </summary>
+    /// <param name="resource">The resource model to map</param>
+    /// <returns>The mapped DTO, or null if the input is null</returns>
+    public static Update{{featureName}}Dto ToDto(Update{{featureName}}Resource resource)
+    {
+        if (resource == null)
+            return null;
+
+        return new Update{{featureName}}Dto
+        {
+            {{#each inputProperties}}
+            {{name}} = resource.{{name}},
+            {{/each}}
+            Version = resource.Version
+        };
+    }
+
+    /// <summary>
+    /// Maps a search request to search criteria
+    /// </summary>
+    /// <param name="request">The search request to map</param>
+    /// <returns>The mapped search criteria, or null if the input is null</returns>
+    public static Search{{featureName}}Criteria ToCriteria(Search{{featureName}}Request request)
+    {
+        if (request == null)
+            return null;
+
+        return new Search{{featureName}}Criteria
+        {
+            SearchTerm = request.SearchTerm,
+            {{#each filterableProperties}}
+            {{name}} = request.{{name}},
+            {{/each}}
+            CreatedAtRange = request.CreatedAtRange,
+            UpdatedAtRange = request.UpdatedAtRange,
+            PageNumber = request.PageNumber,
+            PageSize = request.PageSize,
+            SortBy = request.SortBy,
+            SortDescending = request.SortDescending,
+            IncludeDeleted = request.IncludeDeleted
+        };
+    }
+
+    /// <summary>
+    /// Maps a paginated result of domain models to a paginated result of resource models
+    /// </summary>
+    /// <param name="result">The paginated result to map</param>
+    /// <returns>A paginated result containing the mapped resource models</returns>
+    public static PaginatedResult<{{featureName}}Resource> ToPaginatedResult(PaginatedResult<{{featureName}}> result)
+    {
+        if (result == null)
+            return null;
+
+        return new PaginatedResult<{{featureName}}Resource>
+        {
+            Items = ToResources(result.Items),
+            TotalCount = result.TotalCount,
+            PageNumber = result.PageNumber,
+            PageSize = result.PageSize
+        };
+    }
+
+    /// <summary>
+    /// Maps a result of a domain model to a result of a resource model
+    /// </summary>
+    /// <param name="result">The result to map</param>
+    /// <returns>A result containing the mapped resource model</returns>
+    public static Result<{{featureName}}Resource> ToResult(Result<{{featureName}}> result)
+    {
+        if (result == null)
+            return null;
+
+        return result.IsSuccess
+            ? Result<{{featureName}}Resource>.Success(ToResource(result.Value))
+            : Result<{{featureName}}Resource>.Failure(result.Error);
+    }
+
+    /// <summary>
+    /// Maps a result of a collection of domain models to a result of a collection of resource models
+    /// </summary>
+    /// <param name="result">The result to map</param>
+    /// <returns>A result containing the mapped resource models</returns>
+    public static Result<IEnumerable<{{featureName}}Resource>> ToResult(Result<IEnumerable<{{featureName}}>> result)
+    {
+        if (result == null)
+            return null;
+
+        return result.IsSuccess
+            ? Result<IEnumerable<{{featureName}}Resource>>.Success(ToResources(result.Value))
+            : Result<IEnumerable<{{featureName}}Resource>>.Failure(result.Error);
+    }
+
+    /// <summary>
+    /// Maps a result of a paginated result of domain models to a result of a paginated result of resource models
+    /// </summary>
+    /// <param name="result">The result to map</param>
+    /// <returns>A result containing the mapped paginated result of resource models</returns>
+    public static Result<PaginatedResult<{{featureName}}Resource>> ToResult(Result<PaginatedResult<{{featureName}}>> result)
+    {
+        if (result == null)
+            return null;
+
+        return result.IsSuccess
+            ? Result<PaginatedResult<{{featureName}}Resource>>.Success(ToPaginatedResult(result.Value))
+            : Result<PaginatedResult<{{featureName}}Resource>>.Failure(result.Error);
+    }
+}

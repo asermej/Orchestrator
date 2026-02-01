@@ -1,0 +1,38 @@
+using System;
+using System.Linq;
+
+namespace Orchestrator.Domain;
+
+/// <summary>
+/// Maps between domain models and {{integrationName}} resource models
+/// </summary>
+internal static class {{integrationName}}Mapper
+{
+    {{#each mappings}}
+    /// <summary>
+    /// Maps {{fromDescription}} to {{toDescription}}
+    /// </summary>
+    public static {{toType}} To{{toType}}({{fromType}} {{camelCase fromType}})
+    {
+        if ({{camelCase fromType}} == null)
+            {{#if (eq toType "string")}}
+            return string.Empty;
+            {{else if (eq toType "int")}}
+            return 0;
+            {{else}}
+            throw new ArgumentNullException(nameof({{camelCase fromType}}));
+            {{/if}}
+
+        return new {{toType}}
+        {
+            {{#each propertyMappings}}
+            {{toProperty}} = {{#if conversion}}{{conversion}}{{else}}{{camelCase ../fromType}}.{{fromProperty}}{{/if}},
+            {{/each}}
+        };
+    }
+    {{#unless @last}}
+
+    {{/unless}}
+    {{/each}}
+}
+

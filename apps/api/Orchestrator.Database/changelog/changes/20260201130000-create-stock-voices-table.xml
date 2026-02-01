@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="20260201130000-create-stock-voices-table" author="liquibase">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="stock_voices"/>
+            </not>
+        </preConditions>
+        <comment>Curated stock voices for Choose a voice (ElevenLabs IDs)</comment>
+        <createTable tableName="stock_voices">
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="voice_id" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="varchar(1000)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="tags" type="varchar(500)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="preview_text" type="varchar(500)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="sort_order" type="int" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="stock_voices" indexName="idx_stock_voices_sort_order">
+            <column name="sort_order"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

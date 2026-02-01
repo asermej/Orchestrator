@@ -1,0 +1,51 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: Critical naming conventions and best practices for Liquibase migrations
+keywords: ["liquibase", "naming", "timestamp", "changeset", "migration", "best practices"]
+applies_to: ["Orchestrator.Database"]
+alwaysApply: true
+priority: 900
+triggers: ["liquibase", "changeset", "migration", "filename", "timestamp"]
+related_files: ["database-workflow.mdc"]
+---
+
+# 🏷️ Liquibase Best Practices
+
+**CRITICAL NAMING RULES**: These conventions are MANDATORY and prevent merge conflicts and deployment issues.
+
+## Required Naming Conventions
+
+- **Changelog Filename MUST Use a Timestamp**
+    - All new changelog files created in `Orchestrator.Database/changelog/changes/` must follow the format `<timestamp>-FeatureName.xml`.
+    - The timestamp should be generated using `YYYYMMDDHHMMSS`.
+    - **❌ DON'T**: Do not use sequential or simple numeric prefixes (e.g., `002-feature.xml`, `003-another-feature.xml`). This leads to merge conflicts and ambiguity.
+    - **✅ DO**: Use a full, unique timestamp as the prefix (e.g., `20250621224920-User.xml`).
+
+- **Changeset IDs MUST Be Globally Unique**
+    - The `id` attribute of every `<changeSet>` tag must be unique across the *entire* project, not just within its own file.
+    - To guarantee uniqueness, the ID must also start with the same timestamp used in the filename.
+    - **❌ DON'T**: Do not use generic, reusable IDs like `id="create-users-table"`. This will cause migration failures when another developer uses the same ID.
+    - **✅ DO**: Use a descriptive ID prefixed with the timestamp, like `id="20250621224920-create-users-table"`.
+
+- **Example of Correct Implementation:**
+
+  ```xml
+  <!-- File: Orchestrator.Database/changelog/changes/20250621224920-User.xml -->
+  <databaseChangeLog ...>
+      <changeSet id="20250621224920-create-users-table" author="your-name">
+          <createTable tableName="users">
+              <!-- ... columns ... -->
+          </createTable>
+      </changeSet>
+
+      <changeSet id="20250621224920-create-addresses-table" author="your-name">
+          <createTable tableName="addresses">
+              <!-- ... columns ... -->
+          </createTable>
+      </changeSet>
+  </databaseChangeLog>
+  ```

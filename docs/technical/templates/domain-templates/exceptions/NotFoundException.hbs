@@ -1,0 +1,21 @@
+namespace Orchestrator.Domain;
+
+public class {{featureName}}NotFoundException : NotFoundBaseException
+{
+    public override string Reason => "{{featureName}} not found";
+
+    public {{featureName}}NotFoundException(string message) : base(message)
+    {
+    }
+
+    public {{featureName}}NotFoundException(string message, Exception innerException) : base(message, innerException)
+    {
+    }
+} 
+
+
+
+
+
+
+

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:pro="http://www.liquibase.org/xml/ns/pro"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd
+        http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-latest.xsd">
+
+    <include file="changes/001-initial-schema.xml" relativeToChangelogFile="true"/>
+    <include file="changes/002-add-entity-columns.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20250721164527-User.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20250803221140-drop-personas-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251101191839-Persona.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251102211018-PersonaChat.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251101212808-ChatMessage.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251102165049-add-auth0-sub-to-users.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251102194839-make-user-names-optional.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251107205122-Topic.xml" relativeToChangelogFile="true"/>
+    <!-- PersonaTopic table removed in favor of direct topic ownership - see 20251108224220-refactor-topics-remove-persona-topic.xml -->
+    <!-- <include file="changes/20251107205908-PersonaTopic.xml" relativeToChangelogFile="true"/> -->
+    <include file="changes/20251107212943-ChatTopic.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251107213332-add-training-file-path-to-personas.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251108000000-fix-topic-created-by-type.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251108003338-Category.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251108004033-PersonaCategory.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251108004519-AddCategoryToTopics.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251108025302-insert-general-category.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251108025322-create-tags-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251108025336-create-topic-tags-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251108025352-update-topics-category-not-null.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251108033228-rename-persona-chats-to-chats.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251108044047-rename-chat-messages-to-messages.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251108205501-add-profile-image-to-users.xml" relativeToChangelogFile="true"/>
+    <!-- 20251108223132-add-persona-id-to-topics.xml superseded by comprehensive refactor below -->
+    <include file="changes/20251108224220-refactor-topics-remove-persona-topic.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251108230840-fix-created-by-type.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251110000000-fix-persona-display-name-unique-constraint.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251110000001-expand-topic-content-fields.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251109221220-clean-topic-content-urls.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251109221256-add-content-url-constraint.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20251112185859-make-topic-content-required.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260131120000-add-voice-config-to-personas.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260201120000-add-voice-metadata-to-personas.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260201120001-create-consent-audit-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260201120002-create-voice-clone-jobs-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260201130000-create-stock-voices-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260201130001-seed-stock-voices.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260201140000-add-style-lane-to-voice-clone-jobs.xml" relativeToChangelogFile="true"/>
+</databaseChangeLog> 

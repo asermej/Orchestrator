@@ -1,0 +1,18 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace Orchestrator.DomainLayer;
+
+public partial class DataFacade
+{
+    private readonly string _dbConnectionString;
+
+    internal DataFacade(string dbConnectionString)
+    {
+        _dbConnectionString = dbConnectionString;
+    }
+}
+
+
+

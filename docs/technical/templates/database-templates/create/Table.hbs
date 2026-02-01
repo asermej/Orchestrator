@@ -1,0 +1,81 @@
+{{!-- 
+Template: Database Table Creation
+Description: Generates a Liquibase changeset for creating a new table with audit fields, indexes, and constraints
+Usage: Used in Phase 2 of database-workflow.mdc
+Variables:
+  - timestamp: UTC timestamp for changeset ID (e.g., "20250621224920")
+  - tableName: The database table name in snake_case (e.g., "customers")
+  - schema: Database schema name (default: "public")
+  - properties: Array of column definitions with name, type, and constraints
+  - searchableProperties: Array of properties that need indexes
+  - hasAuditFields: Boolean to include version and status columns
+  - hasUniqueConstraints: Boolean to add unique constraints
+Generated File: Platform.Database/changelog/changes/{timestamp}-create-{tableName}-table.xml
+--}}
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="{{timestamp}}-create-{{tableName}}-table" author="api-generator">
+        <createTable tableName="{{tableName}}" schemaName="{{schema}}">
+            <column name="id" type="int" autoIncrement="true">
+                <constraints primaryKey="true"/>
+            </column>
+            {{#each properties}}
+            <column name="{{snakeCase name}}" type="{{mapToSqlType type}}"{{#if defaultValue}} defaultValue="{{defaultValue}}"{{/if}}>
+                {{#if (eq constraints "not null")}}
+                <constraints nullable="false"/>
+                {{else if (eq constraints "unique")}}
+                <constraints unique="true"/>
+                {{else if (eq constraints "primary key")}}
+                <constraints primaryKey="true"/>
+                {{/if}}
+            </column>
+            {{/each}}
+            <column name="created_at" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp"/>
+            <column name="created_by" type="varchar(100)"/>
+            <column name="updated_by" type="varchar(100)"/>
+            <column name="is_deleted" type="boolean" defaultValueBoolean="false"/>
+            <column name="deleted_at" type="timestamp"/>
+            <column name="deleted_by" type="varchar(100)"/>
+            {{#if hasAuditFields}}
+            <column name="version" type="int" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="varchar(50)" defaultValue="Active">
+                <constraints nullable="false"/>
+            </column>
+            {{/if}}
+        </createTable>
+
+        <!-- Create indexes for better performance -->
+        {{#each searchableProperties}}
+        <createIndex tableName="{{../tableName}}" schemaName="{{../schema}}" indexName="idx_{{../tableName}}_{{snakeCase name}}">
+            <column name="{{snakeCase name}}"/>
+        </createIndex>
+        {{/each}}
+
+        <createIndex tableName="{{tableName}}" schemaName="{{schema}}" indexName="idx_{{tableName}}_created_at">
+            <column name="created_at"/>
+        </createIndex>
+
+        <createIndex tableName="{{tableName}}" schemaName="{{schema}}" indexName="idx_{{tableName}}_is_deleted">
+            <column name="is_deleted"/>
+        </createIndex>
+
+        {{#if hasUniqueConstraints}}
+        <!-- Add unique constraints -->
+        {{#each uniqueProperties}}
+        <addUniqueConstraint tableName="{{../tableName}}" schemaName="{{../schema}}" columnNames="{{snakeCase name}}" constraintName="uk_{{../tableName}}_{{snakeCase name}}"/>
+        {{/each}}
+        {{/if}}
+    </changeSet>
+
+</databaseChangeLog>
+

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="20251108230840-fix-categories-created-by-type" author="system">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="categories" columnName="created_by"/>
+        </preConditions>
+        <comment>Fix created_by column type to match Entity model (varchar) and other audit fields</comment>
+        
+        <!-- Modify the created_by column from UUID to varchar(100) to match Entity model -->
+        <modifyDataType tableName="categories" columnName="created_by" newDataType="varchar(100)"/>
+    </changeSet>
+
+</databaseChangeLog>
+

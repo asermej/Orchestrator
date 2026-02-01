@@ -1,0 +1,44 @@
+---
+description: "ACTIVE: GatewayFacade rules - External API integration entry point"
+globs: apps/api/Orchestrator.Domain/Gateways/GatewayFacade*.cs
+alwaysApply: false
+---
+
+>>> CONTEXT LOADED: GatewayFacade best practices are now active <<<
+
+# GatewayFacade Best Practices
+
+**Template**: [GatewayFacade.Base.hbs](mdc:docs/technical/templates/domain-templates/gateway/GatewayFacade.Base.hbs)
+
+## Purpose
+GatewayFacade provides **business-focused methods** that shield the domain from external API details.
+
+## Requirements
+
+- **Partial class structure**: Use `GatewayFacade.{Integration}.cs` files
+- **Lazy initialization**: Use `??=` pattern for gateway manager instantiation
+- **IDisposable**: Implement dispose pattern
+- **Business-focused methods**: Abstract away external API complexity
+- **ConfigureAwait(false)**: Use on all async calls
+
+## Pattern
+
+```csharp
+public sealed partial class GatewayFacade : IDisposable
+{
+    private readonly ServiceLocatorBase _serviceLocator;
+    private OpenAIManager? _openAIManager;
+    private OpenAIManager OpenAIManager => _openAIManager ??= new OpenAIManager(_serviceLocator);
+
+    public async Task<string> GenerateChatCompletion(string prompt, string model)
+    {
+        return await OpenAIManager.GenerateChatCompletion(prompt, model).ConfigureAwait(false);
+    }
+}
+```
+
+## Do NOT
+
+- Expose raw external API models (use domain-specific models)
+- Put HTTP/API logic in facade (belongs in gateway managers)
+- Forget to dispose gateway managers

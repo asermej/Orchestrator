@@ -1,0 +1,243 @@
+{{!-- This template is used to update properties in existing files --}}
+{{!-- It reads the existing file and updates properties based on the changes specified --}}
+
+{{!-- For DomainModel --}}
+{{#if (eq fileType "DomainModel")}}
+// ... existing code ...
+
+{{#each properties}}
+{{#if isNew}}
+    /// <summary>
+    /// {{description}}
+    /// </summary>
+    {{#if validation}}
+    [{{validation}}]
+    {{/if}}
+    public {{type}} {{name}} { get; set; }
+{{/if}}
+
+{{#if isUpdated}}
+    /// <summary>
+    /// {{description}}
+    /// </summary>
+    {{#if validation}}
+    [{{validation}}]
+    {{/if}}
+    public {{type}} {{name}} { get; set; }
+{{/if}}
+{{/each}}
+{{/if}}
+
+{{!-- For ResourceModel --}}
+{{#if (eq fileType "ResourceModel")}}
+// ... existing code ...
+
+{{#each properties}}
+{{#if isNew}}
+    /// <summary>
+    /// {{description}}
+    /// </summary>
+    {{#if validation}}
+    [{{validation}}]
+    {{/if}}
+    public {{type}} {{name}} { get; set; }
+{{/if}}
+
+{{#if isUpdated}}
+    /// <summary>
+    /// {{description}}
+    /// </summary>
+    {{#if validation}}
+    [{{validation}}]
+    {{/if}}
+    public {{type}} {{name}} { get; set; }
+{{/if}}
+{{/each}}
+
+{{!-- Update Create{{featureName}}Resource --}}
+public class Create{{featureName}}Resource
+{
+    // ... existing properties ...
+
+    {{#each properties}}
+    {{#if isNew}}
+    /// <summary>
+    /// {{description}}
+    /// </summary>
+    [Required(ErrorMessage = "{{name}} is required")]
+    {{#if validation}}
+    [{{validation}}]
+    {{/if}}
+    public {{type}} {{name}} { get; set; }
+    {{/if}}
+    {{/each}}
+}
+
+{{!-- Update Update{{featureName}}Resource --}}
+public class Update{{featureName}}Resource
+{
+    // ... existing properties ...
+
+    {{#each properties}}
+    {{#if isNew}}
+    /// <summary>
+    /// {{description}}
+    /// </summary>
+    {{#if validation}}
+    [{{validation}}]
+    {{/if}}
+    public {{type}}? {{name}} { get; set; }
+    {{/if}}
+
+    {{#if isUpdated}}
+    /// <summary>
+    /// {{description}}
+    /// </summary>
+    {{#if validation}}
+    [{{validation}}]
+    {{/if}}
+    public {{type}}? {{name}} { get; set; }
+    {{/if}}
+    {{/each}}
+}
+
+{{!-- Update Search{{featureName}}Request --}}
+public class Search{{featureName}}Request : PaginatedRequest
+{
+    // ... existing properties ...
+
+    {{#each properties}}
+    {{#if isNew}}
+    /// <summary>
+    /// Filter by {{name}}
+    /// </summary>
+    public {{type}}? {{name}} { get; set; }
+    {{/if}}
+
+    {{#if isUpdated}}
+    /// <summary>
+    /// Filter by {{name}}
+    /// </summary>
+    public {{type}}? {{name}} { get; set; }
+    {{/if}}
+    {{/each}}
+}
+{{/if}}
+
+{{!-- For Validator --}}
+{{#if (eq fileType "Validator")}}
+// ... existing code ...
+
+{{!-- Update Create{{featureName}}ResourceValidator --}}
+public class Create{{featureName}}ResourceValidator : AbstractValidator<Create{{featureName}}Resource>
+{
+    public Create{{featureName}}ResourceValidator()
+    {
+        // ... existing rules ...
+
+        {{#each properties}}
+        {{#if isNew}}
+        RuleFor(x => x.{{name}})
+            {{#if validation}}
+            {{#each validationRules}}
+            .{{this}}
+            {{/each}}
+            {{/if}}
+            .WithMessage("{{name}} is required");
+        {{/if}}
+
+        {{#if isUpdated}}
+        RuleFor(x => x.{{name}})
+            {{#if validation}}
+            {{#each validationRules}}
+            .{{this}}
+            {{/each}}
+            {{/if}}
+            .WithMessage("{{name}} is required");
+        {{/if}}
+        {{/each}}
+    }
+}
+
+{{!-- Update Update{{featureName}}ResourceValidator --}}
+public class Update{{featureName}}ResourceValidator : AbstractValidator<Update{{featureName}}Resource>
+{
+    public Update{{featureName}}ResourceValidator()
+    {
+        // ... existing rules ...
+
+        {{#each properties}}
+        {{#if isNew}}
+        RuleFor(x => x.{{name}})
+            {{#if validation}}
+            {{#each validationRules}}
+            .{{this}}
+            {{/each}}
+            {{/if}};
+        {{/if}}
+
+        {{#if isUpdated}}
+        RuleFor(x => x.{{name}})
+            {{#if validation}}
+            {{#each validationRules}}
+            .{{this}}
+            {{/each}}
+            {{/if}};
+        {{/if}}
+        {{/each}}
+    }
+}
+{{/if}}
+
+{{!-- For Mapper --}}
+{{#if (eq fileType "Mapper")}}
+// ... existing code ...
+
+public static class {{featureName}}Mapper
+{
+    public static {{featureName}}Resource ToResource({{featureName}} domain)
+    {
+        if (domain == null)
+            return null;
+
+        return new {{featureName}}Resource
+        {
+            Id = domain.Id,
+            {{#each properties}}
+            {{#unless (eq name 'Id')}}
+            {{name}} = domain.{{name}},
+            {{/unless}}
+            {{/each}}
+            CreatedAt = domain.CreatedAt,
+            UpdatedAt = domain.UpdatedAt
+        };
+    }
+
+    public static Create{{featureName}}Dto ToDto(Create{{featureName}}Resource resource)
+    {
+        if (resource == null)
+            return null;
+
+        return new Create{{featureName}}Dto
+        {
+            {{#each properties}}
+            {{name}} = resource.{{name}},
+            {{/each}}
+        };
+    }
+
+    public static Update{{featureName}}Dto ToDto(Update{{featureName}}Resource resource)
+    {
+        if (resource == null)
+            return null;
+
+        return new Update{{featureName}}Dto
+        {
+            {{#each properties}}
+            {{name}} = resource.{{name}},
+            {{/each}}
+            Version = resource.Version
+        };
+    }
+}
+{{/if}}

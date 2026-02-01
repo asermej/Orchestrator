@@ -1,0 +1,21 @@
+namespace Orchestrator.Domain;
+
+public class {{featureName}}Duplicate{{fieldName}}Exception : BusinessBaseException
+{
+    public override string Reason => "{{featureName}} {{fieldName}} already exists";
+
+    public {{featureName}}Duplicate{{fieldName}}Exception(string message) : base(message)
+    {
+    }
+
+    public {{featureName}}Duplicate{{fieldName}}Exception(string message, Exception innerException) : base(message, innerException)
+    {
+    }
+} 
+
+
+
+
+
+
+

@@ -1,0 +1,61 @@
+---
+description: "ACTIVE: DataManager rules - SQL data access implementation"
+globs: apps/api/Orchestrator.Domain/Managers/DataLayer/DataManagers/*DataManager.cs
+alwaysApply: false
+---
+
+>>> CONTEXT LOADED: DataManager best practices are now active <<<
+
+# DataManager Best Practices
+
+**Template**: [DataManager.hbs](mdc:docs/technical/templates/domain-templates/database/DataManager.hbs)
+
+**Related Guides**:
+- [Column Mapping](mdc:docs/technical/reference/guides/domain-guides/database/column-mapping.md) - Dapper snake_case to PascalCase mapping
+- [Dapper Configuration](mdc:docs/technical/reference/guides/domain-guides/database/dapper-configuration.md) - Configuration reference
+- [Timezone Handling](mdc:docs/technical/reference/guides/domain-guides/database/timezone-handling.md) - UTC datetime handling in SQL
+- [Pagination](mdc:docs/technical/reference/guides/common-guides/pagination.md) - Search and pagination patterns
+
+## Purpose
+DataManagers handle **all SQL queries** for a domain entity using Dapper.
+
+## Requirements
+
+- **Internal sealed class**: Never expose publicly
+- **Connection string in constructor**: Store for creating connections
+- **Configure Dapper mapping**: Call `DapperConfiguration.ConfigureSnakeCaseMapping<T>()` in constructor
+- **Parameterized queries ONLY**: Never concatenate SQL strings
+- **Using statements**: Always dispose NpgsqlConnection
+- **Soft delete**: Use `is_deleted = false` in WHERE clauses
+
+## Pattern
+
+```csharp
+internal sealed class FeatureDataManager
+{
+    private readonly string _dbConnectionString;
+
+    public FeatureDataManager(string dbConnectionString)
+    {
+        _dbConnectionString = dbConnectionString;
+        DapperConfiguration.ConfigureSnakeCaseMapping<Feature>();
+    }
+
+    public async Task<Feature?> GetById(Guid id)
+    {
+        const string sql = @"
+            SELECT id, name, created_at, updated_at, is_deleted
+            FROM features
+            WHERE id = @id AND is_deleted = false";
+        using var connection = new NpgsqlConnection(_dbConnectionString);
+        return await connection.QueryFirstOrDefaultAsync<Feature>(sql, new { id });
+    }
+}
+```
+
+## Do NOT
+
+- Use string concatenation for SQL (SQL injection risk)
+- Forget `is_deleted = false` in queries
+- Add business logic (belongs in Manager)
+- Handle exceptions (let them propagate)

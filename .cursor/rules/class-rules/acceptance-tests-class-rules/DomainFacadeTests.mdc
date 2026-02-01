@@ -1,0 +1,58 @@
+---
+description: "ACTIVE: DomainFacadeTests rules - Acceptance testing through DomainFacade"
+globs: apps/api/Orchestrator.AcceptanceTests/Domain/DomainFacadeTests*.cs
+alwaysApply: false
+---
+
+>>> CONTEXT LOADED: DomainFacadeTests best practices are now active <<<
+
+# DomainFacadeTests Best Practices
+
+**Template**: [DomainFacadeTests.Base.hbs](mdc:docs/technical/templates/acceptance-test-templates/DomainFacadeTests.Base.hbs)
+
+**Related Guides**:
+- [Test Cleanup Guide](mdc:docs/technical/reference/guides/acceptance-test-guides/test-cleanup.md) - Database cleanup patterns and test isolation
+
+## Purpose
+Acceptance tests verify business logic **exclusively through DomainFacade**. Never test managers, data managers, or validators directly.
+
+## Requirements
+
+- **Test ONLY through DomainFacade**: Black-box testing of domain logic
+- **Real database**: Use `ServiceLocatorForAcceptanceTesting` with real test database
+- **Cleanup before AND after**: Database-level cleanup for test isolation
+- **Pattern-based cleanup**: Identify test data by patterns (e.g., `@example.com`, `Test*`)
+- **No external mocking frameworks**: Use custom test doubles only
+
+## Pattern
+
+```csharp
+[TestClass]
+public class DomainFacadeTestsFeature
+{
+    private DomainFacade _domainFacade;
+    private string _connectionString;
+
+    [TestInitialize]
+    public void TestInitialize()
+    {
+        var serviceLocator = new ServiceLocatorForAcceptanceTesting();
+        _domainFacade = new DomainFacade(serviceLocator);
+        _connectionString = serviceLocator.CreateConfigurationProvider().GetDbConnectionString();
+        CleanupAllTestData();
+    }
+
+    [TestCleanup]
+    public void TestCleanup()
+    {
+        CleanupAllTestData();
+        _domainFacade?.Dispose();
+    }
+}
+```
+
+## Do NOT
+
+- Test managers, validators, or data managers directly
+- Use external mocking frameworks (Moq, NSubstitute, etc.)
+- Leave test data in the database

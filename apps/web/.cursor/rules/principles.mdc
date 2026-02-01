@@ -1,0 +1,10 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+## Overview
+This document contains the foundational principles that govern the architecture and implementation of all frontend web applications. It is the single source of truth for architectural boundaries, component structure, design system, api interactions, and testing.
+
+---
+

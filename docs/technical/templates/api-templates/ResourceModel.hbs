@@ -1,0 +1,102 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using Orchestrator.Api.Common;
+
+namespace Orchestrator.Api.ResourcesModels;
+
+/// <summary>
+/// Represents a {{featureName}} in API responses
+/// </summary>
+public class {{featureName}}Resource
+{
+    /// <summary>
+    /// The unique identifier of the {{featureName}}
+    /// </summary>
+    public Guid Id { get; set; }
+
+    {{#each responseProperties}}
+    {{#unless (eq name 'Id')}}
+    /// <summary>
+    /// {{description}}
+    /// </summary>
+    public {{type}} {{name}} { get; set; }{{#if_eq type "string"}} = string.Empty;{{/if_eq}}
+    {{/unless}}
+    {{/each}}
+
+    /// <summary>
+    /// When this {{featureName}} was created
+    /// </summary>
+    public DateTime CreatedAt { get; set; }
+
+    /// <summary>
+    /// When this {{featureName}} was last updated
+    /// </summary>
+    public DateTime? UpdatedAt { get; set; }
+}
+
+/// <summary>
+/// Request model for creating a new {{featureName}}
+/// </summary>
+public class Create{{featureName}}Resource
+{
+    {{#each inputProperties}}
+    /// <summary>
+    /// {{description}}
+    /// </summary>
+    [Required(ErrorMessage = "{{name}} is required")]
+    public {{type}} {{name}} { get; set; }
+    {{/each}}
+}
+
+/// <summary>
+/// Request model for updating an existing {{featureName}}
+/// </summary>
+public class Update{{featureName}}Resource
+{
+    {{#each inputProperties}}
+    /// <summary>
+    /// {{description}}
+    /// </summary>
+    public {{type}}? {{name}} { get; set; }
+    {{/each}}
+}
+
+/// <summary>
+/// Request model for searching {{featureName}}s
+/// </summary>
+public class Search{{featureName}}Request : PaginatedRequest
+{
+    {{#each filterableProperties}}
+    /// <summary>
+    /// Filter by {{name}}
+    /// </summary>
+    public {{type}}? {{name}} { get; set; }
+    {{/each}}
+
+    /// <summary>
+    /// Filter by date range
+    /// </summary>
+    public DateTimeRange? CreatedAtRange { get; set; }
+
+    /// <summary>
+    /// Filter by date range
+    /// </summary>
+    public DateTimeRange? UpdatedAtRange { get; set; }
+}
+
+/// <summary>
+/// Represents a date range for filtering
+/// </summary>
+public class DateTimeRange
+{
+    /// <summary>
+    /// The start of the date range (inclusive)
+    /// </summary>
+    public DateTime? From { get; set; }
+
+    /// <summary>
+    /// The end of the date range (inclusive)
+    /// </summary>
+    public DateTime? To { get; set; }
+}

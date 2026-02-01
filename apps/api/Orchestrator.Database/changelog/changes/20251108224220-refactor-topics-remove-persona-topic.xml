@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="20251108224220-refactor-topics-remove-persona-topic" author="system">
+        <!-- Step 1: Add persona_id column if it doesn't exist -->
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="topics" columnName="persona_id"/>
+            </not>
+        </preConditions>
+        <comment>Refactor topics to include training content directly and remove persona_topics join table</comment>
+        
+        <addColumn tableName="topics">
+            <column name="persona_id" type="UUID">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20251108224220-add-training-columns" author="system">
+        <comment>Add training content columns to topics table</comment>
+        
+        <!-- Step 2: Add new columns to topics table -->
+        <addColumn tableName="topics">
+            <column name="content_url" type="varchar(1000)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+        
+        <addColumn tableName="topics">
+            <column name="contribution_notes" type="varchar(500)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20251108224220-migrate-persona-topic-data" author="system">
+        <comment>Migrate data from persona_topics to topics</comment>
+        
+        <!-- Step 3: Migrate data from persona_topics to topics -->
+        <!-- For each topic that has a persona_topic entry, update the topic with that data -->
+        <sql>
+            UPDATE topics t
+            SET 
+                content_url = pt.content_url,
+                contribution_notes = pt.contribution_notes,
+                persona_id = pt.persona_id
+            FROM persona_topics pt
+            WHERE t.id = pt.topic_id
+            AND pt.is_deleted = false;
+        </sql>
+    </changeSet>
+
+    <changeSet id="20251108224220-cleanup-and-constraints" author="system">
+        <comment>Apply constraints and drop old table</comment>
+        
+        <!-- Step 4: Delete any topics that don't have a persona_id (orphaned topics) -->
+        <sql>
+            DELETE FROM topics WHERE persona_id IS NULL;
+        </sql>
+
+        <!-- Step 5: Make persona_id NOT NULL -->
+        <addNotNullConstraint 
+            tableName="topics" 
+            columnName="persona_id" 
+            columnDataType="UUID"/>
+
+        <!-- Step 6: Make content_url NOT NULL (since all topics should have training content) -->
+        <addNotNullConstraint 
+            tableName="topics" 
+            columnName="content_url" 
+            columnDataType="varchar(1000)"/>
+    </changeSet>
+
+    <changeSet id="20251108224220-drop-is-public" author="system">
+        <!-- Step 7: Drop is_public column if it exists -->
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="topics" columnName="is_public"/>
+        </preConditions>
+        <comment>Drop is_public column from topics</comment>
+        
+        <dropColumn tableName="topics" columnName="is_public"/>
+    </changeSet>
+
+    <changeSet id="20251108224220-drop-persona-topics" author="system">
+        <!-- Step 8: Drop persona_topics table (no longer needed) -->
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="persona_topics"/>
+        </preConditions>
+        <comment>Drop persona_topics table</comment>
+        
+        <dropTable tableName="persona_topics" cascadeConstraints="true"/>
+    </changeSet>
+
+    <changeSet id="20251108224220-add-persona-index" author="system">
+        <!-- Step 9: Add index for persona_id if not exists -->
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists tableName="topics" indexName="idx_topics_persona_id"/>
+            </not>
+        </preConditions>
+        <comment>Add index for persona_id</comment>
+        
+        <createIndex tableName="topics" indexName="idx_topics_persona_id" unique="false">
+            <column name="persona_id"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>
+

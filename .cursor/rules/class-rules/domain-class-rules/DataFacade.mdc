@@ -1,0 +1,40 @@
+---
+description: "ACTIVE: DataFacade rules - Internal data access entry point"
+globs: apps/api/Orchestrator.Domain/Managers/DataLayer/DataFacade*.cs
+alwaysApply: false
+---
+
+>>> CONTEXT LOADED: DataFacade best practices are now active <<<
+
+# DataFacade Best Practices
+
+**Template**: [DataFacade.hbs](mdc:docs/technical/templates/domain-templates/database/DataFacade.hbs)
+
+## Purpose
+The `DataFacade` is the **single internal entry point** for data access. Used by managers to interact with DataManagers.
+
+## Requirements
+
+- **Internal class**: Never expose publicly
+- **Partial class structure**: Use `DataFacade.{Feature}.cs` files to organize by feature
+- **Lazy initialization**: Use `??=` pattern for DataManager instantiation
+- **Pass connection string**: DataManagers receive the connection string from DataFacade
+- **No business logic**: Pure data access delegation
+
+## Pattern
+
+```csharp
+internal sealed partial class DataFacade
+{
+    private readonly string _dbConnectionString;
+    private FeatureDataManager? _featureDataManager;
+    private FeatureDataManager FeatureDataManager => 
+        _featureDataManager ??= new FeatureDataManager(_dbConnectionString);
+}
+```
+
+## Do NOT
+
+- Add validation logic (belongs in Validator)
+- Add business rules (belongs in Manager)
+- Expose DataFacade publicly

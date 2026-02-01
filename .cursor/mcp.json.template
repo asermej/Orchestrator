@@ -1,0 +1,27 @@
+{
+    "mcpServers": {
+      "LaunchDarkly": {
+        "command": "npx",
+        "args": [
+          "-y", "--package", "@launchdarkly/mcp-server", "--", "mcp", "start",
+          "--api-key", "<fill in>"
+        ]
+      },
+      "Magic MCP": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@21st-dev/magic@latest",
+          "API_KEY=\"<fill in>\""
+        ],
+        "env": {}
+      },
+       "context7": {
+        "url": "https://mcp.context7.com/mcp"
+      },
+      "postgres": {
+          "command": "npx",
+          "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://localhost/mydb"]
+        }
+    }
+  }

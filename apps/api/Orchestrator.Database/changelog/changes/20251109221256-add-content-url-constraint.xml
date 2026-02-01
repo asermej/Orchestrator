@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="20251109221256-add-content-url-constraint" author="system">
+        <comment>Add check constraint to topics.content_url to ensure it's either empty or a valid URL with a scheme</comment>
+        
+        <sql>
+            ALTER TABLE topics
+            ADD CONSTRAINT chk_topics_content_url_format
+            CHECK (
+                content_url IS NULL 
+                OR content_url = '' 
+                OR content_url ~ '^[a-zA-Z][a-zA-Z0-9+.-]*://'
+            );
+        </sql>
+        
+        <rollback>
+            <sql>
+                ALTER TABLE topics DROP CONSTRAINT IF EXISTS chk_topics_content_url_format;
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
+

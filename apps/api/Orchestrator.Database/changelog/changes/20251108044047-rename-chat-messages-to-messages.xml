@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="20251108044047-rename-chat-messages-to-messages" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="chat_messages"/>
+        </preConditions>
+        
+        <!-- Rename the table -->
+        <renameTable oldTableName="chat_messages" newTableName="messages"/>
+        
+        <!-- Rename indexes -->
+        <sql>
+            ALTER INDEX idx_chat_messages_chat_id RENAME TO idx_messages_chat_id;
+            ALTER INDEX idx_chat_messages_role RENAME TO idx_messages_role;
+            ALTER INDEX idx_chat_messages_created_at RENAME TO idx_messages_created_at;
+        </sql>
+    </changeSet>
+</databaseChangeLog>
+

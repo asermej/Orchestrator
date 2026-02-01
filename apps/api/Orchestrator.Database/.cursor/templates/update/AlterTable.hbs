@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="{{timestamp}}-alter-{{tableName}}-table" author="api-generator">
+        {{#each columns}}
+        {{#if isNew}}
+        <addColumn tableName="{{../tableName}}" schemaName="{{../schema}}">
+            <column name="{{snakeCase name}}" type="{{mapToSqlType type}}"{{#if constraints}} constraints="{{constraints}}"{{/if}}/>
+        </addColumn>
+        {{/if}}
+
+        {{#if isUpdated}}
+        <modifyDataType tableName="{{../tableName}}" schemaName="{{../schema}}"
+                       columnName="{{snakeCase name}}" newDataType="{{mapToSqlType type}}"/>
+        {{#if constraints}}
+        <addNotNullConstraint tableName="{{../tableName}}" schemaName="{{../schema}}"
+                             columnName="{{snakeCase name}}"{{#if defaultValue}} defaultValue="{{defaultValue}}"{{/if}}/>
+        {{/if}}
+        {{/if}}
+
+        {{#if isDeleted}}
+        <dropColumn tableName="{{../tableName}}" schemaName="{{../schema}}" columnName="{{snakeCase name}}"/>
+        {{/if}}
+        {{/each}}
+
+        {{#each indexes}}
+        {{#if isNew}}
+        <createIndex tableName="{{../tableName}}" schemaName="{{../schema}}" indexName="idx_{{../tableName}}_{{snakeCase name}}">
+            <column name="{{snakeCase name}}"/>
+        </createIndex>
+        {{/if}}
+
+        {{#if isDeleted}}
+        <dropIndex tableName="{{../tableName}}" schemaName="{{../schema}}" indexName="idx_{{../tableName}}_{{snakeCase name}}"/>
+        {{/if}}
+        {{/each}}
+
+        {{#each constraints}}
+        {{#if isNew}}
+        <addNotNullConstraint tableName="{{../tableName}}" schemaName="{{../schema}}"
+                             columnName="{{snakeCase columnName}}"{{#if defaultValue}} defaultValue="{{defaultValue}}"{{/if}}/>
+        {{/if}}
+
+        {{#if isDeleted}}
+        <dropNotNullConstraint tableName="{{../tableName}}" schemaName="{{../schema}}"
+                              columnName="{{snakeCase columnName}}"/>
+        {{/if}}
+        {{/each}}
+
+        {{#each foreignKeys}}
+        {{#if isNew}}
+        <addForeignKeyConstraint baseTableName="{{../tableName}}" baseColumnNames="{{snakeCase columnName}}"
+                                constraintName="fk_{{../tableName}}_{{snakeCase columnName}}"
+                                referencedTableName="{{referencedTable}}" referencedColumnNames="{{referencedColumn}}"
+                                onDelete="{{onDelete}}" onUpdate="{{onUpdate}}"/>
+        {{/if}}
+
+        {{#if isDeleted}}
+        <dropForeignKeyConstraint baseTableName="{{../tableName}}"
+                                 constraintName="fk_{{../tableName}}_{{snakeCase columnName}}"/>
+        {{/if}}
+        {{/each}}
+
+        {{#each uniqueConstraints}}
+        {{#if isNew}}
+        <addUniqueConstraint tableName="{{../tableName}}" schemaName="{{../schema}}"
+                            columnNames="{{snakeCase columnName}}" constraintName="uq_{{../tableName}}_{{snakeCase columnName}}"/>
+        {{/if}}
+
+        {{#if isDeleted}}
+        <dropUniqueConstraint tableName="{{../tableName}}" schemaName="{{../schema}}"
+                             constraintName="uq_{{../tableName}}_{{snakeCase columnName}}"/>
+        {{/if}}
+        {{/each}}
+
+        {{#each checkConstraints}}
+        {{#if isNew}}
+        <addCheckConstraint tableName="{{../tableName}}" schemaName="{{../schema}}"
+                           constraintName="chk_{{../tableName}}_{{snakeCase name}}"
+                           condition="{{condition}}"/>
+        {{/if}}
+
+        {{#if isDeleted}}
+        <dropCheckConstraint tableName="{{../tableName}}" schemaName="{{../schema}}"
+                            constraintName="chk_{{../tableName}}_{{snakeCase name}}"/>
+        {{/if}}
+        {{/each}}
+    </changeSet>
+
+    {{#if hasDataMigration}}
+    <changeSet id="{{timestamp}}-migrate-{{tableName}}-data" author="api-generator">
+        {{#each dataMigrations}}
+        <update tableName="{{../tableName}}" schemaName="{{../schema}}">
+            <column name="{{snakeCase targetColumn}}" value="{{value}}"/>
+            {{#if whereClause}}
+            <where>{{whereClause}}</where>
+            {{/if}}
+        </update>
+        {{/each}}
+    </changeSet>
+    {{/if}}
+
+    {{#if hasRollback}}
+    <changeSet id="{{timestamp}}-rollback-{{tableName}}-changes" author="api-generator" runOnChange="true">
+        <rollback>
+            {{#each columns}}
+            {{#if isNew}}
+            <dropColumn tableName="{{../tableName}}" schemaName="{{../schema}}" columnName="{{snakeCase name}}"/>
+            {{/if}}
+
+            {{#if isUpdated}}
+            <modifyDataType tableName="{{../tableName}}" schemaName="{{../schema}}"
+                           columnName="{{snakeCase name}}" newDataType="{{oldType}}"/>
+            {{#if oldConstraints}}
+            <addNotNullConstraint tableName="{{../tableName}}" schemaName="{{../schema}}"
+                                 columnName="{{snakeCase name}}"{{#if oldDefaultValue}} defaultValue="{{oldDefaultValue}}"{{/if}}/>
+            {{/if}}
+            {{/if}}
+
+            {{#if isDeleted}}
+            <addColumn tableName="{{../tableName}}" schemaName="{{../schema}}">
+                <column name="{{snakeCase name}}" type="{{mapToSqlType type}}"{{#if constraints}} constraints="{{constraints}}"{{/if}}/>
+            </addColumn>
+            {{/if}}
+            {{/each}}
+
+            {{#each indexes}}
+            {{#if isNew}}
+            <dropIndex tableName="{{../tableName}}" schemaName="{{../schema}}" indexName="idx_{{../tableName}}_{{snakeCase name}}"/>
+            {{/if}}
+
+            {{#if isDeleted}}
+            <createIndex tableName="{{../tableName}}" schemaName="{{../schema}}" indexName="idx_{{../tableName}}_{{snakeCase name}}">
+                <column name="{{snakeCase name}}"/>
+            </createIndex>
+            {{/if}}
+            {{/each}}
+
+            {{#each constraints}}
+            {{#if isNew}}
+            <dropNotNullConstraint tableName="{{../tableName}}" schemaName="{{../schema}}"
+                                  columnName="{{snakeCase columnName}}"/>
+            {{/if}}
+
+            {{#if isDeleted}}
+            <addNotNullConstraint tableName="{{../tableName}}" schemaName="{{../schema}}"
+                                 columnName="{{snakeCase columnName}}"{{#if defaultValue}} defaultValue="{{defaultValue}}"{{/if}}/>
+            {{/if}}
+            {{/each}}
+
+            {{#each foreignKeys}}
+            {{#if isNew}}
+            <dropForeignKeyConstraint baseTableName="{{../tableName}}"
+                                     constraintName="fk_{{../tableName}}_{{snakeCase columnName}}"/>
+            {{/if}}
+
+            {{#if isDeleted}}
+            <addForeignKeyConstraint baseTableName="{{../tableName}}" baseColumnNames="{{snakeCase columnName}}"
+                                    constraintName="fk_{{../tableName}}_{{snakeCase columnName}}"
+                                    referencedTableName="{{referencedTable}}" referencedColumnNames="{{referencedColumn}}"
+                                    onDelete="{{onDelete}}" onUpdate="{{onUpdate}}"/>
+            {{/if}}
+            {{/each}}
+
+            {{#each uniqueConstraints}}
+            {{#if isNew}}
+            <dropUniqueConstraint tableName="{{../tableName}}" schemaName="{{../schema}}"
+                                 constraintName="uq_{{../tableName}}_{{snakeCase columnName}}"/>
+            {{/if}}
+
+            {{#if isDeleted}}
+            <addUniqueConstraint tableName="{{../tableName}}" schemaName="{{../schema}}"
+                                columnNames="{{snakeCase columnName}}" constraintName="uq_{{../tableName}}_{{snakeCase columnName}}"/>
+            {{/if}}
+            {{/each}}
+
+            {{#each checkConstraints}}
+            {{#if isNew}}
+            <dropCheckConstraint tableName="{{../tableName}}" schemaName="{{../schema}}"
+                                constraintName="chk_{{../tableName}}_{{snakeCase name}}"/>
+            {{/if}}
+
+            {{#if isDeleted}}
+            <addCheckConstraint tableName="{{../tableName}}" schemaName="{{../schema}}"
+                               constraintName="chk_{{../tableName}}_{{snakeCase name}}"
+                               condition="{{condition}}"/>
+            {{/if}}
+            {{/each}}
+        </rollback>
+    </changeSet>
+    {{/if}}
+</databaseChangeLog>

@@ -1,0 +1,34 @@
+using System;
+using System.Threading.Tasks;
+
+namespace Orchestrator.Domain;
+
+/// <summary>
+/// Gateway facade for {{integrationName}} integration
+/// Provides business-focused methods that shield the domain from {{integrationName}} API details
+/// </summary>
+public sealed partial class GatewayFacade
+{
+    private {{integrationName}}Manager? _{{camelCase integrationName}}Manager;
+    private {{integrationName}}Manager {{integrationName}}Manager => _{{camelCase integrationName}}Manager ??= new {{integrationName}}Manager(_serviceLocator);
+
+    {{#each operations}}
+    /// <summary>
+    /// {{description}}
+    /// </summary>
+    {{#if parameters}}
+    {{#each parameters}}
+    /// <param name="{{camelCase name}}">{{description}}</param>
+    {{/each}}
+    {{/if}}
+    /// <returns>{{returns}}</returns>
+    public async Task<{{returnType}}> {{operationName}}({{#each parameters}}{{type}} {{camelCase name}}{{#unless @last}}, {{/unless}}{{/each}})
+    {
+        return await {{integrationName}}Manager.{{operationName}}({{#each parameters}}{{camelCase name}}{{#unless @last}}, {{/unless}}{{/each}}).ConfigureAwait(false);
+    }
+    {{#unless @last}}
+
+    {{/unless}}
+    {{/each}}
+}
+

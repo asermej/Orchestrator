@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="20251108003338-create-categories-table" author="liquibase">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="categories"/>
+            </not>
+        </preConditions>
+        <createTable tableName="categories">
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="varchar(100)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="description" type="varchar(500)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="category_type" type="varchar(50)" defaultValue="Standard">
+                <constraints nullable="false"/>
+            </column>
+            <column name="display_order" type="int" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="UUID">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="updated_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_deleted" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="deleted_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+        <createIndex tableName="categories" indexName="idx_categories_name">
+            <column name="name"/>
+        </createIndex>
+        <createIndex tableName="categories" indexName="idx_categories_category_type">
+            <column name="category_type"/>
+        </createIndex>
+        <createIndex tableName="categories" indexName="idx_categories_display_order">
+            <column name="display_order"/>
+        </createIndex>
+        <createIndex tableName="categories" indexName="idx_categories_is_active">
+            <column name="is_active"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="20251108003338-seed-default-categories" author="liquibase">
+        <insert tableName="categories">
+            <column name="name" value="Daily Blog"/>
+            <column name="description" value="Personal daily blog entries organized by date"/>
+            <column name="category_type" value="DailyBlog"/>
+            <column name="display_order" valueNumeric="0"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+        <insert tableName="categories">
+            <column name="name" value="General"/>
+            <column name="description" value="General topics that don't fit into other categories"/>
+            <column name="category_type" value="Standard"/>
+            <column name="display_order" valueNumeric="1"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+        <insert tableName="categories">
+            <column name="name" value="Uncategorized"/>
+            <column name="description" value="Topics without a specific category"/>
+            <column name="category_type" value="Standard"/>
+            <column name="display_order" valueNumeric="2"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+        <insert tableName="categories">
+            <column name="name" value="Movies"/>
+            <column name="description" value="Film and movie discussions"/>
+            <column name="category_type" value="Standard"/>
+            <column name="display_order" valueNumeric="3"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+        <insert tableName="categories">
+            <column name="name" value="NBA"/>
+            <column name="description" value="NBA basketball topics"/>
+            <column name="category_type" value="Standard"/>
+            <column name="display_order" valueNumeric="4"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+        <insert tableName="categories">
+            <column name="name" value="NFL"/>
+            <column name="description" value="NFL football topics"/>
+            <column name="category_type" value="Standard"/>
+            <column name="display_order" valueNumeric="5"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+        <insert tableName="categories">
+            <column name="name" value="TV"/>
+            <column name="description" value="Television shows and series"/>
+            <column name="category_type" value="Standard"/>
+            <column name="display_order" valueNumeric="6"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+    </changeSet>
+</databaseChangeLog>
+

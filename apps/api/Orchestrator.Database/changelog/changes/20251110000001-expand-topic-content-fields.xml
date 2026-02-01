@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="20251110000001-expand-content-url-to-text" author="system">
+        <comment>Expand content_url from varchar(1000) to TEXT to accommodate large training content (up to 50,000 characters)</comment>
+        
+        <!-- Change content_url from varchar(1000) to TEXT -->
+        <modifyDataType 
+            tableName="topics" 
+            columnName="content_url" 
+            newDataType="TEXT"/>
+    </changeSet>
+
+    <changeSet id="20251110000001-expand-contribution-notes-to-text" author="system">
+        <comment>Expand contribution_notes from varchar(500) to TEXT for more detailed notes</comment>
+        
+        <!-- Change contribution_notes from varchar(500) to TEXT -->
+        <modifyDataType 
+            tableName="topics" 
+            columnName="contribution_notes" 
+            newDataType="TEXT"/>
+    </changeSet>
+
+</databaseChangeLog>
+
+
+

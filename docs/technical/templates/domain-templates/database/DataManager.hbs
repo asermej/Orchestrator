@@ -1,0 +1,115 @@
+using Dapper;
+using Npgsql;
+
+namespace Orchestrator.DomainLayer;
+
+/// <summary>
+/// Manages data access for {{featureName}} entities
+/// </summary>
+internal sealed class {{featureName}}DataManager
+{
+    private readonly string _dbConnectionString;
+
+    public {{featureName}}DataManager(string dbConnectionString)
+    {
+        _dbConnectionString = dbConnectionString;
+        DapperConfiguration.ConfigureSnakeCaseMapping<{{featureName}}>();
+    }
+
+    public async Task<{{featureName}}?> GetById(System.Guid id)
+    {
+        const string sql = @"
+            SELECT id, {{#each properties}}{{#snakeCase}}{{name}}{{/snakeCase}}, {{/each}}created_at, updated_at, is_deleted
+            FROM {{#snakeCase}}{{tableName}}{{/snakeCase}}
+            WHERE id = @id AND is_deleted = false";
+        using var connection = new NpgsqlConnection(_dbConnectionString);
+        return await connection.QueryFirstOrDefaultAsync<{{featureName}}>(sql, new { id });
+    }
+
+    public async Task<{{featureName}}>> Add({{featureName}} {{camelCase featureName}})
+    {
+        if ({{camelCase featureName}}.Id == System.Guid.Empty)
+        {
+            {{camelCase featureName}}.Id = System.Guid.NewGuid();
+        }
+
+        const string sql = @"
+            INSERT INTO {{#snakeCase}}{{tableName}}{{/snakeCase}} (id, {{#each properties}}{{#snakeCase}}{{name}}{{/snakeCase}}{{#unless @last}}, {{/unless}}{{/each}})
+            VALUES (@Id, {{#each properties}}@{{name}}{{#unless @last}}, {{/unless}}{{/each}})
+            RETURNING id, {{#each properties}}{{#snakeCase}}{{name}}{{/snakeCase}}, {{/unless}}created_at, updated_at, is_deleted";
+
+        using var connection = new NpgsqlConnection(_dbConnectionString);
+        var newItem = await connection.QueryFirstOrDefaultAsync<{{featureName}}>(sql, {{camelCase featureName}});
+        return newItem!;
+    }
+
+    public async Task<{{featureName}}>> Update({{featureName}} {{camelCase featureName}})
+    {
+        const string sql = @"
+            UPDATE {{#snakeCase}}{{tableName}}{{/snakeCase}}
+            SET
+                {{#each properties}}
+                {{#snakeCase}}{{name}}{{/snakeCase}} = @{{name}}{{#unless @last}},{{/unless}}
+                {{/each}}
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = @Id AND is_deleted = false
+            RETURNING id, {{#each properties}}{{#snakeCase}}{{name}}{{/snakeCase}}, {{/unless}}created_at, updated_at, is_deleted";
+
+        using var connection = new NpgsqlConnection(_dbConnectionString);
+        var updatedItem = await connection.QueryFirstOrDefaultAsync<{{featureName}}>(sql, {{camelCase featureName}});
+        if (updatedItem == null)
+        {
+            throw new {{featureName}}NotFoundException("{{featureName}} not found or already deleted.");
+        }
+        return updatedItem;
+    }
+
+    public async Task<bool> Delete(System.Guid id)
+    {
+        const string sql = @"
+            UPDATE {{#snakeCase}}{{tableName}}{{/snakeCase}}
+            SET is_deleted = true, updated_at = CURRENT_TIMESTAMP
+            WHERE id = @id AND is_deleted = false";
+
+        using var connection = new NpgsqlConnection(_dbConnectionString);
+        var rowsAffected = await connection.ExecuteAsync(sql, new { id });
+        return rowsAffected > 0;
+    }
+
+    public async Task<PaginatedResult<{{featureName}}>> Search({{#each searchableFields}}{{type}}? {{camelCase name}}, {{/each}}int pageNumber, int pageSize)
+    {
+        var whereClauses = new List<string>();
+        var parameters = new DynamicParameters();
+
+        {{#each searchableFields}}
+        if (!string.IsNullOrWhiteSpace({{camelCase name}}))
+        {
+            whereClauses.Add("{{#snakeCase}}{{name}}{{/snakeCase}} ILIKE @{{name}}");
+            parameters.Add("{{name}}", $"%{{{camelCase name}}}%");
+        }
+        {{/each}}
+
+        whereClauses.Add("is_deleted = false");
+
+        var whereSql = whereClauses.Any() ? $"WHERE {string.Join(" AND ", whereClauses)}" : "";
+
+        using var connection = new NpgsqlConnection(_dbConnectionString);
+        var countSql = $"SELECT COUNT(*) FROM {{#snakeCase}}{{tableName}}{{/snakeCase}} {whereSql}";
+        var totalCount = await connection.QueryFirstOrDefaultAsync<int>(countSql, parameters);
+
+        var offset = (pageNumber - 1) * pageSize;
+        var querySql = $@"
+            SELECT id, {{#each properties}}{{#snakeCase}}{{name}}{{/snakeCase}}{{#unless @last}}, {{/unless}}{{/each}}, created_at, updated_at, is_deleted
+            FROM {{#snakeCase}}{{tableName}}{{/snakeCase}}
+            {whereSql}
+            ORDER BY created_at DESC
+            LIMIT @PageSize OFFSET @Offset";
+
+        parameters.Add("PageSize", pageSize);
+        parameters.Add("Offset", offset);
+
+        var items = await connection.QueryAsync<{{featureName}}>(querySql, parameters);
+
+        return new PaginatedResult<{{featureName}}>(items, totalCount, pageNumber, pageSize);
+    }
+}

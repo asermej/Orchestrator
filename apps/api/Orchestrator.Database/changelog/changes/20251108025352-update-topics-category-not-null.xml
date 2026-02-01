@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="20251108025352-update-topics-category-not-null" author="system">
+        <!-- Set default category_id to General category for any existing topics without a category -->
+        <sql>
+            UPDATE topics
+            SET category_id = '00000000-0000-0000-0000-000000000001'::uuid
+            WHERE category_id IS NULL;
+        </sql>
+
+        <!-- Add NOT NULL constraint to category_id column -->
+        <addNotNullConstraint
+            tableName="topics"
+            columnName="category_id"
+            columnDataType="UUID"/>
+    </changeSet>
+
+</databaseChangeLog>
+

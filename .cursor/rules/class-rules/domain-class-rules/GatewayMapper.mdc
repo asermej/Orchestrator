@@ -1,0 +1,54 @@
+---
+description: "ACTIVE: GatewayMapper rules - External API model mapping"
+globs: apps/api/Orchestrator.Domain/Gateways/Mappers/*.cs
+alwaysApply: false
+---
+
+>>> CONTEXT LOADED: GatewayMapper best practices are now active <<<
+
+# GatewayMapper Best Practices
+
+**Template**: [GatewayMapper.hbs](mdc:docs/technical/templates/domain-templates/gateway/GatewayMapper.hbs)
+
+## Purpose
+Gateway mappers convert between **domain models** and **external API request/response models**.
+
+## Requirements
+
+- **Internal static class**: Mapping logic is internal to gateways
+- **ToRequest methods**: Convert domain models to API request models
+- **FromResponse methods**: Convert API response models to domain models
+- **Null-safe**: Handle null values gracefully
+- **No side effects**: Pure transformation logic only
+
+## Pattern
+
+```csharp
+namespace Orchestrator.Domain;
+
+internal static class OpenAIMapper
+{
+    public static OpenAIChatCompletionRequest ToRequest(string prompt, string model)
+    {
+        return new OpenAIChatCompletionRequest
+        {
+            Model = model,
+            Messages = new[]
+            {
+                new OpenAIMessage { Role = "user", Content = prompt }
+            }
+        };
+    }
+
+    public static string FromResponse(OpenAIChatCompletionResponse response)
+    {
+        return response.Choices?.FirstOrDefault()?.Message?.Content ?? string.Empty;
+    }
+}
+```
+
+## Do NOT
+
+- Add HTTP/API logic (belongs in gateway manager)
+- Make mappers public (internal to gateways)
+- Add business logic (pure transformation only)

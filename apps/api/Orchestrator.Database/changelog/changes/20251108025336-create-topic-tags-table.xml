@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="20251108025336-create-topic-tags-table" author="system">
+        <createTable tableName="topic_tags">
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="topic_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="tag_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+            baseTableName="topic_tags"
+            baseColumnNames="topic_id"
+            constraintName="fk_topic_tags_topic_id"
+            referencedTableName="topics"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint
+            baseTableName="topic_tags"
+            baseColumnNames="tag_id"
+            constraintName="fk_topic_tags_tag_id"
+            referencedTableName="tags"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+
+        <addUniqueConstraint
+            tableName="topic_tags"
+            columnNames="topic_id, tag_id"
+            constraintName="uk_topic_tags_topic_id_tag_id"/>
+
+        <createIndex tableName="topic_tags" indexName="idx_topic_tags_topic_id">
+            <column name="topic_id"/>
+        </createIndex>
+
+        <createIndex tableName="topic_tags" indexName="idx_topic_tags_tag_id">
+            <column name="tag_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>
+

@@ -1,0 +1,38 @@
+using FluentValidation;
+using Orchestrator.Api.ResourcesModels;
+
+namespace Orchestrator.Api.Validators;
+
+public class Create{{featureName}}ResourceValidator : AbstractValidator<Create{{featureName}}Resource>
+{
+    public Create{{featureName}}ResourceValidator()
+    {
+        {{#each createProperties}}
+        RuleFor(x => x.{{name}})
+            {{#if (eq type "string")}}
+            .NotEmpty().WithMessage("{{name}} is required")
+            {{#if (eq validation "email")}}
+            .EmailAddress().WithMessage("Invalid email format")
+            {{/if}}
+            {{#if (eq validation "phone")}}
+            .Matches(@"^\+?[1-9]\d{1,14}$").WithMessage("Invalid phone number format")
+            {{/if}}
+            {{#if (eq validation "url")}}
+            .Must(uri => Uri.TryCreate(uri, UriKind.Absolute, out _)).WithMessage("Invalid URL format")
+            {{/if}}
+            {{#if (eq validation "date")}}
+            .Must(date => DateTime.TryParse(date, out _)).WithMessage("Invalid date format")
+            {{/if}}
+            {{/if}}
+            {{#if (eq type "int")}}
+            .GreaterThan(0).WithMessage("{{name}} must be greater than 0")
+            {{/if}}
+            {{#if (eq type "decimal")}}
+            .GreaterThan(0).WithMessage("{{name}} must be greater than 0")
+            {{/if}}
+            {{#if (eq type "DateTime")}}
+            .NotEmpty().WithMessage("{{name}} is required")
+            {{/if}};
+        {{/each}}
+    }
+}

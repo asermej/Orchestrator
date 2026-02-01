@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="20251112185859-update-null-content-urls" author="system">
+        <comment>Update any existing topics with NULL content_url to empty string before adding NOT NULL constraint</comment>
+        
+        <!-- Update all NULL content_url values to empty string -->
+        <update tableName="topics">
+            <column name="content_url" value=""/>
+            <where>content_url IS NULL</where>
+        </update>
+    </changeSet>
+
+    <changeSet id="20251112185859-make-content-url-not-null" author="system">
+        <comment>Add NOT NULL constraint to content_url column - training content is now required</comment>
+        
+        <!-- Add NOT NULL constraint to content_url -->
+        <addNotNullConstraint 
+            tableName="topics" 
+            columnName="content_url" 
+            columnDataType="TEXT"/>
+    </changeSet>
+
+</databaseChangeLog>
+

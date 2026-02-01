@@ -1,0 +1,56 @@
+---
+description: "ACTIVE: Validator rules - Business validation logic"
+globs: apps/api/Orchestrator.Domain/Managers/Validators/*Validator.cs
+alwaysApply: false
+---
+
+>>> CONTEXT LOADED: Validator best practices are now active <<<
+
+# Validator Best Practices
+
+**Template**: [Validator.hbs](mdc:docs/technical/templates/domain-templates/Validator.hbs)
+
+**Related Guides**:
+- [Validation Rules](mdc:docs/technical/reference/guides/domain-guides/validation-rules.md) - Common validation patterns and FluentValidation extensions
+
+## Purpose
+Validators enforce **business rules and data integrity** before any data operations.
+
+## Requirements
+
+- **Internal static class**: Stateless validation logic
+- **Compiled Regex**: Use `RegexOptions.Compiled` for format validation
+- **Collect all errors**: Validate all fields, don't fail on first error
+- **Throw custom exception**: Use `{Feature}ValidationException` with combined message
+- **Convention-based**: Email, Phone, Url properties get format validation
+
+## Pattern
+
+```csharp
+internal static class FeatureValidator
+{
+    private static readonly Regex EmailRegex = new(
+        @"^[^@\s]+@[^@\s]+\.[^@\s]+$", 
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    public static void Validate(Feature feature)
+    {
+        var errors = new List<string>();
+
+        var emailError = ValidatorString.Validate("Email", feature.Email);
+        if (emailError != null)
+            errors.Add(emailError);
+        else if (!EmailRegex.IsMatch(feature.Email))
+            errors.Add("Email has an invalid format.");
+
+        if (errors.Any())
+            throw new FeatureValidationException(string.Join("; ", errors));
+    }
+}
+```
+
+## Do NOT
+
+- Return bool/result (throw exceptions instead)
+- Validate only one field (collect all errors)
+- Add database checks (that's Manager's job)

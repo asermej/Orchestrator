@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="20251108000000-fix-topic-created-by-type" author="liquibase">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="topics"/>
+        </preConditions>
+        <modifyDataType tableName="topics" columnName="created_by" newDataType="varchar(100)"/>
+    </changeSet>
+</databaseChangeLog>
+

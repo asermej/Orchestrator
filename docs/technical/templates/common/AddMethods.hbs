@@ -1,0 +1,229 @@
+{{!-- This template is used to add new methods to existing files --}}
+{{!-- It reads the existing file and adds new methods based on the operations selected --}}
+
+{{!-- For DomainModel --}}
+{{#if (eq fileType "DomainModel")}}
+// ... existing code ...
+
+{{#each operations}}
+{{#if (eq this "Create")}}
+    // New properties for Create operation
+    {{#each inputProperties}}
+    public {{type}} {{name}} { get; set; }
+    {{/each}}
+{{/if}}
+{{/each}}
+{{/if}}
+
+{{!-- For DataManager --}}
+{{#if (eq fileType "DataManager")}}
+// ... existing code ...
+
+{{#each operations}}
+{{#if (eq this "Create")}}
+    public async Task<int> Create{{../featureName}}({{../featureName}} {{camelCase ../featureName}})
+    {
+        const string sql = @"
+INSERT INTO {{../tableName}} ({{#each ../inputProperties}}{{name}}{{#unless @last}}, {{/unless}}{{/each}})
+VALUES ({{#each ../inputProperties}}@{{name}}{{#unless @last}}, {{/unless}}{{/each}})
+RETURNING Id";
+
+        using var connection = new NpgsqlConnection(_dbConnectionString);
+        return await connection.ExecuteScalarAsync<int>(sql, {{camelCase ../featureName}});
+    }
+{{/if}}
+
+{{#if (eq this "GetById")}}
+    public async Task<{{../featureName}}?> Get{{../featureName}}ById(int id)
+    {
+        const string sql = @"
+SELECT {{#each ../responseProperties}}{{name}}{{#unless @last}}, {{/unless}}{{/each}}
+FROM {{../tableName}}
+WHERE Id = @Id";
+
+        using var connection = new NpgsqlConnection(_dbConnectionString);
+        return await connection.QuerySingleOrDefaultAsync<{{../featureName}}>(sql, new { Id = id });
+    }
+{{/if}}
+
+{{#if (eq this "Search")}}
+    public async Task<IEnumerable<{{../featureName}}>> Search{{../featureName}}s(string searchTerm)
+    {
+        const string sql = @"
+SELECT {{#each ../responseProperties}}{{name}}{{#unless @last}}, {{/unless}}{{/each}}
+FROM {{../tableName}}
+WHERE {{#each ../searchableProperties}}{{name}} ILIKE @SearchTerm{{#unless @last}} OR {{/unless}}{{/each}}";
+
+        using var connection = new NpgsqlConnection(_dbConnectionString);
+        return await connection.QueryAsync<{{../featureName}}>(sql, new { SearchTerm = $"%{searchTerm}%" });
+    }
+{{/if}}
+{{/each}}
+{{/if}}
+
+{{!-- For DataFacade --}}
+{{#if (eq fileType "DataFacade")}}
+// ... existing code ...
+
+{{#each operations}}
+{{#if (eq this "Create")}}
+    public Task<int> Create{{../featureName}}({{../featureName}} {{camelCase ../featureName}})
+    {
+        return {{camelCase ../featureName}}DataManager.Create{{../featureName}}({{camelCase ../featureName}});
+    }
+{{/if}}
+
+{{#if (eq this "GetById")}}
+    public Task<{{../featureName}}?> Get{{../featureName}}ById(int id)
+    {
+        return {{camelCase ../featureName}}DataManager.Get{{../featureName}}ById(id);
+    }
+{{/if}}
+
+{{#if (eq this "Search")}}
+    public Task<IEnumerable<{{../featureName}}>> Search{{../featureName}}s(string searchTerm)
+    {
+        return {{camelCase ../featureName}}DataManager.Search{{../featureName}}s(searchTerm);
+    }
+{{/if}}
+{{/each}}
+{{/if}}
+
+{{!-- For DomainFacade --}}
+{{#if (eq fileType "DomainFacade")}}
+// ... existing code ...
+
+{{#each operations}}
+{{#if (eq this "Create")}}
+    public Task<int> Create{{../featureName}}({{../featureName}} {{camelCase ../featureName}})
+    {
+        return {{../featureName}}Manager.Create{{../featureName}}({{camelCase ../featureName}});
+    }
+{{/if}}
+
+{{#if (eq this "GetById")}}
+    public Task<{{../featureName}}?> Get{{../featureName}}ById(int id)
+    {
+        return {{../featureName}}Manager.Get{{../featureName}}ById(id);
+    }
+{{/if}}
+
+{{#if (eq this "Search")}}
+    public Task<IEnumerable<{{../featureName}}>> Search{{../featureName}}s(string searchTerm)
+    {
+        return {{../featureName}}Manager.Search{{../featureName}}s(searchTerm);
+    }
+{{/if}}
+{{/each}}
+{{/if}}
+
+{{!-- For Controller --}}
+{{#if (eq fileType "Controller")}}
+// ... existing code ...
+
+{{#each operations}}
+{{#if (eq this "Create")}}
+    [HttpPost]
+    public async Task<ActionResult<int>> Create({{../featureName}}Resource resource)
+    {
+        var validation = _validator.Validate(resource);
+        if (!validation.IsValid)
+            return BadRequest(validation.Errors);
+
+        var domain = {{../featureName}}Mapper.ToDomain(resource);
+        int id = await _domainFacade.Create{{../featureName}}(domain);
+        return Ok(id);
+    }
+{{/if}}
+
+{{#if (eq this "GetById")}}
+    [HttpGet("{id}")]
+    public async Task<ActionResult<{{../featureName}}Resource>> GetById(int id)
+    {
+        var result = await _domainFacade.Get{{../featureName}}ById(id);
+        if (result == null)
+            return NotFound();
+
+        return Ok({{../featureName}}Mapper.ToResource(result));
+    }
+{{/if}}
+
+{{#if (eq this "Search")}}
+    [HttpGet("search")]
+    public async Task<ActionResult<IEnumerable<{{../featureName}}Resource>>> Search([FromQuery] string term)
+    {
+        var results = await _domainFacade.Search{{../featureName}}s(term);
+        return Ok(results.Select({{../featureName}}Mapper.ToResource));
+    }
+{{/if}}
+{{/each}}
+{{/if}}
+
+{{!-- For Test --}}
+{{#if (eq fileType "Test")}}
+// ... existing code ...
+
+{{#each operations}}
+{{#if (eq this "Create")}}
+    [TestMethod]
+    public async Task TestCreate{{../featureName}}()
+    {
+        var domain = new {{../featureName}}
+        {
+            {{#each ../inputProperties}}
+            {{name}} = /* TODO: provide sample {{type}} */,
+            {{/each}}
+        };
+        int id = await _domainFacade.Create{{../featureName}}(domain);
+        Assert.IsTrue(id > 0);
+    }
+{{/if}}
+
+{{#if (eq this "GetById")}}
+    [TestMethod]
+    public async Task TestGet{{../featureName}}ById()
+    {
+        var domain = new {{../featureName}}
+        {
+            {{#each ../inputProperties}}
+            {{name}} = /* TODO: provide sample {{type}} */,
+            {{/each}}
+        };
+        int id = await _domainFacade.Create{{../featureName}}(domain);
+
+        var fetched = await _domainFacade.Get{{../featureName}}ById(id);
+        Assert.IsNotNull(fetched);
+        {{#each ../responseProperties}}
+        Assert.AreEqual(/* TODO: expected {{type}} */, fetched.{{name}});
+        {{/each}}
+    }
+{{/if}}
+
+{{#if (eq this "Search")}}
+    [TestMethod]
+    public async Task TestSearch{{../featureName}}s()
+    {
+        // Create test data
+        var domain1 = new {{../featureName}}
+        {
+            {{#each ../inputProperties}}
+            {{name}} = /* TODO: provide sample {{type}} for first item */,
+            {{/each}}
+        };
+        var domain2 = new {{../featureName}}
+        {
+            {{#each ../inputProperties}}
+            {{name}} = /* TODO: provide sample {{type}} for second item */,
+            {{/each}}
+        };
+        await _domainFacade.Create{{../featureName}}(domain1);
+        await _domainFacade.Create{{../featureName}}(domain2);
+
+        // Test search
+        var results = await _domainFacade.Search{{../featureName}}s("search term");
+        Assert.IsNotNull(results);
+        Assert.IsTrue(results.Any());
+    }
+{{/if}}
+{{/each}}
+{{/if}} 

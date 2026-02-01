@@ -1,0 +1,88 @@
+---
+description: "ACTIVE: Controller rules - HTTP API endpoints"
+globs: apps/api/Orchestrator.Api/Controllers/*Controller.cs
+alwaysApply: false
+---
+
+>>> CONTEXT LOADED: Controller best practices are now active <<<
+
+# Controller Best Practices
+
+**Template**: [Controller.hbs](mdc:docs/technical/templates/api-templates/Controller.hbs)
+
+**Related Guides**:
+- [Error Handling](mdc:docs/technical/reference/guides/api-guides/error-handling.md) - Error response patterns and Result pattern
+- [Pagination](mdc:docs/technical/reference/guides/common-guides/pagination.md) - Search and pagination patterns
+
+## Purpose
+Controllers are the **public HTTP entry point** for API features. They map between Resources and Domain models.
+
+## Requirements
+
+- **Route**: `[Route("api/v1/[controller]")]`
+- **DomainFacade injection**: Only interact with DomainFacade
+- **Use Mappers**: Convert between Resource and Domain models
+- **Logging**: Log operations with structured parameters
+- **ProducesResponseType**: Document all response types
+
+## Authentication
+
+- **Default secure**: Add `[Authorize]` at controller level for all protected endpoints
+- **Role-based**: Use `[Authorize(Roles = "Admin,Manager")]` for role restrictions
+- **Policy-based**: Use `[Authorize(Policy = "CanCreateFeatures")]` for complex rules
+- **Public endpoints**: Use `[AllowAnonymous]` sparingly and only when required
+
+```csharp
+[ApiController]
+[Route("api/v1/[controller]")]
+[Authorize]  // Require authentication by default
+public class FeatureController : ControllerBase
+{
+    [HttpGet]
+    [Authorize(Roles = "Admin,Manager")]  // Role-based
+    public async Task<ActionResult<IEnumerable<FeatureResource>>> GetAll() { }
+
+    [HttpPost]
+    [Authorize(Policy = "CanCreateFeatures")]  // Policy-based
+    public async Task<ActionResult<FeatureResource>> Create([FromBody] CreateFeatureResource resource) { }
+
+    [HttpGet("public")]
+    [AllowAnonymous]  // Only for truly public endpoints
+    public async Task<ActionResult<FeatureResource>> GetPublic() { }
+}
+```
+
+## Pattern
+
+```csharp
+[ApiController]
+[Route("api/v1/[controller]")]
+[Produces("application/json")]
+[Authorize]
+public class FeatureController : ControllerBase
+{
+    private readonly DomainFacade _domainFacade;
+    private readonly ILogger<FeatureController> _logger;
+
+    [HttpPost]
+    [ProducesResponseType(typeof(FeatureResource), 201)]
+    [ProducesResponseType(typeof(ErrorResponse), 400)]
+    [ProducesResponseType(401)]
+    public async Task<ActionResult<FeatureResource>> Create([FromBody] CreateFeatureResource resource)
+    {
+        _logger.LogInformation("Creating Feature: {@Resource}", resource);
+        var dto = FeatureMapper.ToDto(resource);
+        var id = await _domainFacade.CreateFeature(dto);
+        var created = await _domainFacade.GetFeatureById(id);
+        return CreatedAtAction(nameof(GetById), new { id }, FeatureMapper.ToResource(created));
+    }
+}
+```
+
+## Do NOT
+
+- Access DataFacade or Managers directly
+- Put business logic in controllers
+- Catch exceptions (middleware handles them)
+- Use `[AllowAnonymous]` without explicit justification
+- Forget `[ProducesResponseType(401)]` on protected endpoints

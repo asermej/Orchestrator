@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="20251108004519-add-category-id-to-topics" author="liquibase">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="topics" columnName="category_id"/>
+            </not>
+        </preConditions>
+        
+        <!-- Add category_id column (nullable initially) -->
+        <addColumn tableName="topics">
+            <column name="category_id" type="UUID">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+
+        <!-- Create index on category_id -->
+        <createIndex tableName="topics" indexName="idx_topics_category_id">
+            <column name="category_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="20251108004519-migrate-topics-to-general-category" author="liquibase">
+        <!-- Get the ID of the "General" category and update all topics to use it -->
+        <sql>
+            <![CDATA[
+                UPDATE topics 
+                SET category_id = (SELECT id FROM categories WHERE name = 'General' LIMIT 1)
+                WHERE category_id IS NULL;
+            ]]>
+        </sql>
+    </changeSet>
+
+    <changeSet id="20251108004519-make-category-id-not-null" author="liquibase">
+        <!-- Now that all topics have a category, make category_id NOT NULL -->
+        <addNotNullConstraint tableName="topics" columnName="category_id" columnDataType="UUID"/>
+
+        <!-- Add foreign key constraint -->
+        <addForeignKeyConstraint
+            baseTableName="topics"
+            baseColumnNames="category_id"
+            constraintName="fk_topics_category"
+            referencedTableName="categories"
+            referencedColumnNames="id"
+            onDelete="RESTRICT"/>
+    </changeSet>
+</databaseChangeLog>
+

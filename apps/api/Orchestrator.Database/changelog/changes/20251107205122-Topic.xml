@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="20251107205122-create-topics-table" author="liquibase">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="topics"/>
+            </not>
+        </preConditions>
+        <createTable tableName="topics">
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="varchar(200)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="varchar(1000)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_public" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="UUID">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="updated_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_deleted" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="deleted_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+        <createIndex tableName="topics" indexName="idx_topics_name">
+            <column name="name"/>
+        </createIndex>
+        <createIndex tableName="topics" indexName="idx_topics_is_public">
+            <column name="is_public"/>
+        </createIndex>
+        <createIndex tableName="topics" indexName="idx_topics_created_at">
+            <column name="created_at"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>
+

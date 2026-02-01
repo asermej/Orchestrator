@@ -1,0 +1,359 @@
+---
+description: High-level overview of the Surrova Platform architecture, including layer responsibilities, dependency rules, data flow, and best practices for maintainability and scalability.
+globs: 
+alwaysApply: true
+---
+# Surrova Platform Architecture
+
+## Overview
+The Surrova Platform follows Clean Architecture principles with a layered approach that ensures separation of concerns, testability, and maintainability.
+
+## Architecture Principles
+
+### 1. Clean Architecture Layers
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Orchestrator.Web                             │
+│              (Presentation Layer)                           │
+└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    Orchestrator.Api                             │
+│              (API/HTTP Layer)                               │
+└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                Orchestrator.AcceptanceTests                     │
+│              (Integration Testing Layer)                    │
+└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                Orchestrator.DomainLayer                         │
+│              (Core Business Logic)                          │
+└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    Orchestrator.Database                        │
+│              (Data Persistence)                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 2. Dependency Rules
+- **Orchestrator.DomainLayer**: No project references allowed (self-contained)
+- **Orchestrator.Api**: Primarily uses the DomainLayer
+- **Orchestrator.Web**: Should only communicate with Orchestrator.Api via HTTP
+- **Orchestrator.AcceptanceTests**: Can reference Orchestrator.DomainLayer only
+- **All projects**: Can reference external NuGet packages as needed
+
+### 3. InternalsVisibleTo Pattern
+The DomainLayer uses `[assembly: InternalsVisibleTo("Orchestrator.AcceptanceTests")]` to allow:
+- Creation of custom test doubles and stubs for internal components
+- Access to internal constructors and methods for test double implementation
+- Maintaining clean architecture while enabling testability without external frameworks
+
+### 4. DomainLayer Structure
+```
+Orchestrator.DomainLayer/
+├── Common/                          # Cross-cutting concerns
+│   ├── Result.cs                    # Generic result wrapper
+│   ├── PaginatedResult.cs           # Pagination support
+│   └── Validation/                  # Validation utilities
+├── DomainFacade.cs                  # Main facade interface
+├── DomainFacade.{Feature}.cs        # Feature-specific facade methods
+├── Managers/
+│   ├── Models/                      # Domain models
+│   ├── DataLayer/                   # Data access layer
+│   │   ├── DataFacade.cs            # Data facade interface
+│   │   ├── DataFacade.{Feature}.cs  # Feature-specific data methods
+│   │   └── DataManagers/            # Data managers
+│   └── ServiceLocators/             # Dependency injection
+└── Properties/
+    └── AssemblyInfo.cs              # InternalsVisibleTo for tests
+```
+
+### 5. Testing Strategy
+- **Unit Tests**: Test individual components in isolation using custom stubs and test doubles
+- **Integration Tests**: Test component interactions with minimal external dependencies
+- **Acceptance Tests**: Test through DomainFacade interface only using custom test doubles
+- **API Tests**: Test HTTP endpoints and request/response handling
+- **No External Mocking Frameworks**: All test doubles are custom implementations
+
+## Project Responsibilities
+
+### Orchestrator.DomainLayer
+- **Purpose**: Core business logic and data access
+- **Dependencies**: None (self-contained)
+- **Exports**: DomainFacade interface, domain models, DTOs
+- **Internal Access**: Available to Orchestrator.AcceptanceTests for mocking via InternalsVisibleTo
+
+### Orchestrator.Api
+- **Purpose**: HTTP API endpoints and request/response handling
+- **Dependencies**: Orchestrator.DomainLayer only
+- **Responsibilities**: 
+  - Controllers for HTTP endpoints
+  - Request/response models (Resources)
+  - Validation
+  - Mapping between API and domain models
+  - Error handling and logging
+
+### Orchestrator.Web
+- **Purpose**: Web frontend and user interface
+- **Dependencies**: None (communicates via HTTP only)
+- **Responsibilities**:
+  - User interface components
+  - Client-side logic
+  - HTTP API consumption
+  - State management
+  - Centralized error handling
+
+#### Error Handling Architecture
+Orchestrator.Web uses a comprehensive error handling system:
+
+**Server Actions (Server Components):**
+- **MUST** use `api-client-server` helpers:
+  - `apiGet<T>(url)` for GET requests
+  - `apiPost<T>(url, body)` for POST requests
+  - `apiPut<T>(url, body)` for PUT requests
+  - `apiDelete(url)` for DELETE requests
+  - `apiPostFormData<T>(url, formData)` for file uploads
+- **NEVER** use raw `fetch` calls
+- **NEVER** manually handle authentication tokens
+- Let errors bubble up (no try-catch blocks needed)
+- All errors throw structured `ApiClientError`
+
+**Client Components:**
+- Use `apiClient` class methods (`.get()`, `.post()`, `.put()`, `.delete()`)
+- Automatic session timeout (401) redirects to login
+- Automatic token refresh via Auth0 SDK
+
+**Page Components:**
+- **MUST** use `useServerAction` hook for mutations:
+  ```typescript
+  const { execute, isLoading, error } = useServerAction(serverAction, {
+    successMessage: 'Success message',
+    onSuccess: () => router.push('/next-page')
+  });
+  ```
+- Hook automatically handles:
+  - Loading states
+  - Error states and toast notifications
+  - Success messages
+  - Callbacks on success/error
+
+**Error Types:**
+- **Business Exceptions**: User-facing messages (validation, not found) - Display actual error message
+- **Technical Exceptions**: System errors - Display generic "Something went wrong" message
+- **Session Timeout (401)**: Automatic redirect to login
+
+**Best Practices:**
+- Never use raw `fetch` calls - always use API client helpers
+- Never manually manage auth tokens
+- Always provide user-friendly error messages in API exceptions
+- Use `useServerAction` for all mutation operations
+- Provide success messages for user actions
+
+### Orchestrator.AcceptanceTests
+- **Purpose**: Integration and acceptance testing
+- **Dependencies**: Orchestrator.DomainLayer only
+- **Special Access**: InternalsVisibleTo for creating test doubles
+- **Responsibilities**:
+  - Test business logic through DomainFacade
+  - Create custom test doubles and stubs for internal components
+  - Verify end-to-end functionality
+  - No external mocking framework dependencies
+
+## Common Patterns
+
+### 1. Result Pattern
+All operations return a `Result<T>` wrapper that indicates success/failure:
+```csharp
+public class Result<T>
+{
+    public bool IsSuccess { get; }
+    public T? Value { get; }
+    public Exception? Error { get; }
+}
+```
+
+### 2. Pagination Pattern
+Search operations use `PaginatedResult<T>` for consistent pagination:
+```csharp
+public class PaginatedResult<T>
+{
+    public IEnumerable<T> Items { get; set; }
+    public int TotalCount { get; set; }
+    public int PageNumber { get; set; }
+    public int PageSize { get; set; }
+}
+```
+
+### 3. Facade Pattern
+- **DomainFacade**: High-level business operations
+- **DataFacade**: Low-level data access operations
+- Both provide clean interfaces for their respective layers
+
+### 4. InternalsVisibleTo Pattern
+```csharp
+// In Orchestrator.DomainLayer/Properties/AssemblyInfo.cs
+[assembly: InternalsVisibleTo("Orchestrator.AcceptanceTests")]
+```
+
+This allows tests to:
+- Create custom test doubles for internal constructors and methods
+- Access internal components for implementing stubs and fakes
+- Maintain clean architecture boundaries without external dependencies
+- Enable comprehensive test coverage using custom implementations
+
+### 5. Test Double Patterns
+Instead of external mocking frameworks, use custom test doubles:
+
+- **Stubs**: Provide canned answers to calls made during tests
+- **Fakes**: Working implementations with shortcuts (e.g., in-memory database)
+- **Test Doubles**: Objects that replace real dependencies with test-specific behavior
+
+**Benefits of Custom Test Doubles:**
+- No external dependencies in test projects
+- Full control over test behavior
+- Clear and explicit test setup
+- Better understanding of what is being tested
+- Easier to maintain and debug
+
+## Data Flow
+
+### Create Operation
+```
+HTTP Request → Controller → Validator → Mapper → DomainFacade → DataFacade → DataManager → Database
+```
+
+### Read Operation
+```
+HTTP Request → Controller → DomainFacade → DataFacade → DataManager → Database
+Database → DataManager → DataFacade → DomainFacade → Mapper → Controller → HTTP Response
+```
+
+### Update Operation
+```
+HTTP Request → Controller → Validator → Mapper → DomainFacade → DataFacade → DataManager → Database
+```
+
+### Delete Operation
+```
+HTTP Request → Controller → DomainFacade → DataFacade → DataManager → Database
+```
+
+## Communication Flow
+
+### Frontend to Backend Communication
+Orchestrator.Web (Frontend) → HTTP Requests → Orchestrator.Api (Backend) → Orchestrator.DomainLayer
+
+## Testing Strategy
+
+### Acceptance Tests
+- **Location**: Orchestrator.AcceptanceTests/DomainLayer/
+- **Purpose**: Test business logic through DomainFacade
+- **Access**: Can access internal members via InternalsVisibleTo
+- **Test Doubles**: Create custom stubs, fakes, and test doubles for isolation
+- **Dependencies**: Orchestrator.DomainLayer only
+- **No External Frameworks**: All test doubles are custom implementations
+
+### Enhanced Test Cleanup
+- **Database-Level Cleanup**: Use direct SQL for efficient test data removal
+- **Pattern-Based Identification**: Identify test data by consistent patterns (email domains, specific names)
+- **Complete Isolation**: Clean up before AND after each test for 100% reliability
+- **Robust Error Handling**: Cleanup failures don't break tests
+- **Performance**: Single SQL operation vs. multiple API calls
+- **Maintainability**: Simple, consistent patterns across all tests
+
+**Test Cleanup Implementation:**
+```csharp
+[TestInitialize]
+public void TestInitialize()
+{
+    // Clean up ALL test data before each test to ensure complete isolation
+    CleanupAllTestData();
+    _domainFacade = new DomainFacade(new ServiceLocatorForAcceptanceTesting());
+}
+
+[TestCleanup]
+public void TestCleanup()
+{
+    try
+    {
+        // Clean up any remaining test data after the test
+        CleanupAllTestData();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Warning: Error during test cleanup: {ex.Message}");
+    }
+    finally
+    {
+        _domainFacade?.Dispose();
+    }
+}
+
+private void CleanupAllTestData()
+{
+    // Database-level cleanup using pattern-based identification
+    var deleteSql = @"
+        DELETE FROM users 
+        WHERE email LIKE '%@example.com' 
+           OR email LIKE '%@test.com'
+           OR first_name IN ('John', 'Jane', 'Bob', 'Alice', 'Search', ...)
+           OR first_name LIKE 'Search%'
+           OR first_name LIKE 'Pagination%'";
+}
+
+### API Tests
+- **Location**: Orchestrator.AcceptanceTests/Api/
+- **Purpose**: Test HTTP endpoints and request/response handling
+- **Access**: Only public interfaces
+- **Dependencies**: Orchestrator.DomainLayer only
+
+## Security Considerations
+- **Input Validation**: All inputs validated at API layer
+- **Authorization**: Handled at API layer
+- **Data Access**: Controlled through DomainFacade interface
+- **Audit Trail**: Built into domain models
+- **CORS**: Configured at API layer for frontend access
+- **HTTPS**: Enforced for all API communications
+- **API Rate Limiting**: Implemented at API layer
+
+## Performance Considerations
+- **Pagination**: All list operations support pagination
+- **Caching**: Can be added at DomainFacade level
+- **Database**: Optimized queries with proper indexing
+- **Async**: All operations are async for scalability
+
+## Future Considerations
+- **Event Sourcing**: Can be added at DomainFacade level
+- **CQRS**: Can be implemented by splitting read/write operations
+- **Microservices**: DomainLayer can be extracted as a service
+- **API Versioning**: Can be added at API layer
+
+## API Documentation
+- **OpenAPI/Swagger**: Auto-generated from controllers
+- **Endpoint Documentation**: Each endpoint documented with examples
+- **Error Responses**: Standardized error response format
+- **Authentication**: JWT token-based authentication
+- **Rate Limits**: Documented limits per endpoint
+
+## API Contract
+- **Protocol**: HTTP/HTTPS
+- **Format**: JSON
+- **Authentication**: Bearer tokens (JWT)
+- **Error Handling**: Standard HTTP status codes with error details in response body
+- **Versioning**: URL-based versioning (e.g., `/api/v1/users`)
+
+## Frontend Responsibilities
+- **State Management**: Client-side state for UI components
+- **API Integration**: HTTP client for API communication
+- **User Experience**: Responsive design, loading states, error handling
+- **Routing**: Client-side navigation and routing
+
+# Clean Architecture Checklist
+
+- [ ] All business validation (e.g., email format, required fields) is enforced in the DomainLayer, not just the API layer.
+- [ ] DomainLayer always uses ServiceLocator and ConfigurationProvider for connection strings and dependencies.
+- [ ] No constructors are added to partial DataFacade classes; all feature-specific logic is instance-based.
+- [ ] Acceptance tests use only the real DomainFacade and DataFacade, never test doubles for data access.
+- [ ] Liquibase migration templates use <constraints ... /> elements, not attributes.
+- [ ] Namespaces and using statements are correct and consistent, especially for test helpers and infrastructure.
+- [ ] Test assertions print or log error messages (e.g., result.ErrorMessage) on failure for easier debugging.
+- [ ] Templates and rules are updated whenever a bug is fixed in generated code.

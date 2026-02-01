@@ -1,0 +1,20 @@
+using System.Text.Json.Serialization;
+
+namespace Orchestrator.Domain;
+
+/// <summary>
+/// Response model for {{integrationName}} API {{operationName}} operation
+/// Represents the exact structure returned by the external API
+/// </summary>
+internal class {{integrationName}}{{operationName}}Response
+{
+    {{#each properties}}
+    /// <summary>
+    /// {{description}}
+    /// </summary>
+    [JsonPropertyName("{{jsonPropertyName}}")]
+    public {{type}} {{name}} { get; set; }{{#if defaultValue}} = {{defaultValue}};{{else}}{{#if (eq type "string")}} = string.Empty;{{else if (eq type "List<string>")}} = new();{{/if}}{{/if}}
+
+    {{/each}}
+}
+

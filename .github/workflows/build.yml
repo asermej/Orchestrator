@@ -1,0 +1,97 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  POSTGRES_DB: surrova
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: apps/web/Platform.Web/package-lock.json
+
+    - name: Install just
+      uses: extractions/setup-just@v2
+
+    - name: Setup Java (for Liquibase)
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Install Liquibase with PostgreSQL driver
+      run: |
+        # Create temporary directory for extraction
+        mkdir -p /tmp/liquibase-install
+        cd /tmp/liquibase-install
+        
+        # Download and extract Liquibase
+        wget -O liquibase.tar.gz https://github.com/liquibase/liquibase/releases/download/v4.32.0/liquibase-4.32.0.tar.gz
+        tar -xzf liquibase.tar.gz
+        
+        # Create installation directory and move files
+        sudo mkdir -p /opt/liquibase
+        sudo cp -r * /opt/liquibase/
+        sudo chmod +x /opt/liquibase/liquibase
+        sudo ln -s /opt/liquibase/liquibase /usr/local/bin/liquibase
+        
+        # Download PostgreSQL JDBC driver
+        sudo wget -O /opt/liquibase/lib/postgresql.jar https://jdbc.postgresql.org/download/postgresql-42.7.4.jar
+        
+        # Verify installation
+        liquibase --version
+        
+        # Clean up
+        cd /
+        rm -rf /tmp/liquibase-install
+
+    - name: Install web dependencies
+      run: cd apps/web/Platform.Web && npm ci
+
+    - name: Build
+      run: just build
+
+    - name: Run Database Migrations
+      run: just db-update
+      env:
+        PGPASSWORD: ${{ env.POSTGRES_PASSWORD }}
+
+    - name: Test
+      run: just test
+      env:
+        ConnectionStrings__DbConnectionString: "Host=localhost;Port=5432;Database=${{ env.POSTGRES_DB }};Username=${{ env.POSTGRES_USER }};Password=${{ env.POSTGRES_PASSWORD }}" 

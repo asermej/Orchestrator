@@ -1,0 +1,41 @@
+---
+description: "ACTIVE: DomainFacade rules - Public entry point to Orchestrator.Domain"
+globs: apps/api/Orchestrator.Domain/DomainFacade*.cs
+alwaysApply: false
+---
+
+>>> CONTEXT LOADED: DomainFacade best practices are now active <<<
+
+# DomainFacade Best Practices
+
+**Template**: [DomainFacade.Base.hbs](mdc:docs/technical/templates/domain-templates/DomainFacade.Base.hbs)
+
+## Purpose
+The `DomainFacade` is the **single public entry point** to `Orchestrator.Domain`. The API layer should ONLY interact with `DomainFacade`.
+
+## Requirements
+
+- **Partial class structure**: Use `DomainFacade.{Feature}.cs` files to organize by feature
+- **Lazy initialization**: Use `??=` pattern for manager instantiation
+- **Dispose pattern**: Always dispose managers in `Dispose(bool disposing)`
+- **Delegate to managers**: Facade methods should call manager methods, not contain business logic
+- **ConfigureAwait(false)**: Use on all async calls in domain layer
+
+## Pattern
+
+```csharp
+public sealed partial class DomainFacade : IDisposable
+{
+    private FeatureManager? _featureManager;
+    private FeatureManager FeatureManager => _featureManager ??= new FeatureManager(_serviceLocator);
+    
+    // In Dispose(bool disposing):
+    _featureManager?.Dispose();
+}
+```
+
+## Do NOT
+
+- Expose join table managers directly (see [principles.mdc](mdc:.cursor/rules/architecture-overview.mdc))
+- Put business logic in facade methods
+- Create public constructors beyond the default

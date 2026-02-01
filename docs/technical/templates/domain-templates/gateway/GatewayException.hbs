@@ -1,0 +1,18 @@
+namespace Orchestrator.Domain;
+
+/// <summary>
+/// Exception thrown when {{integrationName}} {{exceptionType}} occurs
+/// </summary>
+public class {{integrationName}}{{exceptionType}}Exception : TechnicalBaseException
+{
+    public override string Reason => "{{integrationName}} {{exceptionType}} error";
+
+    public {{integrationName}}{{exceptionType}}Exception(string message) : base(message)
+    {
+    }
+
+    public {{integrationName}}{{exceptionType}}Exception(string message, Exception innerException) : base(message, innerException)
+    {
+    }
+}
+
