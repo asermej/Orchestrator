@@ -65,23 +65,33 @@ export async function apiGet<T>(url: string): Promise<T> {
 
 /**
  * POST request with automatic authentication
+ * Returns void for 204 No Content responses
  */
-export async function apiPost<T>(url: string, body?: any): Promise<T> {
+export async function apiPost<T>(url: string, body?: any): Promise<T | void> {
   const response = await apiFetch(url, {
     method: 'POST',
     body: body ? JSON.stringify(body) : undefined,
   });
+  // Handle 204 No Content responses
+  if (response.status === 204) {
+    return;
+  }
   return response.json();
 }
 
 /**
  * PUT request with automatic authentication
+ * Returns void for 204 No Content responses
  */
-export async function apiPut<T>(url: string, body?: any): Promise<T> {
+export async function apiPut<T>(url: string, body?: any): Promise<T | void> {
   const response = await apiFetch(url, {
     method: 'PUT',
     body: body ? JSON.stringify(body) : undefined,
   });
+  // Handle 204 No Content responses
+  if (response.status === 204) {
+    return;
+  }
   return response.json();
 }
 
@@ -94,8 +104,9 @@ export async function apiDelete(url: string): Promise<void> {
 
 /**
  * POST with FormData (for file uploads)
+ * Returns void for 204 No Content responses
  */
-export async function apiPostFormData<T>(url: string, formData: FormData): Promise<T> {
+export async function apiPostFormData<T>(url: string, formData: FormData): Promise<T | void> {
   const accessToken = await getAccessToken();
   
   const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
@@ -128,6 +139,10 @@ export async function apiPostFormData<T>(url: string, formData: FormData): Promi
     }
   }
   
+  // Handle 204 No Content responses
+  if (response.status === 204) {
+    return;
+  }
   return response.json();
 }
 

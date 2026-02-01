@@ -73,8 +73,11 @@ export function ImageUpload({
           initialQuality: 0.8
         }
 
-        const compressedFile = await imageCompression(file, options)
+        const compressedBlob = await imageCompression(file, options)
         setUploadProgress(50)
+
+        // Preserve original filename (compression may lose it)
+        const compressedFile = new File([compressedBlob], file.name, { type: compressedBlob.type })
 
         // Upload compressed file
         await uploadFile(compressedFile)

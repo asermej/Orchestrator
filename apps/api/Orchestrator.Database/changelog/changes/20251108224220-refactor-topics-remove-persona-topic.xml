@@ -39,6 +39,9 @@
     </changeSet>
 
     <changeSet id="20251108224220-migrate-persona-topic-data" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="persona_topics"/>
+        </preConditions>
         <comment>Migrate data from persona_topics to topics</comment>
         
         <!-- Step 3: Migrate data from persona_topics to topics -->

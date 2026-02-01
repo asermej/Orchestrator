@@ -133,6 +133,7 @@ public static class TestDataCleanup
                    OR name LIKE 'Delete%'
                    OR name LIKE 'Lifecycle%'
                    OR name LIKE '%delete%'
+                   OR name LIKE 'searchtesttag%'
                    OR LOWER(name) IN ('duplicatetag', 'celtics', 'searchbyname', 'basketball', 'differenttag', 'existingtag', 'newtag', 'searchtesttag')");
             totalDeleted += tagsDeleted;
 

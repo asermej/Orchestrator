@@ -248,18 +248,37 @@ public class DomainFacadeTestsTag
     [TestMethod]
     public async Task SearchTags_NoSearchTerm_ReturnsAllTags()
     {
-        // Arrange
-        await _domainFacade.CreateTag(new Tag { Name = "testtag1" });
-        await _domainFacade.CreateTag(new Tag { Name = "testtag2" });
-        await _domainFacade.CreateTag(new Tag { Name = "testtag3" });
+        // Arrange - Get initial count before creating test tags
+        // Note: SearchTags only returns tags that are associated with at least one topic
+        var initialResult = await _domainFacade.SearchTags(null, 1, 100);
+        var initialCount = initialResult?.TotalCount ?? 0;
+        
+        // Create a persona and topic first (tags must be associated with a topic to appear in search)
+        var uniqueId = Guid.NewGuid().ToString("N")[..8];
+        var persona = await _domainFacade.CreatePersona(new Persona { DisplayName = $"TestPersona{uniqueId}" });
+        var categoryId = GetGeneralCategoryId();
+        
+        var topic = new Topic
+        {
+            Name = $"TestTopicForTags{uniqueId}",
+            Description = "Test topic for tag search",
+            CategoryId = categoryId,
+            PersonaId = persona.Id,
+            ContentUrl = "https://example.com/test"
+        };
+        var createdTopic = await _domainFacade.CreateTopic(topic);
+        
+        // Create tags by associating them with the topic (this creates tags if they don't exist)
+        var tagNames = new[] { $"searchtesttag{uniqueId}a", $"searchtesttag{uniqueId}b", $"searchtesttag{uniqueId}c" };
+        await _domainFacade.UpdateTopicTags(createdTopic.Id, tagNames, null);
 
         // Act
-        var result = await _domainFacade.SearchTags(null, 1, 10);
+        var result = await _domainFacade.SearchTags(null, 1, 100);
 
         // Assert
         Assert.IsNotNull(result, "Expected search results, but got null");
-        Assert.IsTrue(result.TotalCount >= 3, $"Expected at least 3 tags, but got {result.TotalCount}");
-        Console.WriteLine($"Search returned {result.TotalCount} total tags");
+        Assert.IsTrue(result.TotalCount >= initialCount + 3, $"Expected at least {initialCount + 3} tags after creating 3, but got {result.TotalCount}");
+        Console.WriteLine($"Search returned {result.TotalCount} total tags (was {initialCount} before test)");
     }
 
     [TestMethod]
