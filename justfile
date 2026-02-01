@@ -1,28 +1,28 @@
 build:
-	dotnet build apps/Platform.sln
-	cd apps/web/Platform.Web && npm install && npm run build
+	dotnet build apps/Orchestrator.sln
+	cd apps/web/Orchestrator.Web && npm install && npm run build
 
 test:
-	dotnet test apps/api/Platform.AcceptanceTests/Platform.AcceptanceTests.csproj --verbosity normal
+	dotnet test apps/api/Orchestrator.AcceptanceTests/Orchestrator.AcceptanceTests.csproj --verbosity normal
 
 db-update:
-	liquibase --defaultsFile=apps/api/Platform.Database/liquibase/config/liquibase.properties --changelog-file=apps/api/Platform.Database/changelog/db.changelog-master.xml update
+	liquibase --defaultsFile=apps/api/Orchestrator.Database/liquibase/config/liquibase.properties --changelog-file=apps/api/Orchestrator.Database/changelog/db.changelog-master.xml update
 
 db-connect:
-	psql -h localhost -U postgres -d surrova
+	psql -h localhost -U postgres -d orchestrator
 
 # Dev targets: real ElevenLabs = dev-api, dev, start. Fake voice (no key) = dev-api-fake, dev-fake, start-fake.
 # Start ONLY the API server (useful for running in separate terminal)
 dev-api:
-	cd apps/api/Platform.Api && ASPNETCORE_ENVIRONMENT=Development dotnet run
+	cd apps/api/Orchestrator.Api && ASPNETCORE_ENVIRONMENT=Development dotnet run
 
 # Run API with fake ElevenLabs (no API key needed)
 dev-api-fake:
-	cd apps/api/Platform.Api && ASPNETCORE_ENVIRONMENT=Development Voice__UseFakeElevenLabs=true dotnet run
+	cd apps/api/Orchestrator.Api && ASPNETCORE_ENVIRONMENT=Development Voice__UseFakeElevenLabs=true dotnet run
 
 # Start ONLY the web server (useful for running in separate terminal)
 dev-web:
-	cd apps/web/Platform.Web && npm run dev
+	cd apps/web/Orchestrator.Web && npm run dev
 
 # Start both API and web applications in development mode (no build)
 dev:
@@ -36,12 +36,12 @@ dev:
 	sleep 1
 
 	echo "🚀 Starting API server..."
-	cd apps/api/Platform.Api
+	cd apps/api/Orchestrator.Api
 	ASPNETCORE_ENVIRONMENT=Development dotnet run 2>&1 | sed 's/^/[🔵 API] /' &
 	API_PID=$!
 
 	echo "🌐 Starting web server..."
-	cd ../../../apps/web/Platform.Web
+	cd ../../../apps/web/Orchestrator.Web
 	npm run dev 2>&1 | sed 's/^/[🟢 WEB] /' &
 	WEB_PID=$!
 
@@ -72,12 +72,12 @@ dev-fake:
 	sleep 1
 
 	echo "🚀 Starting API server (fake voice)..."
-	cd apps/api/Platform.Api
+	cd apps/api/Orchestrator.Api
 	ASPNETCORE_ENVIRONMENT=Development Voice__UseFakeElevenLabs=true dotnet run 2>&1 | sed 's/^/[🔵 API] /' &
 	API_PID=$!
 
 	echo "🌐 Starting web server..."
-	cd ../../../apps/web/Platform.Web
+	cd ../../../apps/web/Orchestrator.Web
 	npm run dev 2>&1 | sed 's/^/[🟢 WEB] /' &
 	WEB_PID=$!
 
@@ -111,12 +111,12 @@ start:
 	just build
 
 	echo "🚀 Starting API server..."
-	cd apps/api/Platform.Api
+	cd apps/api/Orchestrator.Api
 	ASPNETCORE_ENVIRONMENT=Development dotnet run 2>&1 | sed 's/^/[🔵 API] /' &
 	API_PID=$!
 
 	echo "🌐 Starting web server..."
-	cd ../../../apps/web/Platform.Web
+	cd ../../../apps/web/Orchestrator.Web
 	npm run dev 2>&1 | sed 's/^/[🟢 WEB] /' &
 	WEB_PID=$!
 
@@ -150,12 +150,12 @@ start-fake:
 	just build
 
 	echo "🚀 Starting API server (fake voice)..."
-	cd apps/api/Platform.Api
+	cd apps/api/Orchestrator.Api
 	ASPNETCORE_ENVIRONMENT=Development Voice__UseFakeElevenLabs=true dotnet run 2>&1 | sed 's/^/[🔵 API] /' &
 	API_PID=$!
 
 	echo "🌐 Starting web server..."
-	cd ../../../apps/web/Platform.Web
+	cd ../../../apps/web/Orchestrator.Web
 	npm run dev 2>&1 | sed 's/^/[🟢 WEB] /' &
 	WEB_PID=$!
 
