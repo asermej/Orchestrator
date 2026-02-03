@@ -6,18 +6,18 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { PersonaAvatar } from "@/components/persona-avatar";
+import { AgentAvatar } from "@/components/agent-avatar";
 import { Header } from "@/components/header";
 import { ArrowLeft, Search, Loader2, User } from "lucide-react";
 import Link from "next/link";
-import { fetchPersonas, PersonaItem } from "./actions";
+import { fetchAgents, AgentItem } from "./actions";
 
-export default function BrowsePersonas() {
+export default function BrowseAgents() {
   const { user, isLoading: isUserLoading } = useUser();
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const [personas, setPersonas] = useState<PersonaItem[]>([]);
+  const [agents, setAgents] = useState<AgentItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -41,20 +41,20 @@ export default function BrowsePersonas() {
 
   useEffect(() => {
     if (user) {
-      loadPersonas();
+      loadAgents();
     }
   }, [user, currentPage, searchTerm]);
 
-  const loadPersonas = async () => {
+  const loadAgents = async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const data = await fetchPersonas(currentPage, pageSize, searchTerm);
-      setPersonas(data.items);
+      const data = await fetchAgents(currentPage, pageSize, searchTerm);
+      setAgents(data.items);
       setTotalCount(data.totalCount);
     } catch (err) {
-      console.error("Error loading personas:", err);
-      setError("Failed to load personas. Please try again.");
+      console.error("Error loading agents:", err);
+      setError("Failed to load agents. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -95,9 +95,9 @@ export default function BrowsePersonas() {
           
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold">Discover Personas</h1>
+              <h1 className="text-3xl font-bold">Discover Agents</h1>
               <p className="text-muted-foreground mt-2">
-                Browse all AI personalities created by the community
+                Browse all AI agents created by the community
               </p>
             </div>
             
@@ -129,54 +129,47 @@ export default function BrowsePersonas() {
           <div className="flex justify-center items-center py-20">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
           </div>
-        ) : personas.length === 0 ? (
+        ) : agents.length === 0 ? (
           /* Empty State */
           <div className="text-center py-20">
             <User className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2">No personas found</h3>
+            <h3 className="text-xl font-semibold mb-2">No agents found</h3>
             <p className="text-muted-foreground mb-6">
               {searchTerm
                 ? "Try adjusting your search terms"
-                : "Be the first to create a persona!"}
+                : "Be the first to create an agent!"}
             </p>
             {!searchTerm && (
               <Link href="/create-persona">
-                <Button>Create Persona</Button>
+                <Button>Create Agent</Button>
               </Link>
             )}
           </div>
         ) : (
-          /* Personas Grid */
+          /* Agents Grid */
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
-              {personas.map((persona) => (
-                <Link key={persona.id} href={`/personas/${persona.id}/chat`}>
+              {agents.map((agent) => (
+                <Link key={agent.id} href={`/personas/${agent.id}/chat`}>
                   <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
                     <CardHeader className="p-6">
                       <div className="flex flex-col items-center text-center space-y-4">
-                        <PersonaAvatar
-                          imageUrl={persona.profileImageUrl}
-                          displayName={persona.displayName}
+                        <AgentAvatar
+                          imageUrl={agent.profileImageUrl}
+                          displayName={agent.displayName}
                           size="2xl"
                           shape="square"
                         />
                         <div className="space-y-1">
                           <h3 className="font-semibold text-lg leading-none">
-                            {persona.displayName}
+                            {agent.displayName}
                           </h3>
-                          {(persona.firstName || persona.lastName) && (
-                            <p className="text-sm text-muted-foreground">
-                              {[persona.firstName, persona.lastName]
-                                .filter(Boolean)
-                                .join(" ")}
-                            </p>
-                          )}
                         </div>
                       </div>
                     </CardHeader>
                     <CardContent className="p-6 pt-0">
                       <div className="text-xs text-muted-foreground text-center">
-                        Created {new Date(persona.createdAt).toLocaleDateString()}
+                        Created {new Date(agent.createdAt).toLocaleDateString()}
                       </div>
                     </CardContent>
                   </Card>

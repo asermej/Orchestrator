@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({ voiceId, text: text ?? "Hey — I'm your Surrova persona voice." }),
+      body: JSON.stringify({ voiceId, text: text ?? "Hello! I'm your AI interviewer." }),
     });
 
     if (!backendResponse.ok) {

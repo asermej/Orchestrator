@@ -19,10 +19,10 @@ internal static class ChatValidator
     {
         var errors = new List<string>();
 
-        // --- Validation for PersonaId ---
-        if (chat.PersonaId == Guid.Empty)
+        // --- Validation for AgentId ---
+        if (chat.AgentId == Guid.Empty)
         {
-            errors.Add("PersonaId is required.");
+            errors.Add("AgentId is required.");
         }
 
         // --- Validation for UserId ---

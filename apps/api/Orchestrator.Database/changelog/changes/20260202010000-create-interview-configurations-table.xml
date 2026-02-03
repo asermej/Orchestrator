@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Create interview_configurations table -->
+    <changeSet id="20260202010000-create-interview-configurations-table" author="system">
+        <createTable tableName="interview_configurations">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="organization_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_interview_configurations_organization" references="organizations(id)"/>
+            </column>
+            <column name="agent_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_interview_configurations_agent" references="agents(id)"/>
+            </column>
+            <column name="name" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <column name="scoring_rubric" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <!-- Audit fields -->
+            <column name="created_at" type="timestamp" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="updated_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_deleted" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="deleted_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="interview_configurations" indexName="idx_interview_configurations_organization_id">
+            <column name="organization_id"/>
+        </createIndex>
+
+        <createIndex tableName="interview_configurations" indexName="idx_interview_configurations_agent_id">
+            <column name="agent_id"/>
+        </createIndex>
+
+        <createIndex tableName="interview_configurations" indexName="idx_interview_configurations_name">
+            <column name="name"/>
+        </createIndex>
+
+        <createIndex tableName="interview_configurations" indexName="idx_interview_configurations_is_deleted">
+            <column name="is_deleted"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Create interview_configuration_questions table -->
+    <changeSet id="20260202010000-create-interview-configuration-questions-table" author="system">
+        <createTable tableName="interview_configuration_questions">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="interview_configuration_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_interview_configuration_questions_configuration" references="interview_configurations(id)" deleteCascade="true"/>
+            </column>
+            <column name="question" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="display_order" type="int" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="scoring_weight" type="decimal(5,2)" defaultValueNumeric="1.0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="scoring_guidance" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <!-- Audit fields -->
+            <column name="created_at" type="timestamp" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="interview_configuration_questions" indexName="idx_interview_configuration_questions_configuration_id">
+            <column name="interview_configuration_id"/>
+        </createIndex>
+
+        <createIndex tableName="interview_configuration_questions" indexName="idx_interview_configuration_questions_display_order">
+            <column name="display_order"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

@@ -9,7 +9,7 @@ export const API_BASE_URL = 'http://localhost:5000'
 
 /**
  * Get the full URL for an image
- * @param relativePath - The relative path to the image (e.g., "/uploads/personas/abc.png")
+ * @param relativePath - The relative path to the image (e.g., "/uploads/agents/abc.png")
  * @returns The full URL to the image
  */
 export function getImageUrl(relativePath: string | null | undefined): string | null {

@@ -2,13 +2,14 @@
 
 import { apiGet, apiPut, apiDelete } from "@/lib/api-client-server";
 
-export interface PersonaItem {
+export interface AgentItem {
   id: string;
-  firstName?: string | null;
-  lastName?: string | null;
+  organizationId: string;
   displayName: string;
   profileImageUrl?: string | null;
-  elevenLabsVoiceId?: string | null;
+  systemPrompt?: string | null;
+  interviewGuidelines?: string | null;
+  elevenlabsVoiceId?: string | null;
   voiceStability?: number;
   voiceSimilarityBoost?: number;
   voiceProvider?: string | null;
@@ -21,16 +22,16 @@ export interface PersonaItem {
 }
 
 interface PaginatedResponse {
-  items: PersonaItem[];
+  items: AgentItem[];
   totalCount: number;
   pageNumber: number;
   pageSize: number;
 }
 
 /**
- * Fetch personas created by the current user
+ * Fetch agents created by the current user
  */
-export async function fetchMyPersonas(
+export async function fetchMyAgents(
   pageNumber: number = 1,
   pageSize: number = 12,
   searchTerm?: string
@@ -47,41 +48,44 @@ export async function fetchMyPersonas(
     params.append("DisplayName", searchTerm.trim());
   }
 
-  const data = await apiGet<PaginatedResponse>(`/Persona?${params.toString()}`);
+  const data = await apiGet<PaginatedResponse>(`/Agent?${params.toString()}`);
   return data;
 }
 
 /**
- * Fetch a single persona by ID
+ * Fetch a single agent by ID
  */
-export async function fetchPersonaById(id: string): Promise<PersonaItem> {
-  const data = await apiGet<PersonaItem>(`/Persona/${id}`);
+export async function fetchAgentById(id: string): Promise<AgentItem> {
+  const data = await apiGet<AgentItem>(`/Agent/${id}`);
   return data;
 }
 
 /**
- * Update a persona
+ * Update an agent
  */
-export async function updatePersona(
+export async function updateAgent(
   id: string,
   data: {
-    firstName?: string | null;
-    lastName?: string | null;
     displayName?: string;
     profileImageUrl?: string | null;
-    elevenLabsVoiceId?: string | null;
-    voiceStability?: number;
-    voiceSimilarityBoost?: number;
+    systemPrompt?: string | null;
+    interviewGuidelines?: string | null;
   }
-): Promise<PersonaItem> {
-  const updatedPersona = await apiPut<PersonaItem>(`/Persona/${id}`, data);
-  return updatedPersona;
+): Promise<AgentItem> {
+  const updatedAgent = await apiPut<AgentItem>(`/Agent/${id}`, data);
+  return updatedAgent;
 }
 
 /**
- * Delete a persona
+ * Delete an agent
  */
-export async function deletePersona(id: string): Promise<void> {
-  await apiDelete(`/Persona/${id}`);
+export async function deleteAgent(id: string): Promise<void> {
+  await apiDelete(`/Agent/${id}`);
 }
 
+// Aliases for backward compatibility
+export type PersonaItem = AgentItem;
+export { fetchMyAgents as fetchMyPersonas };
+export { fetchAgentById as fetchPersonaById };
+export { updateAgent as updatePersona };
+export { deleteAgent as deletePersona };

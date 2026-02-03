@@ -49,4 +49,35 @@
     <include file="changes/20260201130000-create-stock-voices-table.xml" relativeToChangelogFile="true"/>
     <include file="changes/20260201130001-seed-stock-voices.xml" relativeToChangelogFile="true"/>
     <include file="changes/20260201140000-add-style-lane-to-voice-clone-jobs.xml" relativeToChangelogFile="true"/>
+    
+    <!-- ATS Platform Reset and New Schema -->
+    <include file="changes/20260201150000-ats-platform-reset.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260201150001-Organization.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260201150002-Persona.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260201150003-JobType.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260201150004-InterviewQuestion.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260201150005-Applicant.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260201150006-Job.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260201150007-Interview.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260201150008-InterviewResponse.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260201150009-InterviewResult.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260201150010-Webhook.xml" relativeToChangelogFile="true"/>
+    
+    <!-- Phase 3: Rename Persona to Agent -->
+    <include file="changes/20260202000000-rename-personas-to-agents.xml" relativeToChangelogFile="true"/>
+    
+    <!-- Phase 4: Interview Configurations (replacement for JobTypes) -->
+    <include file="changes/20260202010000-create-interview-configurations-table.xml" relativeToChangelogFile="true"/>
+    
+    <!-- Phase 5: Remove first_name/last_name from agents -->
+    <include file="changes/20260203000000-drop-agent-name-columns.xml" relativeToChangelogFile="true"/>
+    
+    <!-- Phase 6: Fix consent_audit table - rename persona_id to agent_id -->
+    <include file="changes/20260203120000-fix-consent-audit-agent-column.xml" relativeToChangelogFile="true"/>
+    
+    <!-- Phase 7: Remove voice cloning feature -->
+    <include file="changes/20260203150000-remove-voice-cloning.xml" relativeToChangelogFile="true"/>
+    
+    <!-- Phase 8: Make interview_responses.question_id nullable for test interviews -->
+    <include file="changes/20260203160000-make-interview-response-question-nullable.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog> 

@@ -53,7 +53,7 @@ export const topicSortOptions: SortOption[] = [
   { value: "chat_count", label: "Most Chats" },
 ];
 
-export const personaSortOptions: SortOption[] = [
+export const agentSortOptions: SortOption[] = [
   { value: "recent", label: "Most Recent" },
   { value: "popularity", label: "Most Popular" },
   { value: "alphabetical", label: "Alphabetical" },

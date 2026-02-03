@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="20260201150010-1" author="system">
+        <comment>Create webhook_configs table for ATS webhook configurations</comment>
+        <createTable tableName="webhook_configs" schemaName="public">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="organization_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_webhook_configs_organization_id" references="organizations(id)"/>
+            </column>
+            <column name="name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="url" type="VARCHAR(2048)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="secret" type="VARCHAR(512)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="event_type" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_active" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITHOUT TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITHOUT TIME ZONE"/>
+            <column name="is_deleted" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex indexName="idx_webhook_configs_organization_id" tableName="webhook_configs" schemaName="public">
+            <column name="organization_id"/>
+        </createIndex>
+        <createIndex indexName="idx_webhook_configs_event_type" tableName="webhook_configs" schemaName="public">
+            <column name="event_type"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="20260201150010-2" author="system">
+        <comment>Create webhook_deliveries table for tracking webhook delivery attempts</comment>
+        <createTable tableName="webhook_deliveries" schemaName="public">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="webhook_config_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_webhook_deliveries_webhook_config_id" references="webhook_configs(id)"/>
+            </column>
+            <column name="event_type" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="payload" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="response_status_code" type="INTEGER"/>
+            <column name="response_body" type="TEXT"/>
+            <column name="error_message" type="TEXT"/>
+            <column name="status" type="VARCHAR(50)" defaultValue="pending">
+                <constraints nullable="false"/>
+            </column>
+            <column name="attempts" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="next_retry_at" type="TIMESTAMP WITHOUT TIME ZONE"/>
+            <column name="delivered_at" type="TIMESTAMP WITHOUT TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITHOUT TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex indexName="idx_webhook_deliveries_webhook_config_id" tableName="webhook_deliveries" schemaName="public">
+            <column name="webhook_config_id"/>
+        </createIndex>
+        <createIndex indexName="idx_webhook_deliveries_status" tableName="webhook_deliveries" schemaName="public">
+            <column name="status"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

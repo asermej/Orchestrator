@@ -14,8 +14,8 @@ internal sealed class ChatManager : IDisposable
     private readonly ServiceLocatorBase _serviceLocator;
     private DataFacade? _dataFacade;
     private DataFacade DataFacade => _dataFacade ??= new DataFacade(_serviceLocator.CreateConfigurationProvider().GetDbConnectionString());
-    private PersonaManager? _personaManager;
-    private PersonaManager PersonaManager => _personaManager ??= new PersonaManager(_serviceLocator);
+    private AgentManager? _agentManager;
+    private AgentManager AgentManager => _agentManager ??= new AgentManager(_serviceLocator);
     private TrainingStorageManager? _storageManager;
     private TrainingStorageManager StorageManager => _storageManager ??= new TrainingStorageManager();
 
@@ -49,15 +49,15 @@ internal sealed class ChatManager : IDisposable
     /// <summary>
     /// Searches for Chats
     /// </summary>
-    /// <param name="personaId">Optional persona ID to filter by</param>
+    /// <param name="agentId">Optional agent ID to filter by</param>
     /// <param name="userId">Optional user ID to filter by</param>
     /// <param name="title">Optional title to search for</param>
     /// <param name="pageNumber">Page number for pagination</param>
     /// <param name="pageSize">Page size for pagination</param>
     /// <returns>A paginated list of Chats</returns>
-    public async Task<PaginatedResult<Chat>> SearchChats(Guid? personaId, Guid? userId, string? title, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Chat>> SearchChats(Guid? agentId, Guid? userId, string? title, int pageNumber, int pageSize)
     {
-        return await DataFacade.SearchChats(personaId, userId, title, pageNumber, pageSize).ConfigureAwait(false);
+        return await DataFacade.SearchChats(agentId, userId, title, pageNumber, pageSize).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -121,8 +121,8 @@ internal sealed class ChatManager : IDisposable
         if (string.IsNullOrWhiteSpace(topicContent))
         {
             throw new ChatTopicValidationException(
-                $"Cannot add topic '{topic.Name}' to conversation. The persona has not been trained on this topic. " +
-                $"Please train the persona on this topic first at the Train page."
+                $"Cannot add topic '{topic.Name}' to conversation. The agent has not been trained on this topic. " +
+                $"Please train the agent on this topic first at the Train page."
             );
         }
 
@@ -162,7 +162,7 @@ internal sealed class ChatManager : IDisposable
 
     public void Dispose()
     {
-        _personaManager?.Dispose();
+        _agentManager?.Dispose();
         // DataFacade doesn't implement IDisposable, so no disposal needed
     }
 }

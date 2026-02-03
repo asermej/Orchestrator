@@ -6,7 +6,7 @@ export function HowItWorks() {
     {
       number: "01",
       icon: Search,
-      title: "Choose Your Persona",
+      title: "Choose Your Agent",
       description: "Browse experts across categories—from business advisors to creative minds, tech gurus to wellness guides.",
     },
     {

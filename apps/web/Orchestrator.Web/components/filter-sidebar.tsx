@@ -19,7 +19,7 @@ interface Tag {
 }
 
 interface FilterSidebarProps {
-  mode: "feed" | "personas";
+  mode: "feed" | "agents";
   categories: Category[];
   tags?: Tag[];
   selectedCategoryIds: string[];
@@ -90,10 +90,10 @@ export function FilterSidebar({
 
       <ScrollArea className="flex-1">
         <div className="space-y-6 pr-4">
-          {/* Search (only in personas mode) */}
-          {mode === "personas" && (
+          {/* Search (only in agents mode) */}
+          {mode === "agents" && (
             <div>
-              <h3 className="font-medium mb-3">Search Personas</h3>
+              <h3 className="font-medium mb-3">Search Agents</h3>
               <form onSubmit={handleSearchSubmit} className="flex gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />

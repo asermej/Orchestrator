@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { PersonaAvatar } from "@/components/persona-avatar";
+import { AgentAvatar } from "@/components/agent-avatar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface Message {
@@ -8,15 +8,15 @@ interface Message {
 }
 
 interface ChatMockupProps {
-  personaName: string;
-  personaImage?: string;
+  agentName: string;
+  agentImage?: string;
   messages: Message[];
   title: string;
 }
 
 export function ChatMockup({
-  personaName,
-  personaImage,
+  agentName,
+  agentImage,
   messages,
   title,
 }: ChatMockupProps) {
@@ -25,14 +25,14 @@ export function ChatMockup({
       {/* Header */}
       <div className="bg-muted/30 border-b px-4 py-3">
         <div className="flex items-center gap-3">
-          <PersonaAvatar
-            imageUrl={personaImage}
-            displayName={personaName}
+          <AgentAvatar
+            imageUrl={agentImage}
+            displayName={agentName}
             size="sm"
             shape="circle"
           />
           <div>
-            <h3 className="font-semibold text-sm">{personaName}</h3>
+            <h3 className="font-semibold text-sm">{agentName}</h3>
             <p className="text-xs text-muted-foreground">{title}</p>
           </div>
         </div>
@@ -49,9 +49,9 @@ export function ChatMockup({
           >
             {message.role === "assistant" && (
               <div className="flex-shrink-0">
-                <PersonaAvatar
-                  imageUrl={personaImage}
-                  displayName={personaName}
+                <AgentAvatar
+                  imageUrl={agentImage}
+                  displayName={agentName}
                   size="sm"
                   shape="circle"
                 />

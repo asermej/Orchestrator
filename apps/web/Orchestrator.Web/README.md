@@ -44,8 +44,8 @@ apps/web/Platform.Web/
 │   ├── page.tsx                       # Homepage
 │   ├── globals.css                    # Global Styles
 │   ├── loading.tsx                    # Loading UI
-│   └── create-persona/                # Feature Pages
-│       ├── page.tsx                   # Create Persona Page
+│   └── create-agent/                  # Feature Pages
+│       ├── page.tsx                   # Create Agent Page
 │       └── actions.ts                 # Server Actions
 ├── components/                        # React Components
 │   ├── theme-provider.tsx             # Theme Management
@@ -167,7 +167,7 @@ export function ExampleForm() {
 ### Current Pages
 
 - **Homepage** (`/`) - Main landing page
-- **Create Persona** (`/create-persona`) - Persona creation form
+- **Create Agent** (`/create-agent`) - Agent creation form
 
 ### Styling
 
@@ -233,11 +233,11 @@ Custom theme configuration in `tailwind.config.ts`:
 The application uses Next.js Server Actions for API communication:
 
 ```tsx
-// app/create-persona/actions.ts
+// app/create-agent/actions.ts
 'use server'
 
-export async function createPersona(formData: FormData) {
-  const response = await fetch('https://localhost:5001/api/personas', {
+export async function createAgent(formData: FormData) {
+  const response = await fetch('https://localhost:5001/api/agents', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -257,7 +257,7 @@ export async function createPersona(formData: FormData) {
 The web application communicates with these API endpoints:
 
 - **Base URL**: `https://localhost:5001/api`
-- **Personas**: `/personas` - CRUD operations for personas
+- **Agents**: `/agents` - CRUD operations for agents
 - **Swagger**: `/swagger` - API documentation
 
 ## 🎨 Theming

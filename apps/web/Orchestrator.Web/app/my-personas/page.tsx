@@ -6,18 +6,18 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { PersonaAvatar } from "@/components/persona-avatar";
+import { AgentAvatar } from "@/components/agent-avatar";
 import { Header } from "@/components/header";
 import { ArrowLeft, Search, Loader2, User, Pencil, Plus, GraduationCap, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { fetchMyPersonas, PersonaItem } from "./actions";
+import { fetchMyAgents, AgentItem } from "./actions";
 
-export default function MyPersonas() {
+export default function MyAgents() {
   const { user, isLoading: isUserLoading } = useUser();
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const [personas, setPersonas] = useState<PersonaItem[]>([]);
+  const [agents, setAgents] = useState<AgentItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -41,20 +41,20 @@ export default function MyPersonas() {
 
   useEffect(() => {
     if (user) {
-      loadPersonas();
+      loadAgents();
     }
   }, [user, currentPage, searchTerm]);
 
-  const loadPersonas = async () => {
+  const loadAgents = async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const data = await fetchMyPersonas(currentPage, pageSize, searchTerm);
-      setPersonas(data.items);
+      const data = await fetchMyAgents(currentPage, pageSize, searchTerm);
+      setAgents(data.items);
       setTotalCount(data.totalCount);
     } catch (err) {
-      console.error("Error loading personas:", err);
-      setError("Failed to load personas. Please try again.");
+      console.error("Error loading agents:", err);
+      setError("Failed to load agents. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -95,9 +95,9 @@ export default function MyPersonas() {
           
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold">Manage Personas</h1>
+              <h1 className="text-3xl font-bold">Manage Agents</h1>
               <p className="text-muted-foreground mt-2">
-                Create new personas or edit the ones you've already created
+                Create new agents or edit the ones you've already created
               </p>
             </div>
             
@@ -139,33 +139,33 @@ export default function MyPersonas() {
           <div className="flex justify-center items-center py-20">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
           </div>
-        ) : personas.length === 0 ? (
+        ) : agents.length === 0 ? (
           /* Empty State */
           <div className="text-center py-20">
             <User className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2">No personas yet</h3>
+            <h3 className="text-xl font-semibold mb-2">No agents yet</h3>
             <p className="text-muted-foreground mb-6">
               {searchTerm
-                ? "No personas match your search"
-                : "Create your first AI persona to get started!"}
+                ? "No agents match your search"
+                : "Create your first AI agent to get started!"}
             </p>
             {!searchTerm && (
               <Link href="/create-persona">
                 <Button>
                   <Plus className="mr-2 h-4 w-4" />
-                  Create Your First Persona
+                  Create Your First Agent
                 </Button>
               </Link>
             )}
           </div>
         ) : (
-          /* Personas Grid */
+          /* Agents Grid */
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
-              {personas.map((persona) => (
-                <Card key={persona.id} className="overflow-hidden hover:shadow-lg transition-shadow relative">
+              {agents.map((agent) => (
+                <Card key={agent.id} className="overflow-hidden hover:shadow-lg transition-shadow relative">
                   {/* Edit button in top right corner */}
-                  <Link href={`/my-personas/${persona.id}/edit`} className="absolute top-2 right-2 z-10">
+                  <Link href={`/my-personas/${agent.id}/edit`} className="absolute top-2 right-2 z-10">
                     <Button variant="outline" size="icon" className="h-8 w-8 rounded-md bg-background shadow-sm">
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -173,35 +173,28 @@ export default function MyPersonas() {
                   
                   <CardHeader className="p-4 pb-3">
                     <div className="flex flex-col items-center text-center space-y-3">
-                      <PersonaAvatar
-                        imageUrl={persona.profileImageUrl}
-                        displayName={persona.displayName}
+                      <AgentAvatar
+                        imageUrl={agent.profileImageUrl}
+                        displayName={agent.displayName}
                         size="2xl"
                         shape="square"
                       />
                       <div className="space-y-1">
                         <h3 className="font-semibold text-base leading-none">
-                          {persona.displayName}
+                          {agent.displayName}
                         </h3>
-                        {(persona.firstName || persona.lastName) && (
-                          <p className="text-xs text-muted-foreground">
-                            {[persona.firstName, persona.lastName]
-                              .filter(Boolean)
-                              .join(" ")}
-                          </p>
-                        )}
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent className="p-4 pt-0 space-y-2">
-                    <Link href={`/my-personas/${persona.id}/training`}>
+                    <Link href={`/my-personas/${agent.id}/general-training`}>
                       <Button className="w-full" variant="secondary">
                         Train
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Button>
                     </Link>
                     <div className="text-xs text-muted-foreground text-center pt-1.5 border-t">
-                      Created {new Date(persona.createdAt).toLocaleDateString()}
+                      Created {new Date(agent.createdAt).toLocaleDateString()}
                     </div>
                   </CardContent>
                 </Card>

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260201150008-create-interview-responses-table" author="system">
+        <createTable tableName="interview_responses">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="interview_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_interview_responses_interview" references="interviews(id)"/>
+            </column>
+            <column name="question_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_interview_responses_question" references="interview_questions(id)"/>
+            </column>
+            <column name="question_text" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="transcript" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <column name="audio_url" type="varchar(500)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="duration_seconds" type="integer">
+                <constraints nullable="true"/>
+            </column>
+            <column name="response_order" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_follow_up" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="ai_analysis" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <!-- Audit fields -->
+            <column name="created_at" type="timestamp" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="updated_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_deleted" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="deleted_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="interview_responses" indexName="idx_interview_responses_interview_id">
+            <column name="interview_id"/>
+        </createIndex>
+
+        <createIndex tableName="interview_responses" indexName="idx_interview_responses_question_id">
+            <column name="question_id"/>
+        </createIndex>
+
+        <createIndex tableName="interview_responses" indexName="idx_interview_responses_order">
+            <column name="interview_id"/>
+            <column name="response_order"/>
+        </createIndex>
+
+        <createIndex tableName="interview_responses" indexName="idx_interview_responses_is_deleted">
+            <column name="is_deleted"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

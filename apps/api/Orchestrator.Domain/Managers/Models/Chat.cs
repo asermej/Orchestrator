@@ -8,8 +8,8 @@ namespace Orchestrator.Domain;
 [Table("chats")]
 public class Chat : Entity
 {
-    [Column("persona_id")]
-    public Guid PersonaId { get; set; }
+    [Column("agent_id")]
+    public Guid AgentId { get; set; }
 
     [Column("user_id")]
     public Guid UserId { get; set; }

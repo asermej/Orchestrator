@@ -2,18 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { useUser } from "@auth0/nextjs-auth0/client";
-import { useRouter, useParams, useSearchParams } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Header } from "@/components/header";
-import { ArrowLeft, Loader2, Save, BookOpen, Trash2, AlertTriangle, Volume2 } from "lucide-react";
-import { Slider } from "@/components/ui/slider";
+import { ArrowLeft, Loader2, Save, BookOpen, Trash2, AlertTriangle, Mic, Volume2, Search } from "lucide-react";
 import Link from "next/link";
-import { fetchPersonaById, updatePersona, deletePersona } from "../../actions";
+import { fetchAgentById, updateAgent, deleteAgent } from "../../actions";
 import { ImageUpload } from "@/components/image-upload";
-import { PersonaAvatar } from "@/components/persona-avatar";
+import { AgentAvatar } from "@/components/agent-avatar";
 import { uploadImage } from "@/lib/upload-image";
 import { useServerAction } from "@/lib/use-server-action";
 import {
@@ -26,14 +26,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  getStockVoices,
+  selectAgentVoice,
+  type VoiceItem,
+  type AvailableVoicesResponse,
+} from "../../voice-actions";
+import { toast } from "sonner";
 
-export default function EditPersona() {
+export default function EditAgent() {
   const { user, isLoading: isUserLoading } = useUser();
   const router = useRouter();
   const params = useParams();
-  const searchParams = useSearchParams();
-  const personaId = params.id as string;
-  const isOnboarding = searchParams.get("onboarding") === "true";
+  const agentId = params.id as string;
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,14 +52,20 @@ export default function EditPersona() {
 
   // Profile state
   const [displayName, setDisplayName] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
   const [profileImageUrl, setProfileImageUrl] = useState("");
-  
-  // Voice settings state
-  const [elevenLabsVoiceId, setElevenLabsVoiceId] = useState("");
-  const [voiceStability, setVoiceStability] = useState(0.5);
-  const [voiceSimilarityBoost, setVoiceSimilarityBoost] = useState(0.75);
+
+  // Voice state
+  const [voiceName, setVoiceName] = useState<string | null>(null);
+  const [chooseVoiceOpen, setChooseVoiceOpen] = useState(false);
+  const [testVoiceOpen, setTestVoiceOpen] = useState(false);
+  const [voices, setVoices] = useState<VoiceItem[]>([]);
+  const [voicesLoading, setVoicesLoading] = useState(false);
+  const [voiceSearch, setVoiceSearch] = useState("");
+  const [voiceTagFilter, setVoiceTagFilter] = useState<string | null>(null);
+  const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
+  const [selectingVoiceId, setSelectingVoiceId] = useState<string | null>(null);
+  const [testVoiceText, setTestVoiceText] = useState("Hello! I'm your AI interviewer. How are you today?");
+  const [testVoiceLoading, setTestVoiceLoading] = useState(false);
 
   // Server actions with error handling
   const { execute: executeUpdate, isLoading: isSaving } = useServerAction(
@@ -58,32 +75,20 @@ export default function EditPersona() {
         throw new Error("Display name is required");
       }
 
-      await updatePersona(personaId, {
+      await updateAgent(agentId, {
         displayName: displayName.trim(),
-        firstName: firstName.trim() || null,
-        lastName: lastName.trim() || null,
         profileImageUrl: profileImageUrl.trim() || null,
-        elevenLabsVoiceId: elevenLabsVoiceId.trim() || null,
-        voiceStability: voiceStability,
-        voiceSimilarityBoost: voiceSimilarityBoost,
       });
     },
     {
       successMessage: "Profile updated successfully!",
-      onSuccess: () => {
-        if (isOnboarding) {
-          setTimeout(() => {
-            router.push(`/my-personas/${personaId}/general-training?onboarding=true`);
-          }, 1000);
-        }
-      },
     }
   );
 
   const { execute: executeDelete, isLoading: isDeleting } = useServerAction(
-    () => deletePersona(personaId),
+    () => deleteAgent(agentId),
     {
-      successMessage: "Persona deleted successfully!",
+      successMessage: "Agent deleted successfully!",
       onSuccess: () => router.push("/my-personas"),
       onError: () => setDeleteDialogOpen(false),
     }
@@ -96,28 +101,24 @@ export default function EditPersona() {
   }, [user, isUserLoading, router]);
 
   useEffect(() => {
-    if (user && personaId) {
-      loadPersona();
+    if (user && agentId) {
+      loadAgent();
     }
-  }, [user, personaId]);
+  }, [user, agentId]);
 
-  const loadPersona = async () => {
+  const loadAgent = async () => {
     try {
       setIsLoading(true);
       setError(null);
       
-      const persona = await fetchPersonaById(personaId);
+      const agent = await fetchAgentById(agentId);
       
-      setDisplayName(persona.displayName);
-      setFirstName(persona.firstName || "");
-      setLastName(persona.lastName || "");
-      setProfileImageUrl(persona.profileImageUrl || "");
-      setElevenLabsVoiceId(persona.elevenLabsVoiceId || "");
-      setVoiceStability(persona.voiceStability ?? 0.5);
-      setVoiceSimilarityBoost(persona.voiceSimilarityBoost ?? 0.75);
+      setDisplayName(agent.displayName);
+      setProfileImageUrl(agent.profileImageUrl || "");
+      setVoiceName(agent.voiceName ?? null);
     } catch (err) {
-      console.error("Error loading persona:", err);
-      setError("Failed to load persona. Please try again.");
+      console.error("Error loading agent:", err);
+      setError("Failed to load agent. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -130,6 +131,108 @@ export default function EditPersona() {
 
   const handleDelete = async () => {
     await executeDelete();
+  };
+
+  // Voice helper functions
+  const voiceStatusText = voiceName ? `Selected voice: ${voiceName}` : "Default voice";
+
+  const openChooseVoice = async () => {
+    setChooseVoiceOpen(true);
+    setVoicesLoading(true);
+    setVoiceSearch("");
+    setVoiceTagFilter(null);
+    try {
+      const res: AvailableVoicesResponse = await getStockVoices();
+      setVoices(res.curatedPrebuiltVoices ?? []);
+    } catch (err) {
+      console.error("Failed to load voices", err);
+      toast.error("Failed to load voices");
+    } finally {
+      setVoicesLoading(false);
+    }
+  };
+
+  const allTags = Array.from(
+    new Set(voices.flatMap((v) => v.tags ?? []))
+  ).filter(Boolean).sort();
+  
+  const filteredVoices = voices.filter((voice) => {
+    const matchSearch =
+      !voiceSearch.trim() ||
+      voice.name.toLowerCase().includes(voiceSearch.toLowerCase()) ||
+      (voice.description?.toLowerCase().includes(voiceSearch.toLowerCase()));
+    const matchTag =
+      !voiceTagFilter ||
+      (voice.tags && voice.tags.includes(voiceTagFilter));
+    return matchSearch && matchTag;
+  });
+
+  const handlePreviewVoice = async (voice: VoiceItem) => {
+    setPreviewingVoiceId(voice.id);
+    try {
+      const previewText = voice.previewText ?? "Hello! I'm your AI interviewer.";
+      const res = await fetch("/api/voice/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ voiceId: voice.id, text: previewText }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error ?? "Preview failed");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      await audio.play();
+      audio.onended = () => URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Preview error", err);
+      toast.error("Failed to play preview");
+    } finally {
+      setPreviewingVoiceId(null);
+    }
+  };
+
+  const handleSelectVoice = async (voice: VoiceItem) => {
+    setSelectingVoiceId(voice.id);
+    try {
+      await selectAgentVoice(agentId, "elevenlabs", voice.voiceType || "prebuilt", voice.id, voice.name);
+      toast.success(`Voice "${voice.name}" selected`);
+      setChooseVoiceOpen(false);
+      await loadAgent();
+    } catch (err) {
+      console.error("Select voice error", err);
+      toast.error("Failed to select voice");
+    } finally {
+      setSelectingVoiceId(null);
+    }
+  };
+
+  const handleTestVoice = async () => {
+    setTestVoiceLoading(true);
+    try {
+      const res = await fetch(`/api/agents/${agentId}/voice/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: testVoiceText || "Hello! I'm your AI interviewer." }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error ?? "Test failed");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      await audio.play();
+      audio.onended = () => URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Test voice error", err);
+      toast.error("Failed to play test");
+    } finally {
+      setTestVoiceLoading(false);
+    }
   };
 
   if (isUserLoading || isLoading) {
@@ -159,14 +262,14 @@ export default function EditPersona() {
                 </Button>
               </Link>
               <div className="flex items-center gap-4">
-                <PersonaAvatar
+                <AgentAvatar
                   imageUrl={profileImageUrl}
                   displayName={displayName}
                   size="xl"
                   shape="square"
                 />
                 <div>
-                  <h1 className="text-3xl font-bold">{displayName || "Edit Persona"}</h1>
+                  <h1 className="text-3xl font-bold">{displayName || "Edit Agent"}</h1>
                   <p className="text-muted-foreground mt-1">Basic Profile Information</p>
                 </div>
               </div>
@@ -178,36 +281,6 @@ export default function EditPersona() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto space-y-6">
-          {/* Onboarding Progress */}
-          {isOnboarding && (
-            <Card className="border-2 border-primary">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-semibold">
-                      1
-                    </div>
-                    <span className="font-medium">Profile</span>
-                  </div>
-                  <div className="flex-1 h-px bg-border" />
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center font-semibold">
-                      2
-                    </div>
-                    <span className="text-muted-foreground">General Training</span>
-                  </div>
-                  <div className="flex-1 h-px bg-border" />
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center font-semibold">
-                      3
-                    </div>
-                    <span className="text-muted-foreground">Topics</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
           {/* Error Message */}
           {error && (
             <div className="p-4 bg-destructive/10 text-destructive rounded-lg border border-destructive/20">
@@ -220,7 +293,7 @@ export default function EditPersona() {
             <CardHeader>
               <CardTitle>Profile Information</CardTitle>
               <CardDescription>
-                Update the basic information for this persona
+                Update the basic information for this agent
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -233,41 +306,15 @@ export default function EditPersona() {
                   <Input
                     id="displayName"
                     name="displayName"
-                    placeholder="e.g., Yoda, John Smith, or Madonna"
+                    placeholder="e.g., Alex, Jordan, or Sam"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     required
                     disabled={isSaving}
                   />
                   <p className="text-sm text-muted-foreground">
-                    This is how the persona will be identified.
+                    This is how the agent will be identified.
                   </p>
-                </div>
-
-                {/* First Name (Optional) */}
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input
-                    id="firstName"
-                    name="firstName"
-                    placeholder="Optional - e.g., John"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    disabled={isSaving}
-                  />
-                </div>
-
-                {/* Last Name (Optional) */}
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input
-                    id="lastName"
-                    name="lastName"
-                    placeholder="Optional - e.g., Smith"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    disabled={isSaving}
-                  />
                 </div>
 
                 {/* Profile Image (Optional) */}
@@ -280,7 +327,7 @@ export default function EditPersona() {
                       </p>
                     </div>
                     {profileImageUrl && (
-                      <PersonaAvatar
+                      <AgentAvatar
                         imageUrl={profileImageUrl}
                         displayName={displayName || "Preview"}
                         size="lg"
@@ -299,85 +346,6 @@ export default function EditPersona() {
                   />
                 </div>
 
-                {/* Voice Settings */}
-                <div className="space-y-4 pt-4 border-t">
-                  <div className="flex items-center gap-2">
-                    <Volume2 className="h-5 w-5" />
-                    <h3 className="font-medium">Voice Settings</h3>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Configure the voice for this persona when using voice conversation mode.
-                  </p>
-                  
-                  {/* ElevenLabs Voice ID */}
-                  <div className="space-y-2">
-                    <Label htmlFor="elevenLabsVoiceId">ElevenLabs Voice ID</Label>
-                    <Input
-                      id="elevenLabsVoiceId"
-                      name="elevenLabsVoiceId"
-                      placeholder="e.g., 21m00Tcm4TlvDq8ikWAM"
-                      value={elevenLabsVoiceId}
-                      onChange={(e) => setElevenLabsVoiceId(e.target.value)}
-                      disabled={isSaving}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Leave empty to use the default voice. Find voice IDs at{" "}
-                      <a
-                        href="https://elevenlabs.io/voice-library"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary underline"
-                      >
-                        ElevenLabs Voice Library
-                      </a>
-                    </p>
-                  </div>
-
-                  {/* Voice Stability */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label>Voice Stability</Label>
-                      <span className="text-sm text-muted-foreground">
-                        {(voiceStability * 100).toFixed(0)}%
-                      </span>
-                    </div>
-                    <Slider
-                      value={[voiceStability]}
-                      onValueChange={(value) => setVoiceStability(value[0])}
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      disabled={isSaving}
-                      className="w-full"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Higher stability makes the voice more consistent. Lower values add more variation and emotion.
-                    </p>
-                  </div>
-
-                  {/* Similarity Boost */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label>Similarity Boost</Label>
-                      <span className="text-sm text-muted-foreground">
-                        {(voiceSimilarityBoost * 100).toFixed(0)}%
-                      </span>
-                    </div>
-                    <Slider
-                      value={[voiceSimilarityBoost]}
-                      onValueChange={(value) => setVoiceSimilarityBoost(value[0])}
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      disabled={isSaving}
-                      className="w-full"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Higher values make the voice sound more like the original. Lower values allow more variation.
-                    </p>
-                  </div>
-                </div>
-
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row gap-3 pt-4">
                   <Button
@@ -394,11 +362,6 @@ export default function EditPersona() {
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Saving...
                       </>
-                    ) : isOnboarding ? (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
-                        Save & Continue
-                      </>
                     ) : (
                       <>
                         <Save className="mr-2 h-4 w-4" />
@@ -411,33 +374,54 @@ export default function EditPersona() {
             </CardContent>
           </Card>
 
-          {/* Quick Links */}
-          {!isOnboarding && (
-            <Card className="bg-muted/50">
-              <CardContent className="p-6">
-                <h3 className="font-semibold mb-4">Quick Links</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Link href={`/my-personas/${personaId}/general-training`}>
-                    <Button variant="outline" className="w-full justify-start">
-                      <BookOpen className="mr-2 h-4 w-4" />
-                      General Training
-                    </Button>
-                  </Link>
-                  <Link href={`/my-personas/${personaId}/training`}>
-                    <Button variant="outline" className="w-full justify-start">
-                      <BookOpen className="mr-2 h-4 w-4" />
-                      Topic Training
-                    </Button>
-                  </Link>
+          {/* Voice Card */}
+          <Card className="shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-violet-100 via-purple-100 to-violet-100 dark:from-violet-950/20 dark:via-purple-950/20 dark:to-violet-950/20 border-b">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-violet-200 dark:bg-violet-800/30">
+                  <Mic className="h-6 w-6 text-violet-700 dark:text-violet-400" />
                 </div>
-              </CardContent>
-            </Card>
-          )}
+                <div className="flex-1">
+                  <CardTitle className="text-2xl">Voice</CardTitle>
+                  <CardDescription className="mt-2 text-base">
+                    Choose a voice for this agent. This voice is used when the agent speaks.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Current: {voiceStatusText}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Button type="button" variant="default" onClick={openChooseVoice}>
+                  Choose a voice
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setTestVoiceOpen(true)}>
+                  Test voice
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Links */}
+          <Card className="bg-muted/50">
+            <CardContent className="p-6">
+              <h3 className="font-semibold mb-4">Quick Links</h3>
+              <Link href={`/my-personas/${agentId}/general-training`}>
+                <Button variant="outline" className="w-full justify-start">
+                  <BookOpen className="mr-2 h-4 w-4" />
+                  General Training
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
 
           {/* Danger Zone */}
-          {!isOnboarding && (
-            <Card className="border-destructive">
-              <CardHeader>
+          <Card className="border-destructive">
+            <CardHeader>
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5 text-destructive" />
                   <CardTitle className="text-destructive">Danger Zone</CardTitle>
@@ -449,9 +433,9 @@ export default function EditPersona() {
               <CardContent>
                 <div className="flex items-center justify-between p-4 border border-destructive/20 rounded-lg bg-destructive/5">
                   <div>
-                    <h4 className="font-semibold text-sm">Delete this persona</h4>
+                    <h4 className="font-semibold text-sm">Delete this agent</h4>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Once you delete a persona, there is no going back. All training data will be lost.
+                      Once you delete an agent, there is no going back. All training data will be lost.
                     </p>
                   </div>
                   <Button
@@ -465,7 +449,6 @@ export default function EditPersona() {
                 </div>
               </CardContent>
             </Card>
-          )}
         </div>
       </main>
 
@@ -492,15 +475,166 @@ export default function EditPersona() {
                   Deleting...
                 </>
               ) : (
-                <>
+                  <>
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Persona
+                  Delete Agent
                 </>
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Choose voice modal */}
+      <Dialog open={chooseVoiceOpen} onOpenChange={setChooseVoiceOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Choose a voice</DialogTitle>
+          </DialogHeader>
+          {voicesLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name or description..."
+                    value={voiceSearch}
+                    onChange={(e) => setVoiceSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                {allTags.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant={voiceTagFilter === null ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setVoiceTagFilter(null)}
+                    >
+                      All
+                    </Button>
+                    {allTags.map((tag) => (
+                      <Button
+                        key={tag}
+                        type="button"
+                        variant={voiceTagFilter === tag ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setVoiceTagFilter(tag)}
+                      >
+                        {tag}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <ul className="space-y-2 mt-4">
+                {filteredVoices.map((voice) => (
+                  <li
+                    key={voice.id}
+                    className="flex items-center justify-between gap-4 rounded-lg border p-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium">{voice.name}</p>
+                      {voice.description && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {voice.description}
+                        </p>
+                      )}
+                      {voice.tags && voice.tags.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {voice.tags.join(" · ")}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handlePreviewVoice(voice)}
+                        disabled={previewingVoiceId !== null}
+                      >
+                        {previewingVoiceId === voice.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Volume2 className="h-4 w-4" />
+                        )}
+                        <span className="sr-only">Preview</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => handleSelectVoice(voice)}
+                        disabled={selectingVoiceId !== null}
+                      >
+                        {selectingVoiceId === voice.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          "Select"
+                        )}
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {filteredVoices.length === 0 && !voicesLoading && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No voices match your search.
+                </p>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Test voice modal */}
+      <Dialog open={testVoiceOpen} onOpenChange={setTestVoiceOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Test voice</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Enter a short phrase to hear the agent&apos;s current voice.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="test-voice-text">Phrase</Label>
+            <Textarea
+              id="test-voice-text"
+              value={testVoiceText}
+              onChange={(e) => setTestVoiceText(e.target.value)}
+              placeholder="Hello! I'm your AI interviewer. How are you today?"
+              rows={3}
+              className="resize-none"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setTestVoiceOpen(false)}>
+              Close
+            </Button>
+            <Button
+              type="button"
+              onClick={handleTestVoice}
+              disabled={testVoiceLoading}
+            >
+              {testVoiceLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Volume2 className="mr-2 h-4 w-4" />
+                  Generate & play
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

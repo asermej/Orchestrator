@@ -15,14 +15,14 @@ public sealed partial class DomainFacade
         return await TopicManager.GetTopicById(id);
     }
 
-    public async Task<PaginatedResult<Topic>> SearchTopics(string? name, Guid? personaId, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Topic>> SearchTopics(string? name, Guid? agentId, int pageNumber, int pageSize)
     {
-        return await TopicManager.SearchTopics(name, personaId, pageNumber, pageSize);
+        return await TopicManager.SearchTopics(name, agentId, pageNumber, pageSize);
     }
 
-    public async Task<(PaginatedResult<Topic> topics, Dictionary<Guid, List<Tag>> tagsByTopicId)> SearchTopicsWithTags(string? name, Guid? personaId, int pageNumber, int pageSize)
+    public async Task<(PaginatedResult<Topic> topics, Dictionary<Guid, List<Tag>> tagsByTopicId)> SearchTopicsWithTags(string? name, Guid? agentId, int pageNumber, int pageSize)
     {
-        return await TopicManager.SearchTopicsWithTags(name, personaId, pageNumber, pageSize);
+        return await TopicManager.SearchTopicsWithTags(name, agentId, pageNumber, pageSize);
     }
 
     public async Task<Topic> UpdateTopic(Topic topic)
@@ -35,7 +35,7 @@ public sealed partial class DomainFacade
         return await TopicManager.DeleteTopic(id);
     }
 
-    public async Task<Topic> GetOrCreateDailyBlogTopic(DateTime date, Guid personaId, string contentUrl, string? createdBy = null)
+    public async Task<Topic> GetOrCreateDailyBlogTopic(DateTime date, Guid agentId, string contentUrl, string? createdBy = null)
     {
         // Get the DailyBlog category
         var categories = await CategoryManager.SearchCategories(null, "DailyBlog", true, 1, 10);
@@ -50,7 +50,7 @@ public sealed partial class DomainFacade
         var topicName = $"Daily Blog - {date:MMMM dd, yyyy}";
 
         // Search for existing topic with this name in DailyBlog category
-        var existingTopics = await TopicManager.SearchTopics(topicName, personaId, 1, 10);
+        var existingTopics = await TopicManager.SearchTopics(topicName, agentId, 1, 10);
         var existingTopic = existingTopics.Items.FirstOrDefault(t => t.Name == topicName && t.CategoryId == dailyBlogCategory.Id);
 
         if (existingTopic != null)
@@ -63,7 +63,7 @@ public sealed partial class DomainFacade
         {
             Name = topicName,
             Description = $"Daily blog entry for {date:MMMM dd, yyyy}",
-            PersonaId = personaId,
+            AgentId = agentId,
             ContentUrl = contentUrl,
             CategoryId = dailyBlogCategory.Id,
             CreatedBy = createdBy

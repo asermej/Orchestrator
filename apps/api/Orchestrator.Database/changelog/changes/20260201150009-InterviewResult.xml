@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260201150009-create-interview-results-table" author="system">
+        <createTable tableName="interview_results">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="interview_id" type="uuid">
+                <constraints nullable="false" unique="true" foreignKeyName="fk_interview_results_interview" references="interviews(id)"/>
+            </column>
+            <column name="summary" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <column name="score" type="integer">
+                <constraints nullable="true"/>
+            </column>
+            <column name="recommendation" type="varchar(50)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="strengths" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <column name="areas_for_improvement" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <column name="full_transcript_url" type="varchar(500)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="webhook_sent_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="webhook_response" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <!-- Audit fields -->
+            <column name="created_at" type="timestamp" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="updated_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_deleted" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="deleted_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="interview_results" indexName="idx_interview_results_interview_id">
+            <column name="interview_id"/>
+        </createIndex>
+
+        <createIndex tableName="interview_results" indexName="idx_interview_results_recommendation">
+            <column name="recommendation"/>
+        </createIndex>
+
+        <createIndex tableName="interview_results" indexName="idx_interview_results_is_deleted">
+            <column name="is_deleted"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

@@ -93,9 +93,9 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2">SurrovaApp</h1>
+          <h1 className="text-3xl font-bold mb-2">Orchestrator</h1>
           <p className="text-muted-foreground">
-            Create and discover AI personas
+            Create and discover AI agents
           </p>
         </div>
 

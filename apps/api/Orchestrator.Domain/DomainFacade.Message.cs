@@ -68,25 +68,25 @@ public sealed partial class DomainFacade
             throw new MessageValidationException("Audio can only be generated for assistant messages");
         }
 
-        // Get the chat to find the persona
+        // Get the chat to find the agent
         var chat = await ChatManager.GetChatById(message.ChatId).ConfigureAwait(false);
         if (chat == null)
         {
             throw new ChatNotFoundException($"Chat with ID {message.ChatId} not found");
         }
 
-        // Get persona for voice settings
-        var persona = await PersonaManager.GetPersonaById(chat.PersonaId).ConfigureAwait(false);
-        if (persona == null)
+        // Get agent for voice settings
+        var agent = await AgentManager.GetAgentById(chat.AgentId).ConfigureAwait(false);
+        if (agent == null)
         {
-            throw new PersonaNotFoundException($"Persona with ID {chat.PersonaId} not found");
+            throw new AgentNotFoundException($"Agent with ID {chat.AgentId} not found");
         }
 
         // Get voice settings
         var config = new GatewayFacade(_serviceLocator).GetElevenLabsConfig();
-        var voiceId = persona.ElevenLabsVoiceId ?? config.DefaultVoiceId;
-        var stability = persona.VoiceStability;
-        var similarityBoost = persona.VoiceSimilarityBoost;
+        var voiceId = agent.ElevenlabsVoiceId ?? config.DefaultVoiceId;
+        var stability = agent.VoiceStability;
+        var similarityBoost = agent.VoiceSimilarityBoost;
 
         // Get or generate audio via cache manager
         return await AudioCacheManager.GetOrGenerateAudioAsync(

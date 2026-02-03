@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- ATS Platform Reset: Drop legacy tables no longer needed -->
+    
+    <changeSet id="20260201150000-drop-chat-topics" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="chat_topics"/>
+        </preConditions>
+        <dropTable tableName="chat_topics"/>
+    </changeSet>
+
+    <changeSet id="20260201150000-drop-topic-tags" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="topic_tags"/>
+        </preConditions>
+        <dropTable tableName="topic_tags"/>
+    </changeSet>
+
+    <changeSet id="20260201150000-drop-topics" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="topics"/>
+        </preConditions>
+        <dropTable tableName="topics"/>
+    </changeSet>
+
+    <changeSet id="20260201150000-drop-tags" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="tags"/>
+        </preConditions>
+        <dropTable tableName="tags"/>
+    </changeSet>
+
+    <changeSet id="20260201150000-drop-persona-categories" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="persona_categories"/>
+        </preConditions>
+        <dropTable tableName="persona_categories"/>
+    </changeSet>
+
+    <changeSet id="20260201150000-drop-categories" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="categories"/>
+        </preConditions>
+        <dropTable tableName="categories"/>
+    </changeSet>
+
+    <changeSet id="20260201150000-drop-consent-audit" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="consent_audit"/>
+        </preConditions>
+        <dropTable tableName="consent_audit"/>
+    </changeSet>
+
+    <changeSet id="20260201150000-drop-voice-clone-jobs" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="voice_clone_jobs"/>
+        </preConditions>
+        <dropTable tableName="voice_clone_jobs"/>
+    </changeSet>
+
+    <changeSet id="20260201150000-drop-stock-voices" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="stock_voices"/>
+        </preConditions>
+        <dropTable tableName="stock_voices"/>
+    </changeSet>
+
+    <!-- Drop chats and messages to start fresh -->
+    <changeSet id="20260201150000-drop-messages" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="messages"/>
+        </preConditions>
+        <dropTable tableName="messages"/>
+    </changeSet>
+
+    <changeSet id="20260201150000-drop-chats" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="chats"/>
+        </preConditions>
+        <dropTable tableName="chats"/>
+    </changeSet>
+
+    <!-- Drop personas to recreate with new structure -->
+    <changeSet id="20260201150000-drop-personas" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="personas"/>
+        </preConditions>
+        <dropTable tableName="personas"/>
+    </changeSet>
+
+</databaseChangeLog>

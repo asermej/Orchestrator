@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Remove voice cloning feature: drop tables and columns no longer needed -->
+    
+    <!-- Step 1: Drop consent_audit table -->
+    <changeSet id="20260203150000-drop-consent-audit-table" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="consent_audit"/>
+        </preConditions>
+        <dropTable tableName="consent_audit"/>
+    </changeSet>
+
+    <!-- Step 2: Drop voice_clone_jobs table -->
+    <changeSet id="20260203150000-drop-voice-clone-jobs-table" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="voice_clone_jobs"/>
+        </preConditions>
+        <dropTable tableName="voice_clone_jobs"/>
+    </changeSet>
+
+    <!-- Step 3: Drop voice_created_at column from agents table -->
+    <changeSet id="20260203150000-drop-agents-voice-created-at" author="system">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="agents" columnName="voice_created_at"/>
+        </preConditions>
+        <dropColumn tableName="agents" columnName="voice_created_at"/>
+    </changeSet>
+
+    <!-- Step 4: Drop voice_created_by_user_id column from agents table -->
+    <changeSet id="20260203150000-drop-agents-voice-created-by-user-id" author="system">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="agents" columnName="voice_created_by_user_id"/>
+        </preConditions>
+        <dropColumn tableName="agents" columnName="voice_created_by_user_id"/>
+    </changeSet>
+
+</databaseChangeLog>

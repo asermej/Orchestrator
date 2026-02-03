@@ -18,7 +18,7 @@ internal sealed class TrainingStorageManager
     public TrainingStorageManager()
     {
         // Base path for training data files
-        _basePath = Path.Combine(Directory.GetCurrentDirectory(), "training-data", "personas");
+        _basePath = Path.Combine(Directory.GetCurrentDirectory(), "training-data", "agents");
         
         // Ensure directory exists
         if (!Directory.Exists(_basePath))
@@ -28,13 +28,13 @@ internal sealed class TrainingStorageManager
     }
 
     /// <summary>
-    /// Saves general training data for a persona to local filesystem
+    /// Saves general training data for an agent to local filesystem
     /// </summary>
-    /// <param name="personaId">The persona ID</param>
+    /// <param name="agentId">The agent ID</param>
     /// <param name="content">The training content</param>
     /// <returns>The storage URL (file://) where the content was saved</returns>
     /// <exception cref="TrainingStorageException">Thrown when content exceeds size limit</exception>
-    public async Task<string> SaveGeneralTraining(Guid personaId, string content)
+    public async Task<string> SaveGeneralTraining(Guid agentId, string content)
     {
         if (string.IsNullOrWhiteSpace(content))
         {
@@ -47,7 +47,7 @@ internal sealed class TrainingStorageManager
             throw new TrainingStorageException($"General training content exceeds maximum size of {MaxGeneralTrainingSize} characters (current: {content.Length})");
         }
 
-        var fileName = $"{personaId}-general.txt";
+        var fileName = $"{agentId}-general.txt";
         var filePath = Path.Combine(_basePath, fileName);
         
         await File.WriteAllTextAsync(filePath, content);
@@ -59,14 +59,14 @@ internal sealed class TrainingStorageManager
     }
 
     /// <summary>
-    /// Saves topic training data for a persona to local filesystem
+    /// Saves topic training data for an agent to local filesystem
     /// </summary>
-    /// <param name="personaId">The persona ID</param>
+    /// <param name="agentId">The agent ID</param>
     /// <param name="topicId">The topic ID</param>
     /// <param name="content">The training content</param>
     /// <returns>The storage URL (file://) where the content was saved</returns>
     /// <exception cref="TrainingStorageException">Thrown when content exceeds size limit</exception>
-    public async Task<string> SaveTopicTraining(Guid personaId, Guid topicId, string content)
+    public async Task<string> SaveTopicTraining(Guid agentId, Guid topicId, string content)
     {
         if (string.IsNullOrWhiteSpace(content))
         {
@@ -79,7 +79,7 @@ internal sealed class TrainingStorageManager
             throw new TrainingStorageException($"Topic training content exceeds maximum size of {MaxTopicTrainingSize} characters (current: {content.Length})");
         }
 
-        var fileName = $"{personaId}-topic-{topicId}.txt";
+        var fileName = $"{agentId}-topic-{topicId}.txt";
         var filePath = Path.Combine(_basePath, fileName);
         
         await File.WriteAllTextAsync(filePath, content);

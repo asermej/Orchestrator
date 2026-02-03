@@ -1,62 +1,53 @@
 using Orchestrator.Domain;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orchestrator.AcceptanceTests.Domain;
-using Orchestrator.AcceptanceTests.TestUtilities;
-using Npgsql;
-using Dapper;
 
 namespace Orchestrator.AcceptanceTests.Domain;
 
 /// <summary>
-/// Tests for User operations using real DomainFacade and real DataFacade with data cleanup
+/// Tests for User operations using real DomainFacade
 /// 
 /// TEST APPROACH:
-/// - Uses real DomainFacade and DataFacade instances for acceptance tests
+/// - Uses real DomainFacade instances for acceptance tests
 /// - Tests the actual integration between layers
 /// - No external mocking frameworks used
-/// - ServiceLocatorForAcceptanceTesting provides real implementations
-/// - Tests clean up their own data to ensure complete independence
-/// 
-/// ENHANCED CLEANUP APPROACH:
-/// - Database-level cleanup before AND after each test for complete isolation
-/// - Identifies test data by patterns (email domains, specific names)
-/// - Robust error handling that doesn't break tests
-/// - Ensures 100% test reliability and independence
+/// - Tests clean up ONLY the data they create (tracked by ID)
 /// </summary>
 [TestClass]
 public class DomainFacadeTestsUser
 {
-    private DomainFacade _domainFacade;
-    private string _connectionString;
-
-    public DomainFacadeTestsUser()
-    {
-        _domainFacade = null!;
-        _connectionString = null!;
-    }
+    private DomainFacade _domainFacade = null!;
+    
+    // Track entities created during test for targeted cleanup
+    private readonly List<Guid> _createdUserIds = new();
 
     [TestInitialize]
     public void TestInitialize()
     {
         var serviceLocator = new ServiceLocatorForAcceptanceTesting();
         _domainFacade = new DomainFacade(serviceLocator);
-        _connectionString = serviceLocator.CreateConfigurationProvider().GetDbConnectionString();
         
-        // Clean up ALL test data before each test to ensure complete isolation
-        TestDataCleanup.CleanupAllTestData(_connectionString);
+        // Clear tracking list
+        _createdUserIds.Clear();
     }
 
     [TestCleanup]
-    public void TestCleanup()
+    public async Task TestCleanup()
     {
         try
         {
-            // Clean up any remaining test data after the test
-            TestDataCleanup.CleanupAllTestData(_connectionString);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Warning: Error during test cleanup: {ex.Message}");
+            // Delete ONLY the users created during this test
+            foreach (var userId in _createdUserIds)
+            {
+                try
+                {
+                    await _domainFacade.DeleteUser(userId);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Warning: Could not delete user {userId}: {ex.Message}");
+                }
+            }
         }
         finally
         {
@@ -65,37 +56,26 @@ public class DomainFacadeTestsUser
     }
 
     /// <summary>
-    /// Helper method to create test User with unique data and track it for cleanup
+    /// Helper method to create test User and track it for cleanup
     /// </summary>
     private async Task<User> CreateTestUserAsync(string suffix = "")
     {
+        var uniqueId = Guid.NewGuid().ToString("N")[..8];
+        var randomDigits = DateTime.Now.Ticks.ToString()[..7];
         var user = new User
         {
-            FirstName = $"Test{suffix}{DateTime.Now.Ticks}",
-            LastName = $"User{suffix}{DateTime.Now.Ticks}",
-            Email = $"test{suffix}{DateTime.Now.Ticks}@example.com",
-            Phone = $"+1555{DateTime.Now.Ticks.ToString().Substring(0, 7)}"
+            FirstName = $"Test{suffix}",
+            LastName = $"User{suffix}",
+            Email = $"test_{uniqueId}@example.com",
+            Phone = $"+1555{randomDigits}"
         };
 
         var result = await _domainFacade.CreateUser(user);
         Assert.IsNotNull(result, "Failed to create test User");
-        return result;
-    }
-
-    /// <summary>
-    /// Simple helper method to create test User with basic data
-    /// </summary>
-    private async Task<User> CreateTestUser()
-    {
-        var user = new User
-        {
-            FirstName = $"Test{DateTime.Now.Ticks}",
-            LastName = $"User{DateTime.Now.Ticks}",
-            Email = $"test{DateTime.Now.Ticks}@example.com",
-            Phone = "+15551234567"
-        };
-
-        var result = await _domainFacade.CreateUser(user);
+        
+        // Track for cleanup
+        _createdUserIds.Add(result.Id);
+        
         return result;
     }
 
@@ -103,26 +83,26 @@ public class DomainFacadeTestsUser
     public async Task CreateUser_ValidData_ReturnsCreatedUser()
     {
         // Arrange
+        var uniqueId = Guid.NewGuid().ToString("N")[..8];
         var user = new User
         {
-            FirstName = $"firstname{DateTime.Now.Ticks}",
-            LastName = $"lastname{DateTime.Now.Ticks}",
-            Email = $"email{DateTime.Now.Ticks}@example.com",
-            Phone = $"+1555{DateTime.Now.Ticks.ToString().Substring(0, 7)}"
+            FirstName = "John",
+            LastName = "Doe",
+            Email = $"john_{uniqueId}@example.com",
+            Phone = "+15551230001"
         };
 
         // Act
         var result = await _domainFacade.CreateUser(user);
+        _createdUserIds.Add(result.Id); // Track for cleanup
 
         // Assert
         Assert.IsNotNull(result, "Create should return a User");
         Assert.AreNotEqual(Guid.Empty, result.Id, "User should have a valid ID");
-        Assert.AreEqual(user.FirstName, result.FirstName);
-        Assert.AreEqual(user.LastName, result.LastName);
-        Assert.AreEqual(user.Email, result.Email);
-        Assert.AreEqual(user.Phone, result.Phone);
-        
-        Console.WriteLine($"User created with ID: {result.Id}");
+        Assert.AreEqual(user.FirstName, result.FirstName, "FirstName should match");
+        Assert.AreEqual(user.LastName, result.LastName, "LastName should match");
+        Assert.AreEqual(user.Email, result.Email, "Email should match");
+        Assert.AreEqual(user.Phone, result.Phone, "Phone should match");
     }
 
     [TestMethod]
@@ -139,7 +119,8 @@ public class DomainFacadeTestsUser
 
         // Act & Assert
         await Assert.ThrowsExceptionAsync<UserValidationException>(() => 
-            _domainFacade.CreateUser(user), "Should throw validation exception for invalid data");
+            _domainFacade.CreateUser(user), 
+            "Should throw validation exception for empty required fields");
     }
 
     [TestMethod]
@@ -159,7 +140,8 @@ public class DomainFacadeTestsUser
 
         // Act & Assert
         await Assert.ThrowsExceptionAsync<UserDuplicateEmailException>(() => 
-            _domainFacade.CreateUser(secondUser), "Should throw duplicate email exception");
+            _domainFacade.CreateUser(secondUser), 
+            "Should throw duplicate email exception");
     }
 
     [TestMethod]
@@ -173,11 +155,11 @@ public class DomainFacadeTestsUser
 
         // Assert
         Assert.IsNotNull(result, $"Should return User with ID: {createdUser.Id}");
-        Assert.AreEqual(createdUser.Id, result.Id);
-        Assert.AreEqual(createdUser.FirstName, result.FirstName);
-        Assert.AreEqual(createdUser.LastName, result.LastName);
-        Assert.AreEqual(createdUser.Email, result.Email);
-        Assert.AreEqual(createdUser.Phone, result.Phone);
+        Assert.AreEqual(createdUser.Id, result.Id, "ID should match");
+        Assert.AreEqual(createdUser.FirstName, result.FirstName, "FirstName should match");
+        Assert.AreEqual(createdUser.LastName, result.LastName, "LastName should match");
+        Assert.AreEqual(createdUser.Email, result.Email, "Email should match");
+        Assert.AreEqual(createdUser.Phone, result.Phone, "Phone should match");
     }
 
     [TestMethod]
@@ -196,26 +178,48 @@ public class DomainFacadeTestsUser
     [TestMethod]
     public async Task SearchUsers_WithResults_ReturnsPaginatedList()
     {
-        // Arrange - Create some test Users
-        var user1 = await CreateTestUserAsync("Test1");
-        var user2 = await CreateTestUserAsync("Test2");
+        // Arrange - Create some test Users with unique lastName pattern
+        var uniqueLastName = $"SearchTest{Guid.NewGuid():N}"[..20];
+        var uniqueId1 = Guid.NewGuid().ToString("N")[..8];
+        var uniqueId2 = Guid.NewGuid().ToString("N")[..8];
+        
+        var user1 = new User
+        {
+            FirstName = "Search1",
+            LastName = uniqueLastName,
+            Email = $"search1_{uniqueId1}@example.com",
+            Phone = "+15551111111"
+        };
+        var created1 = await _domainFacade.CreateUser(user1);
+        _createdUserIds.Add(created1.Id);
+        
+        var user2 = new User
+        {
+            FirstName = "Search2",
+            LastName = uniqueLastName,
+            Email = $"search2_{uniqueId2}@example.com",
+            Phone = "+15552222222"
+        };
+        var created2 = await _domainFacade.CreateUser(user2);
+        _createdUserIds.Add(created2.Id);
 
-        // Act - Search by firstName pattern
-        var result = await _domainFacade.SearchUsers(null, null, "Test", 1, 10);
+        // Act - Search by lastName pattern (SearchUsers searches by phone, email, lastName)
+        var result = await _domainFacade.SearchUsers(null, null, uniqueLastName, 1, 10);
 
         // Assert
         Assert.IsNotNull(result, "Search should return results");
-        Assert.IsTrue(result.TotalCount >= 2, $"Should find at least 2 Users, found {result.TotalCount}");
-        Assert.IsTrue(result.Items.Count() >= 2, $"Should return at least 2 items, returned {result.Items.Count()}");
-        
-        Console.WriteLine($"Search returned {result.TotalCount} total Users");
+        Assert.AreEqual(2, result.TotalCount, $"Should find exactly 2 Users with lastName '{uniqueLastName}'");
+        Assert.AreEqual(2, result.Items.Count(), "Should return 2 items");
     }
 
     [TestMethod]
     public async Task SearchUsers_NoResults_ReturnsEmptyList()
     {
-        // Act
-        var result = await _domainFacade.SearchUsers("NonExistentSearchTerm", "NonExistentSearchTerm", "NonExistentSearchTerm", 1, 10);
+        // Arrange - Use a unique search term that won't match anything
+        var uniqueSearchTerm = $"NonExistent{Guid.NewGuid():N}"[..20];
+        
+        // Act - Search by lastName (SearchUsers searches by phone, email, lastName)
+        var result = await _domainFacade.SearchUsers(null, null, uniqueSearchTerm, 1, 10);
 
         // Assert
         Assert.IsNotNull(result, "Search should return results even if empty");
@@ -228,11 +232,12 @@ public class DomainFacadeTestsUser
     {
         // Arrange - Create a test User
         var user = await CreateTestUserAsync();
+        var newUniqueId = Guid.NewGuid().ToString("N")[..8];
         
         // Modify the User
-        user.FirstName = $"Updated{DateTime.Now.Ticks}";
-        user.LastName = $"UpdatedLast{DateTime.Now.Ticks}";
-        user.Email = $"updated{DateTime.Now.Ticks}@example.com";
+        user.FirstName = "Updated";
+        user.LastName = "Name";
+        user.Email = $"updated_{newUniqueId}@example.com";
         user.Phone = "+15559999999";
 
         // Act
@@ -240,12 +245,10 @@ public class DomainFacadeTestsUser
 
         // Assert
         Assert.IsNotNull(result, "Update should return the updated User");
-        Assert.AreEqual(user.FirstName, result.FirstName);
-        Assert.AreEqual(user.LastName, result.LastName);
-        Assert.AreEqual(user.Email, result.Email);
-        Assert.AreEqual(user.Phone, result.Phone);
-        
-        Console.WriteLine($"User updated successfully");
+        Assert.AreEqual(user.FirstName, result.FirstName, "FirstName should be updated");
+        Assert.AreEqual(user.LastName, result.LastName, "LastName should be updated");
+        Assert.AreEqual(user.Email, result.Email, "Email should be updated");
+        Assert.AreEqual(user.Phone, result.Phone, "Phone should be updated");
     }
 
     [TestMethod]
@@ -262,7 +265,7 @@ public class DomainFacadeTestsUser
         // Act & Assert
         await Assert.ThrowsExceptionAsync<UserValidationException>(() => 
             _domainFacade.UpdateUser(user), 
-            "Should throw validation exception for invalid data");
+            "Should throw validation exception for empty required fields");
     }
 
     [TestMethod]
@@ -286,16 +289,18 @@ public class DomainFacadeTestsUser
     {
         // Arrange - Create a test User
         var user = await CreateTestUserAsync();
+        var userId = user.Id;
+        
+        // Remove from tracking since we're testing delete
+        _createdUserIds.Remove(userId);
 
         // Act
-        var result = await _domainFacade.DeleteUser(user.Id);
+        var result = await _domainFacade.DeleteUser(userId);
 
         // Assert
         Assert.IsTrue(result, "Should return true when deleting existing User");
-        var deletedUser = await _domainFacade.GetUserById(user.Id);
+        var deletedUser = await _domainFacade.GetUserById(userId);
         Assert.IsNull(deletedUser, "Should not find deleted User");
-        
-        Console.WriteLine($"User deleted successfully");
     }
 
     [TestMethod]
@@ -315,28 +320,41 @@ public class DomainFacadeTestsUser
     public async Task UserLifecycleTest_CreateGetUpdateSearchDelete_WorksCorrectly()
     {
         // Create
-        var user = await CreateTestUserAsync("Lifecycle");
-        Assert.IsNotNull(user, "User should be created");
-        var createdId = user.Id;
+        var uniqueId = Guid.NewGuid().ToString("N")[..8];
+        var uniqueLastName = $"Lifecycle{uniqueId}"[..15];
+        var user = new User
+        {
+            FirstName = "Lifecycle",
+            LastName = uniqueLastName,
+            Email = $"lifecycle_{uniqueId}@example.com",
+            Phone = "+15551234567"
+        };
+        var created = await _domainFacade.CreateUser(user);
+        Assert.IsNotNull(created, "User should be created");
+        var createdId = created.Id;
+        // Don't add to tracking - we'll delete it as part of the test
         
         // Get
         var retrievedUser = await _domainFacade.GetUserById(createdId);
         Assert.IsNotNull(retrievedUser, "Should retrieve created User");
-        Assert.AreEqual(createdId, retrievedUser.Id);
+        Assert.AreEqual(createdId, retrievedUser.Id, "Retrieved ID should match");
         
         // Update
-        retrievedUser.FirstName = $"Updated{DateTime.Now.Ticks}";
-        retrievedUser.LastName = $"UpdatedLast{DateTime.Now.Ticks}";
-        retrievedUser.Email = $"updated{DateTime.Now.Ticks}@example.com";
+        var updatedUniqueId = Guid.NewGuid().ToString("N")[..8];
+        var updatedLastName = $"Updated{updatedUniqueId}"[..15];
+        retrievedUser.FirstName = "Updated";
+        retrievedUser.LastName = updatedLastName;
+        retrievedUser.Email = $"updated_{updatedUniqueId}@example.com";
         retrievedUser.Phone = "+15559999999";
         
         var updatedUser = await _domainFacade.UpdateUser(retrievedUser);
         Assert.IsNotNull(updatedUser, "Should update User");
+        Assert.AreEqual(updatedLastName, updatedUser.LastName, "LastName should be updated");
         
-        // Search - Search by lastName pattern
-        var searchResult = await _domainFacade.SearchUsers(null, null, "Updated", 1, 10);
+        // Search - Search by updated lastName (SearchUsers searches by phone, email, lastName)
+        var searchResult = await _domainFacade.SearchUsers(null, null, updatedLastName, 1, 10);
         Assert.IsNotNull(searchResult, "Search should return results");
-        Assert.IsTrue(searchResult.TotalCount > 0, "Should find updated User");
+        Assert.AreEqual(1, searchResult.TotalCount, "Should find exactly 1 updated User");
         
         // Delete
         var deleteResult = await _domainFacade.DeleteUser(createdId);
@@ -345,63 +363,5 @@ public class DomainFacadeTestsUser
         // Verify deletion
         var deletedUser = await _domainFacade.GetUserById(createdId);
         Assert.IsNull(deletedUser, "Should not find deleted User");
-        
-        Console.WriteLine("User lifecycle test completed successfully");
     }
-
-    /// <summary>
-    /// Optional: Call this method to completely reset the database after all tests
-    /// This can be useful for integration test scenarios or when you want a completely clean slate
-    /// </summary>
-    [TestMethod]
-    [TestCategory("DatabaseReset")]
-    public void ResetDatabase_RemoveAllTestData()
-    {
-        try
-        {
-            using var connection = new NpgsqlConnection(_connectionString);
-            connection.Open();
-
-            // More aggressive cleanup that removes ALL potential test data
-            var resetSql = @"
-                DELETE FROM users 
-                WHERE email LIKE '%@example.com' 
-                   OR email LIKE '%@test.com'
-                   OR email LIKE '%test%'
-                   OR first_name LIKE '%Test%'
-                   OR first_name LIKE '%test%'
-                   OR first_name LIKE '%Search%'
-                   OR first_name LIKE '%Update%'
-                   OR first_name LIKE '%Delete%'
-                   OR first_name LIKE '%Lifecycle%'
-                   OR last_name LIKE '%Test%'
-                   OR last_name LIKE '%test%';";
-
-            var rowsAffected = connection.Execute(resetSql);
-            
-            Console.WriteLine($"Database reset: Removed {rowsAffected} test User records");
-            Assert.IsTrue(true, $"Successfully reset database - removed {rowsAffected} records");
-        }
-        catch (Exception ex)
-        {
-            Assert.Fail($"Failed to reset database: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Optional: Call this to verify the database is clean after reset
-    /// </summary>
-    [TestMethod]
-    [TestCategory("DatabaseReset")]
-    public async Task VerifyDatabaseClean_NoTestDataRemains()
-    {
-        // Search for any remaining test data
-        var result = await _domainFacade.SearchUsers(null, null, "Test", 1, 100);
-        
-        Assert.IsNotNull(result, "Search should return results object");
-        Assert.AreEqual(0, result.TotalCount, $"Database should be clean but found {result.TotalCount} test records");
-        Assert.IsFalse(result.Items.Any(), "No test items should remain in database");
-        
-        Console.WriteLine("✅ Database verification passed - no test data found");
-    }
-} 
+}

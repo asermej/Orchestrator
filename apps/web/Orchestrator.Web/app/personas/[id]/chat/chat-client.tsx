@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { PersonaAvatar } from "@/components/persona-avatar";
+import { AgentAvatar } from "@/components/agent-avatar";
 import { Header } from "@/components/header";
 import { ArrowLeft, Send, Loader2, MessageSquarePlus, MessageSquare, Menu, Edit2, Check, X, Trash2, BookMarked, FolderOpen, Search, Mic } from "lucide-react";
 import { VoiceConversationMode } from "@/components/voice-conversation-mode";
@@ -24,10 +24,10 @@ import {
   Message,
   TopicItem,
   Category,
-  PersonaCategory,
+  AgentCategory,
   TagItem,
 } from "./actions";
-import { PersonaItem } from "../../actions";
+import { AgentItem } from "../../actions";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import {
@@ -59,15 +59,15 @@ import { useServerAction } from "@/lib/use-server-action";
 
 interface ChatClientProps {
   user: any;
-  personaId: string;
-  initialPersona: PersonaItem;
+  agentId: string;
+  initialAgent: AgentItem;
   initialChats: Chat[];
   initialChatTopicsMap: Map<string, TopicItem[]>;
-  initialPersonaTopics: TopicItem[];
+  initialAgentTopics: TopicItem[];
   initialAllTopics: TopicItem[];
   initialCategories: Category[];
   initialTags: TagItem[];
-  initialPersonaCategories: PersonaCategory[];
+  initialAgentCategories: AgentCategory[];
   chatIdFromUrl: string | null;
   topicIdFromUrl: string | null;
   initialMessages?: Message[];
@@ -76,15 +76,15 @@ interface ChatClientProps {
 
 export function ChatClient({
   user,
-  personaId,
-  initialPersona,
+  agentId,
+  initialAgent,
   initialChats,
   initialChatTopicsMap,
-  initialPersonaTopics,
+  initialAgentTopics,
   initialAllTopics,
   initialCategories,
   initialTags,
-  initialPersonaCategories,
+  initialAgentCategories,
   chatIdFromUrl,
   topicIdFromUrl,
   initialMessages,
@@ -92,7 +92,7 @@ export function ChatClient({
 }: ChatClientProps) {
   const router = useRouter();
 
-  const [persona] = useState<PersonaItem>(initialPersona);
+  const [agent] = useState<AgentItem>(initialAgent);
   const [currentChat, setCurrentChat] = useState<Chat | null>(null);
   const [pastChats, setPastChats] = useState<Chat[]>(initialChats);
   const [messages, setMessages] = useState<Message[]>(initialMessages || []);
@@ -194,13 +194,13 @@ export function ChatClient({
 
   const { execute: executeCreateChatWithTopic, isLoading: isCreatingChat } = useServerAction(
     async (topicId: string | null, chatName: string) => {
-      if (!userId || !personaId || !persona) throw new Error("Session not ready");
+      if (!userId || !agentId || !agent) throw new Error("Session not ready");
 
       let newChat: Chat | null = null;
       
       try {
         // Create the chat
-        newChat = await createChat(personaId, userId, chatName);
+        newChat = await createChat(agentId, userId, chatName);
         setCurrentChat(newChat);
         setPastChats((prev) => [newChat, ...prev]);
         setMessages([]);
@@ -234,7 +234,7 @@ export function ChatClient({
             // Re-throw with a more helpful message
             const errorMessage = topicError.message || "Failed to add topic to chat";
             if (errorMessage.includes("not been trained")) {
-              throw new Error("This topic doesn't have any training content yet. Please train the persona on this topic first before starting a conversation.");
+              throw new Error("This topic doesn't have any training content yet. Please train the agent on this topic first before starting a conversation.");
             }
             throw new Error(errorMessage);
           }
@@ -243,7 +243,7 @@ export function ChatClient({
         }
         
         // Update URL with new chat ID
-        router.replace(`/personas/${personaId}/chat?chatId=${newChat.id}`, { scroll: false });
+        router.replace(`/personas/${agentId}/chat?chatId=${newChat.id}`, { scroll: false });
         
         return newChat;
       } catch (error) {
@@ -281,11 +281,11 @@ export function ChatClient({
 
   // Topic management state
   const [loadedTopics, setLoadedTopics] = useState<TopicItem[]>(initialLoadedTopics || []);
-  const [personaTopics] = useState<TopicItem[]>(initialPersonaTopics);
+  const [agentTopics] = useState<TopicItem[]>(initialAgentTopics);
   const [availableTopics] = useState<TopicItem[]>(initialAllTopics);
   const [allCategories] = useState<Category[]>(initialCategories);
   const [allTags] = useState<TagItem[]>(initialTags);
-  const [personaCategories] = useState<PersonaCategory[]>(initialPersonaCategories);
+  const [agentCategories] = useState<AgentCategory[]>(initialAgentCategories);
 
   // Sidebar mode state
   const [sidebarMode, setSidebarMode] = useState<'chats' | 'topics'>('topics');
@@ -413,7 +413,7 @@ export function ChatClient({
       setLoadedTopics(chatTopics);
       
       // Update URL with current chat ID
-      router.replace(`/personas/${personaId}/chat?chatId=${chat.id}`, { scroll: false });
+      router.replace(`/personas/${agentId}/chat?chatId=${chat.id}`, { scroll: false });
     } catch (err) {
       console.error("Error loading chat:", err);
     } finally {
@@ -487,8 +487,8 @@ export function ChatClient({
   useEffect(() => {
     if (topicIdFromUrl && !isCreatingChatFromUrl.current) {
       // Handle topic selection from URL (from "Chat Now" button)
-      // Automatically create chat and have persona kick off the conversation
-      const selectedTopic = personaTopics.find(t => t.id === topicIdFromUrl);
+      // Automatically create chat and have agent kick off the conversation
+      const selectedTopic = agentTopics.find(t => t.id === topicIdFromUrl);
       if (selectedTopic) {
         const defaultName = generateDefaultChatName(selectedTopic);
         
@@ -499,7 +499,7 @@ export function ChatClient({
         (async () => {
           try {
             // Create the chat with the topic - this returns the new chat and sets currentChat
-            const newChat = await createChat(personaId, userId, defaultName);
+            const newChat = await createChat(agentId, userId, defaultName);
             setCurrentChat(newChat);
             setPastChats((prev) => [newChat, ...prev]);
             setMessages([]);
@@ -520,7 +520,7 @@ export function ChatClient({
             setSidebarMode('chats');
             
             // Update URL with new chat ID (this removes topicId from URL)
-            router.replace(`/personas/${personaId}/chat?chatId=${newChat.id}`, { scroll: false });
+            router.replace(`/personas/${agentId}/chat?chatId=${newChat.id}`, { scroll: false });
           } catch (error) {
             console.error("Failed to auto-create chat:", error);
             isCreatingChatFromUrl.current = false;
@@ -576,17 +576,17 @@ export function ChatClient({
             {/* Sidebar Header */}
             <div className="p-4 border-b space-y-3">
               <div className="flex items-center gap-2">
-                <PersonaAvatar
-                  imageUrl={persona.profileImageUrl}
-                  displayName={persona.displayName}
+                <AgentAvatar
+                  imageUrl={agent.profileImageUrl}
+                  displayName={agent.displayName}
                   size="md"
                 />
                 <div className="flex-1 min-w-0">
-                  <h2 className="font-semibold text-sm truncate">{persona.displayName}</h2>
+                  <h2 className="font-semibold text-sm truncate">{agent.displayName}</h2>
                   <Link href="/personas">
                     <Button variant="link" size="sm" className="h-auto p-0 text-xs">
                       <ArrowLeft className="mr-1 h-3 w-3" />
-                      Back to Personas
+                      Back to Agents
                     </Button>
                   </Link>
                 </div>
@@ -849,7 +849,7 @@ export function ChatClient({
                     {/* Filtered Topics */}
                     {(() => {
                       const filteredTopics = filterAndSortTopics(
-                        personaTopics,
+                        agentTopics,
                         topicSearchQuery,
                         topicFilterCategory,
                         topicFilterTags,
@@ -860,17 +860,10 @@ export function ChatClient({
                         return (
                           <div key="empty" className="text-center py-8 px-4">
                             <p className="text-sm text-muted-foreground">
-                              {personaTopics.length === 0 
+                              {agentTopics.length === 0 
                                 ? "No topics available yet."
                                 : "No topics match your search."}
                             </p>
-                            {personaTopics.length === 0 && (
-                              <Link href={`/personas/${personaId}/train`}>
-                                <Button variant="link" size="sm" className="mt-2 h-auto p-0">
-                                  Train this persona on topics
-                                </Button>
-                              </Link>
-                            )}
                           </div>
                         );
                       }
@@ -941,18 +934,13 @@ export function ChatClient({
           <div className="border-b p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <PersonaAvatar
-                  imageUrl={persona.profileImageUrl}
-                  displayName={persona.displayName}
+                <AgentAvatar
+                  imageUrl={agent.profileImageUrl}
+                  displayName={agent.displayName}
                   size="lg"
                 />
                 <div>
-                  <h1 className="text-xl font-bold">{persona.displayName}</h1>
-                  {(persona.firstName || persona.lastName) && (
-                    <p className="text-sm text-muted-foreground">
-                      {[persona.firstName, persona.lastName].filter(Boolean).join(" ")}
-                    </p>
-                  )}
+                  <h1 className="text-xl font-bold">{agent.displayName}</h1>
                 </div>
               </div>
               {currentChat && (
@@ -1058,7 +1046,7 @@ export function ChatClient({
               <div className="flex items-center justify-center h-full">
                 <div className="text-center space-y-2 px-4">
                   <h3 className="text-lg font-semibold">
-                    Start chatting with {persona.displayName}
+                    Start chatting with {agent.displayName}
                   </h3>
                   <p className="text-sm text-muted-foreground">
                     Select a topic from the sidebar or type a message below
@@ -1075,9 +1063,9 @@ export function ChatClient({
                     }`}
                   >
                     {message.role === "assistant" ? (
-                      <PersonaAvatar
-                        imageUrl={persona.profileImageUrl}
-                        displayName={persona.displayName}
+                      <AgentAvatar
+                        imageUrl={agent.profileImageUrl}
+                        displayName={agent.displayName}
                         size="sm"
                         className="flex-shrink-0"
                       />
@@ -1122,9 +1110,9 @@ export function ChatClient({
                 ))}
                 {isSending && (
                   <div className="flex gap-3">
-                    <PersonaAvatar
-                      imageUrl={persona.profileImageUrl}
-                      displayName={persona.displayName}
+                    <AgentAvatar
+                      imageUrl={agent.profileImageUrl}
+                      displayName={agent.displayName}
                       size="sm"
                       className="flex-shrink-0"
                     />
@@ -1265,9 +1253,9 @@ export function ChatClient({
             });
           }}
           chatId={currentChat.id}
-          personaId={personaId}
-          personaName={persona.displayName}
-          personaImageUrl={persona.profileImageUrl}
+          agentId={agentId}
+          agentName={agent.displayName}
+          agentImageUrl={agent.profileImageUrl}
         />
       )}
     </div>

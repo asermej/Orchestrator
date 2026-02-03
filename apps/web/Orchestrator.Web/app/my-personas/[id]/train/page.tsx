@@ -10,11 +10,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Header } from "@/components/header";
 import { ArrowLeft, Loader2, Save, BookOpen, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { fetchPersonaById } from "../../actions";
-import { PersonaAvatar } from "@/components/persona-avatar";
+import { fetchAgentById } from "../../actions";
+import { AgentAvatar } from "@/components/agent-avatar";
 import { 
-  fetchPersonaTraining, 
-  updatePersonaTraining 
+  fetchAgentTraining, 
+  updateAgentTraining 
 } from "../../../personas/[id]/train/actions";
 import { useVoiceInput } from "@/hooks/use-voice-input";
 import { VoiceInputToggle } from "@/components/voice-input-toggle";
@@ -22,11 +22,11 @@ import { useServerAction } from "@/lib/use-server-action";
 
 const MAX_GENERAL_TRAINING_LENGTH = 5000;
 
-export default function PersonaTrainPage() {
+export default function AgentTrainPage() {
   const { user, isLoading: isUserLoading } = useUser();
   const router = useRouter();
   const params = useParams();
-  const personaId = params.id as string;
+  const agentId = params.id as string;
 
   const [isLoading, setIsLoading] = useState(true);
   const [displayName, setDisplayName] = useState("");
@@ -37,7 +37,7 @@ export default function PersonaTrainPage() {
 
   // Server action for saving training
   const { execute: executeSave, isLoading: isSavingTraining } = useServerAction(
-    () => updatePersonaTraining(personaId, trainingContent),
+    () => updateAgentTraining(agentId, trainingContent),
     {
       successMessage: "Training data saved successfully!",
     }
@@ -69,26 +69,26 @@ export default function PersonaTrainPage() {
   }, [user, isUserLoading, router]);
 
   useEffect(() => {
-    if (user && personaId) {
-      loadPersona();
+    if (user && agentId) {
+      loadAgent();
     }
-  }, [user, personaId]);
+  }, [user, agentId]);
 
-  const loadPersona = async () => {
+  const loadAgent = async () => {
     try {
       setIsLoading(true);
       
-      // Load persona details and training data in parallel
-      const [persona, trainingData] = await Promise.all([
-        fetchPersonaById(personaId),
-        fetchPersonaTraining(personaId)
+      // Load agent details and training data in parallel
+      const [agent, trainingData] = await Promise.all([
+        fetchAgentById(agentId),
+        fetchAgentTraining(agentId)
       ]);
       
-      setDisplayName(persona.displayName);
-      setProfileImageUrl(persona.profileImageUrl || "");
+      setDisplayName(agent.displayName);
+      setProfileImageUrl(agent.profileImageUrl || "");
       setTrainingContent(trainingData.trainingContent || "");
     } catch (err) {
-      console.error("Error loading persona:", err);
+      console.error("Error loading agent:", err);
     } finally {
       setIsLoading(false);
     }
@@ -126,24 +126,24 @@ export default function PersonaTrainPage() {
     <div className="min-h-screen bg-background">
       <Header user={user} />
 
-      {/* Hero Header with Persona Info */}
+      {/* Hero Header with Agent Info */}
       <div className="border-b bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5">
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center gap-6">
-            <Link href={`/my-personas/${personaId}/edit`}>
+            <Link href={`/my-personas/${agentId}/edit`}>
               <Button variant="ghost" size="icon" className="rounded-full">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
             <div className="flex items-center gap-4">
-              <PersonaAvatar
+              <AgentAvatar
                 imageUrl={profileImageUrl}
                 displayName={displayName}
                 size="xl"
                 shape="square"
               />
               <div>
-                <h1 className="text-3xl font-bold">{displayName || "Persona"}</h1>
+                <h1 className="text-3xl font-bold">{displayName || "Agent"}</h1>
                 <p className="text-muted-foreground mt-1">General Training & Background</p>
               </div>
             </div>
@@ -165,7 +165,7 @@ export default function PersonaTrainPage() {
                   <CardTitle className="text-2xl">General Training</CardTitle>
                   <CardDescription className="mt-2">
                     Provide background information, personality traits, knowledge, and characteristics 
-                    for {displayName || "this persona"}. This training will be included in every conversation.
+                    for {displayName || "this agent"}. This training will be included in every conversation.
                   </CardDescription>
                 </div>
               </div>

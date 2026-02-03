@@ -19,7 +19,7 @@ internal sealed class ChatDataManager
     public async Task<Chat?> GetById(System.Guid id)
     {
         const string sql = @"
-            SELECT id, persona_id, user_id, title, last_message_at, created_at, updated_at, is_deleted
+            SELECT id, agent_id, user_id, title, last_message_at, created_at, updated_at, is_deleted
             FROM chats
             WHERE id = @id AND is_deleted = false";
         using var connection = new NpgsqlConnection(_dbConnectionString);
@@ -34,9 +34,9 @@ internal sealed class ChatDataManager
         }
 
         const string sql = @"
-            INSERT INTO chats (id, persona_id, user_id, title, last_message_at)
-            VALUES (@Id, @PersonaId, @UserId, @Title, @LastMessageAt)
-            RETURNING id, persona_id, user_id, title, last_message_at, created_at, updated_at, is_deleted";
+            INSERT INTO chats (id, agent_id, user_id, title, last_message_at)
+            VALUES (@Id, @AgentId, @UserId, @Title, @LastMessageAt)
+            RETURNING id, agent_id, user_id, title, last_message_at, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var newItem = await connection.QueryFirstOrDefaultAsync<Chat>(sql, chat);
@@ -48,13 +48,13 @@ internal sealed class ChatDataManager
         const string sql = @"
             UPDATE chats
             SET
-                persona_id = @PersonaId,
+                agent_id = @AgentId,
                 user_id = @UserId,
                 title = @Title,
                 last_message_at = @LastMessageAt,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = @Id AND is_deleted = false
-            RETURNING id, persona_id, user_id, title, last_message_at, created_at, updated_at, is_deleted";
+            RETURNING id, agent_id, user_id, title, last_message_at, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var updatedItem = await connection.QueryFirstOrDefaultAsync<Chat>(sql, chat);
@@ -77,15 +77,15 @@ internal sealed class ChatDataManager
         return rowsAffected > 0;
     }
 
-    public async Task<PaginatedResult<Chat>> Search(Guid? personaId, Guid? userId, string? title, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Chat>> Search(Guid? agentId, Guid? userId, string? title, int pageNumber, int pageSize)
     {
         var whereClauses = new List<string>();
         var parameters = new DynamicParameters();
 
-        if (personaId.HasValue)
+        if (agentId.HasValue)
         {
-            whereClauses.Add("persona_id = @PersonaId");
-            parameters.Add("PersonaId", personaId.Value);
+            whereClauses.Add("agent_id = @AgentId");
+            parameters.Add("AgentId", agentId.Value);
         }
 
         if (userId.HasValue)
@@ -110,7 +110,7 @@ internal sealed class ChatDataManager
 
         var offset = (pageNumber - 1) * pageSize;
         var querySql = $@"
-            SELECT id, persona_id, user_id, title, last_message_at, created_at, updated_at, is_deleted
+            SELECT id, agent_id, user_id, title, last_message_at, created_at, updated_at, is_deleted
             FROM chats
             {whereSql}
             ORDER BY created_at DESC

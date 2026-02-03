@@ -27,7 +27,7 @@ public static class TopicMapper
             Name = topic.Name,
             Description = topic.Description,
             CategoryId = topic.CategoryId,
-            PersonaId = topic.PersonaId,
+            AgentId = topic.AgentId,
             ContentUrl = topic.ContentUrl,
             ContributionNotes = topic.ContributionNotes,
             CreatedAt = topic.CreatedAt,
@@ -64,7 +64,7 @@ public static class TopicMapper
             Name = createResource.Name,
             Description = createResource.Description,
             CategoryId = createResource.CategoryId,
-            PersonaId = createResource.PersonaId,
+            AgentId = createResource.AgentId,
             ContentUrl = string.Empty, // Will be set by controller after saving training content
             ContributionNotes = createResource.ContributionNotes
         };
@@ -89,7 +89,7 @@ public static class TopicMapper
             Name = updateResource.Name ?? existingTopic.Name,
             Description = updateResource.Description ?? existingTopic.Description,
             CategoryId = updateResource.CategoryId ?? existingTopic.CategoryId,
-            PersonaId = existingTopic.PersonaId,
+            AgentId = existingTopic.AgentId,
             ContentUrl = existingTopic.ContentUrl, // Keep existing - controller will update if new content provided
             ContributionNotes = updateResource.ContributionNotes ?? existingTopic.ContributionNotes,
             CreatedBy = existingTopic.CreatedBy,
@@ -127,7 +127,7 @@ public static class TopicMapper
             Id = feedData.Id,
             Name = feedData.Name,
             Description = feedData.Description,
-            PersonaId = feedData.PersonaId,
+            AgentId = feedData.AgentId,
             Author = author,
             ChatCount = feedData.ChatCount,
             Category = new CategoryResource 

@@ -27,9 +27,9 @@ internal sealed partial class DataFacade
         return TopicDataManager.Delete(id);
     }
 
-    public Task<PaginatedResult<Topic>> SearchTopics(string? name, Guid? personaId, int pageNumber, int pageSize)
+    public Task<PaginatedResult<Topic>> SearchTopics(string? name, Guid? agentId, int pageNumber, int pageSize)
     {
-        return TopicDataManager.Search(name, personaId, pageNumber, pageSize);
+        return TopicDataManager.Search(name, agentId, pageNumber, pageSize);
     }
 
     public Task AddTopicTag(Guid topicId, Guid tagId)

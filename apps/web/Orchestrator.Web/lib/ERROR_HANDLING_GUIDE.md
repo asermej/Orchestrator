@@ -60,7 +60,7 @@ All controllers now have proper authorization:
 import { apiClient } from '@/lib/api-client';
 
 // Automatically handles authentication and 401 redirects
-const personas = await apiClient.get<Persona[]>('/Persona');
+const agents = await apiClient.get<Agent[]>('/Agent');
 ```
 
 **For Server Actions:**
@@ -68,8 +68,8 @@ const personas = await apiClient.get<Persona[]>('/Persona');
 'use server';
 import { apiPost } from '@/lib/api-client-server';
 
-export async function createPersona(data: CreatePersonaRequest) {
-  return await apiPost<Persona>('/Persona', data);
+export async function createAgent(data: CreateAgentRequest) {
+  return await apiPost<Agent>('/Agent', data);
 }
 ```
 
@@ -93,12 +93,12 @@ export async function uploadImage(formData: FormData) {
 
 ```typescript
 import { useServerAction } from '@/lib/use-server-action';
-import { createPersona } from './actions';
+import { createAgent } from './actions';
 
-export function CreatePersonaForm() {
-  const { execute, isLoading, error } = useServerAction(createPersona, {
-    successMessage: 'Persona created successfully!',
-    onSuccess: () => router.push('/personas')
+export function CreateAgentForm() {
+  const { execute, isLoading, error } = useServerAction(createAgent, {
+    successMessage: 'Agent created successfully!',
+    onSuccess: () => router.push('/agents')
   });
 
   const handleSubmit = async (formData: FormData) => {
@@ -123,9 +123,9 @@ export function CreatePersonaForm() {
 import { handleApiError, showSuccess } from '@/lib/error-handler';
 
 try {
-  const result = await createPersona(formData);
-  showSuccess('Persona created successfully!');
-  router.push('/personas');
+  const result = await createAgent(formData);
+  showSuccess('Agent created successfully!');
+  router.push('/agents');
 } catch (error) {
   // Business exceptions show actual error message
   // Technical exceptions show generic message
@@ -139,12 +139,12 @@ try {
 import { handleApiError, ApiClientError } from '@/lib/error-handler';
 
 try {
-  await updatePersona(id, data);
+  await updateAgent(id, data);
 } catch (error) {
   handleApiError(error, (apiError) => {
     // Custom handling for specific errors
     if (apiError.error.message.includes('duplicate')) {
-      showWarning('This persona name is already taken');
+      showWarning('This agent name is already taken');
       return true; // Handled
     }
     return false; // Use default handling
@@ -178,14 +178,14 @@ session: {
 
 ❌ **Don't do this:**
 ```typescript
-const response = await fetch('/api/v1/Persona', {
+const response = await fetch('/api/v1/Agent', {
   headers: { Authorization: `Bearer ${token}` }
 });
 ```
 
 ✅ **Do this:**
 ```typescript
-const persona = await apiClient.get<Persona>('/Persona');
+const agent = await apiClient.get<Agent>('/Agent');
 ```
 
 ### 2. Handle Errors Appropriately
@@ -319,7 +319,7 @@ When updating existing code to use the new error handling:
 See these files for complete examples:
 - `lib/upload-image.ts` - Server action with file upload
 - `components/image-upload.tsx` - Component with error handling
-- `app/create-persona/page.tsx` - Form with server action
+- `app/create-agent/page.tsx` - Form with server action
 
 ## Support
 

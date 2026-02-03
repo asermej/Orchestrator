@@ -24,11 +24,11 @@ public class ConversationController : ControllerBase
     }
 
     /// <summary>
-    /// Sends a text message and receives a streaming audio response from the persona.
+    /// Sends a text message and receives a streaming audio response from the agent.
     /// The user's speech is transcribed in the browser before calling this endpoint.
     /// </summary>
-    /// <param name="request">Text message and context (chatId, personaId, message)</param>
-    /// <returns>Streaming audio/mpeg of persona's spoken response</returns>
+    /// <param name="request">Text message and context (chatId, agentId, message)</param>
+    /// <returns>Streaming audio/mpeg of agent's spoken response</returns>
     /// <response code="200">Returns streaming audio response</response>
     /// <response code="400">If the request is invalid</response>
     /// <response code="401">If the user is not authenticated</response>
@@ -40,8 +40,8 @@ public class ConversationController : ControllerBase
     [ProducesResponseType(503)]
     public async Task GetAudioResponse([FromBody] AudioResponseRequest request)
     {
-        _logger.LogInformation("Streaming audio response for chat {ChatId}, persona {PersonaId}", 
-            request.ChatId, request.PersonaId);
+        _logger.LogInformation("Streaming audio response for chat {ChatId}, agent {AgentId}", 
+            request.ChatId, request.AgentId);
 
         Response.ContentType = "audio/mpeg";
         Response.Headers.Append("Cache-Control", "no-cache");
@@ -54,7 +54,7 @@ public class ConversationController : ControllerBase
         {
             await foreach (var audioChunk in _domainFacade.StreamAudioResponseAsync(
                 request.ChatId, 
-                request.PersonaId, 
+                request.AgentId, 
                 request.Message, 
                 HttpContext.RequestAborted))
             {
@@ -69,9 +69,9 @@ public class ConversationController : ControllerBase
             Response.ContentType = "application/json";
             await Response.WriteAsJsonAsync(new { error = "Voice response is currently disabled" });
         }
-        catch (PersonaNotFoundException ex)
+        catch (AgentNotFoundException ex)
         {
-            _logger.LogWarning(ex, "Persona not found: {PersonaId}", request.PersonaId);
+            _logger.LogWarning(ex, "Agent not found: {AgentId}", request.AgentId);
             Response.StatusCode = 404;
             Response.ContentType = "application/json";
             await Response.WriteAsJsonAsync(new { error = ex.Message });

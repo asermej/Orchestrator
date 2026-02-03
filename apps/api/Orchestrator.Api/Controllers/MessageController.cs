@@ -194,9 +194,9 @@ public class MessageController : ControllerBase
             _logger.LogWarning("ElevenLabs TTS is disabled");
             return StatusCode(503, new { error = "Voice response is currently disabled" });
         }
-        catch (PersonaNotFoundException ex)
+        catch (AgentNotFoundException ex)
         {
-            _logger.LogWarning(ex, "Persona not found for message: {MessageId}", id);
+            _logger.LogWarning(ex, "Agent not found for message: {MessageId}", id);
             return NotFound(ex.Message);
         }
         catch (ChatNotFoundException ex)

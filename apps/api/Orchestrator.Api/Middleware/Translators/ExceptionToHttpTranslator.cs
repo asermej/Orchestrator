@@ -87,10 +87,6 @@ public static class ExceptionToHttpTranslator
     {
         ArgumentNullException.ThrowIfNull(exception);
 
-        if (exception is VoiceCloneRateLimitExceededException)
-        {
-            return 429;
-        }
         if (exception is ElevenLabsDisabledException)
         {
             return 503;

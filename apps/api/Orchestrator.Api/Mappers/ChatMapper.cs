@@ -21,7 +21,7 @@ public static class ChatMapper
         return new ChatResource
         {
             Id = chat.Id,
-            PersonaId = chat.PersonaId,
+            AgentId = chat.AgentId,
             UserId = chat.UserId,
             Title = chat.Title,
             LastMessageAt = chat.LastMessageAt,
@@ -55,7 +55,7 @@ public static class ChatMapper
 
         return new Chat
         {
-            PersonaId = createResource.PersonaId,
+            AgentId = createResource.AgentId,
             UserId = createResource.UserId,
             Title = createResource.Title,
             LastMessageAt = createResource.LastMessageAt
@@ -77,7 +77,7 @@ public static class ChatMapper
         return new Chat
         {
             Id = existingChat.Id,
-            PersonaId = existingChat.PersonaId,
+            AgentId = existingChat.AgentId,
             UserId = existingChat.UserId,
             Title = updateResource.Title ?? existingChat.Title,
             LastMessageAt = updateResource.LastMessageAt ?? existingChat.LastMessageAt,

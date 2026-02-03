@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260201150002-create-personas-table" author="system">
+        <createTable tableName="personas">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="organization_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_personas_organization" references="organizations(id)"/>
+            </column>
+            <column name="first_name" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="last_name" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="display_name" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="profile_image_url" type="varchar(500)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="system_prompt" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <column name="interview_guidelines" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <!-- Voice configuration -->
+            <column name="elevenlabs_voice_id" type="varchar(255)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="voice_stability" type="decimal(3,2)" defaultValueNumeric="0.50">
+                <constraints nullable="false"/>
+            </column>
+            <column name="voice_similarity_boost" type="decimal(3,2)" defaultValueNumeric="0.75">
+                <constraints nullable="false"/>
+            </column>
+            <column name="voice_provider" type="varchar(50)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="voice_type" type="varchar(50)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="voice_name" type="varchar(255)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="voice_created_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="voice_created_by_user_id" type="varchar(255)">
+                <constraints nullable="true"/>
+            </column>
+            <!-- Audit fields -->
+            <column name="created_at" type="timestamp" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="updated_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_deleted" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="deleted_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="personas" indexName="idx_personas_organization_id">
+            <column name="organization_id"/>
+        </createIndex>
+
+        <createIndex tableName="personas" indexName="idx_personas_display_name">
+            <column name="display_name"/>
+        </createIndex>
+
+        <createIndex tableName="personas" indexName="idx_personas_is_deleted">
+            <column name="is_deleted"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

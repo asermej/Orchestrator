@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260201150005-create-applicants-table" author="system">
+        <createTable tableName="applicants">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="organization_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_applicants_organization" references="organizations(id)"/>
+            </column>
+            <column name="external_applicant_id" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="first_name" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="last_name" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="email" type="varchar(255)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="phone" type="varchar(20)">
+                <constraints nullable="true"/>
+            </column>
+            <!-- Audit fields -->
+            <column name="created_at" type="timestamp" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="updated_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_deleted" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="deleted_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="applicants" indexName="idx_applicants_organization_id">
+            <column name="organization_id"/>
+        </createIndex>
+
+        <createIndex tableName="applicants" indexName="idx_applicants_external_id">
+            <column name="organization_id"/>
+            <column name="external_applicant_id"/>
+        </createIndex>
+
+        <createIndex tableName="applicants" indexName="idx_applicants_email">
+            <column name="email"/>
+        </createIndex>
+
+        <createIndex tableName="applicants" indexName="idx_applicants_is_deleted">
+            <column name="is_deleted"/>
+        </createIndex>
+
+        <addUniqueConstraint tableName="applicants" columnNames="organization_id, external_applicant_id" constraintName="uk_applicants_org_external_id"/>
+    </changeSet>
+
+</databaseChangeLog>

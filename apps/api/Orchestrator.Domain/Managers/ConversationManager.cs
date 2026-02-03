@@ -20,8 +20,8 @@ internal sealed class ConversationManager : IDisposable
     private DataFacade DataFacade => _dataFacade ??= new DataFacade(_serviceLocator.CreateConfigurationProvider().GetDbConnectionString());
     private GatewayFacade? _gatewayFacade;
     private GatewayFacade GatewayFacade => _gatewayFacade ??= new GatewayFacade(_serviceLocator);
-    private PersonaManager? _personaManager;
-    private PersonaManager PersonaManager => _personaManager ??= new PersonaManager(_serviceLocator);
+    private AgentManager? _agentManager;
+    private AgentManager AgentManager => _agentManager ??= new AgentManager(_serviceLocator);
     private MessageManager? _messageManager;
     private MessageManager MessageManager => _messageManager ??= new MessageManager(_serviceLocator);
     private ChatManager? _chatManager;
@@ -46,13 +46,13 @@ internal sealed class ConversationManager : IDisposable
     /// Saves user message, generates AI response, and streams TTS audio.
     /// </summary>
     /// <param name="chatId">The chat ID</param>
-    /// <param name="personaId">The persona ID for voice settings</param>
+    /// <param name="agentId">The agent ID for voice settings</param>
     /// <param name="userMessage">The user's text message (transcribed from speech)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Async enumerable of audio chunks (MP3 bytes)</returns>
     public async IAsyncEnumerable<byte[]> StreamAudioResponseAsync(
         Guid chatId,
-        Guid personaId,
+        Guid agentId,
         string userMessage,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -74,18 +74,18 @@ internal sealed class ConversationManager : IDisposable
         MessageValidator.Validate(message);
         await DataFacade.AddMessage(message).ConfigureAwait(false);
 
-        // Get persona for voice settings
-        var persona = await PersonaManager.GetPersonaById(personaId).ConfigureAwait(false);
-        if (persona == null)
+        // Get agent for voice settings
+        var agent = await AgentManager.GetAgentById(agentId).ConfigureAwait(false);
+        if (agent == null)
         {
-            throw new PersonaNotFoundException($"Persona with ID {personaId} not found");
+            throw new AgentNotFoundException($"Agent with ID {agentId} not found");
         }
 
         // Get chat history
         var chatHistory = await DataFacade.SearchMessages(chatId, null, null, 1, 50).ConfigureAwait(false);
 
         // Generate AI response text
-        var aiResponseText = await GenerateAIResponse(personaId, chatId, chatHistory.Items).ConfigureAwait(false);
+        var aiResponseText = await GenerateAIResponse(agentId, chatId, chatHistory.Items).ConfigureAwait(false);
 
         // Save AI response
         var aiMessage = new Message
@@ -106,9 +106,9 @@ internal sealed class ConversationManager : IDisposable
         }
 
         // Stream TTS for each sentence
-        var voiceId = persona.ElevenLabsVoiceId ?? config.DefaultVoiceId;
-        var stability = persona.VoiceStability;
-        var similarityBoost = persona.VoiceSimilarityBoost;
+        var voiceId = agent.ElevenlabsVoiceId ?? config.DefaultVoiceId;
+        var stability = agent.VoiceStability;
+        var similarityBoost = agent.VoiceSimilarityBoost;
         var requestCount = 0;
 
         await foreach (var sentence in BufferSentences(aiResponseText, config.MaxCharsPerRequest).ConfigureAwait(false))
@@ -282,15 +282,15 @@ internal sealed class ConversationManager : IDisposable
     /// <summary>
     /// Generates AI response using OpenAI.
     /// </summary>
-    private async Task<string> GenerateAIResponse(Guid personaId, Guid chatId, IEnumerable<Message> chatHistory)
+    private async Task<string> GenerateAIResponse(Guid agentId, Guid chatId, IEnumerable<Message> chatHistory)
     {
-        var persona = await PersonaManager.GetPersonaById(personaId).ConfigureAwait(false);
-        if (persona == null)
+        var agent = await AgentManager.GetAgentById(agentId).ConfigureAwait(false);
+        if (agent == null)
         {
-            throw new PersonaNotFoundException($"Persona with ID {personaId} not found");
+            throw new AgentNotFoundException($"Agent with ID {agentId} not found");
         }
 
-        var generalTraining = await PersonaManager.GetPersonaTraining(personaId).ConfigureAwait(false);
+        var generalTraining = await AgentManager.GetAgentTraining(agentId).ConfigureAwait(false);
         var chatTopics = await ChatManager.GetChatTopics(chatId).ConfigureAwait(false);
         
         var topicContexts = new List<(string TopicName, string Content)>();
@@ -307,28 +307,19 @@ internal sealed class ConversationManager : IDisposable
             }
         }
 
-        var systemPrompt = BuildSystemPrompt(persona, generalTraining, topicContexts);
+        var systemPrompt = BuildSystemPrompt(agent, generalTraining, topicContexts);
         return await GatewayFacade.GenerateChatCompletion(systemPrompt, chatHistory).ConfigureAwait(false);
     }
 
     /// <summary>
-    /// Builds system prompt for the persona.
+    /// Builds system prompt for the agent.
     /// </summary>
-    private string BuildSystemPrompt(Persona persona, string? generalTraining, List<(string TopicName, string Content)> topicContexts)
+    private string BuildSystemPrompt(Agent agent, string? generalTraining, List<(string TopicName, string Content)> topicContexts)
     {
         var promptParts = new List<string>
         {
-            $"You are {persona.DisplayName}."
+            $"You are {agent.DisplayName}."
         };
-
-        if (!string.IsNullOrWhiteSpace(persona.FirstName) || !string.IsNullOrWhiteSpace(persona.LastName))
-        {
-            var fullName = $"{persona.FirstName} {persona.LastName}".Trim();
-            if (!string.IsNullOrWhiteSpace(fullName))
-            {
-                promptParts.Add($"Your real name is {fullName}.");
-            }
-        }
 
         if (!string.IsNullOrWhiteSpace(generalTraining))
         {
@@ -358,7 +349,7 @@ internal sealed class ConversationManager : IDisposable
     public void Dispose()
     {
         _gatewayFacade?.Dispose();
-        _personaManager?.Dispose();
+        _agentManager?.Dispose();
         _messageManager?.Dispose();
         _chatManager?.Dispose();
     }

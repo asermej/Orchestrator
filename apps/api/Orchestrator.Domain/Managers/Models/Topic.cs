@@ -18,8 +18,8 @@ public class Topic : Entity
     [Column("category_id")]
     public Guid CategoryId { get; set; }
 
-    [Column("persona_id")]
-    public Guid PersonaId { get; set; }
+    [Column("agent_id")]
+    public Guid AgentId { get; set; }
 
     [Column("content_url")]
     public string ContentUrl { get; set; } = string.Empty;

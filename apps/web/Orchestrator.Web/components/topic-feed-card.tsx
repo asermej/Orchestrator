@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { PersonaAvatar } from "@/components/persona-avatar";
+import { AgentAvatar } from "@/components/agent-avatar";
 import { MessageCircle, TrendingUp, ArrowRight } from "lucide-react";
 
 interface TopicFeedCardProps {
@@ -10,7 +10,7 @@ interface TopicFeedCardProps {
     id: string;
     name: string;
     description?: string;
-    personaId: string;
+    agentId: string;
     author?: {
       id: string;
       firstName: string;
@@ -88,7 +88,7 @@ export function TopicFeedCard({ topic }: TopicFeedCardProps) {
           <div className="flex items-center justify-between pt-2 border-t">
             {topic.author && (
               <div className="flex items-center gap-2">
-                <PersonaAvatar
+                <AgentAvatar
                   imageUrl={topic.author.profileImageUrl}
                   displayName={`${topic.author.firstName} ${topic.author.lastName}`}
                   size="sm"
@@ -99,7 +99,7 @@ export function TopicFeedCard({ topic }: TopicFeedCardProps) {
                 </span>
               </div>
             )}
-            <Link href={`/personas/${topic.personaId}/chat?topicId=${topic.id}`}>
+            <Link href={`/agents/${topic.agentId}/chat?topicId=${topic.id}`}>
               <Button variant="outline" size="sm" className="h-8 px-4 gap-1.5">
                 Chat Now
                 <ArrowRight className="h-3.5 w-3.5" />

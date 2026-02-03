@@ -16,10 +16,10 @@ public class AudioResponseRequest
     public Guid ChatId { get; set; }
 
     /// <summary>
-    /// The persona ID to get voice settings from
+    /// The agent ID to get voice settings from
     /// </summary>
     [Required]
-    public Guid PersonaId { get; set; }
+    public Guid AgentId { get; set; }
 
     /// <summary>
     /// The user's text message (already transcribed from speech in the browser)

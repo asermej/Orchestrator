@@ -3,27 +3,21 @@
 import { apiPost } from "@/lib/api-client-server";
 import { redirect } from "next/navigation";
 
-interface CreatePersonaRequest {
-  firstName?: string | null;
-  lastName?: string | null;
+interface CreateAgentRequest {
   displayName: string;
   profileImageUrl?: string | null;
 }
 
-interface PersonaResponse {
+interface AgentResponse {
   id: string;
-  firstName?: string | null;
-  lastName?: string | null;
   displayName: string;
   profileImageUrl?: string | null;
   createdAt: string;
   updatedAt?: string | null;
 }
 
-export async function createPersona(formData: FormData) {
+export async function createAgent(formData: FormData) {
   // Extract form data
-  const firstName = formData.get("firstName") as string;
-  const lastName = formData.get("lastName") as string;
   const displayName = formData.get("displayName") as string;
   const profileImageUrl = formData.get("profileImageUrl") as string;
 
@@ -32,18 +26,15 @@ export async function createPersona(formData: FormData) {
     throw new Error("Display name is required");
   }
 
-  // Create the persona object to send to API
-  const persona: CreatePersonaRequest = {
-    firstName: firstName && firstName.trim() !== "" ? firstName : null,
-    lastName: lastName && lastName.trim() !== "" ? lastName : null,
+  // Create the agent object to send to API
+  const agent: CreateAgentRequest = {
     displayName: displayName.trim(),
     profileImageUrl: profileImageUrl && profileImageUrl.trim() !== "" ? profileImageUrl : null,
   };
 
-  // Call the new PersonaController Create endpoint
-  const createdPersona = await apiPost<PersonaResponse>("/Persona", persona);
+  // Call the AgentController Create endpoint
+  const createdAgent = await apiPost<AgentResponse>("/Agent", agent);
   
-  // Redirect directly to general training page with onboarding flag
-  // Skip the edit page since user already filled out profile info
-  redirect(`/my-personas/${createdPersona.id}/general-training?onboarding=true`);
+  // Redirect to my-personas page after creation
+  redirect(`/my-personas`);
 }

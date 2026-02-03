@@ -6,27 +6,56 @@ public sealed partial class DomainFacade : IDisposable
 {
     private bool _disposed;
     private readonly ServiceLocatorBase _serviceLocator;
+    
+    // Existing managers
     private UserManager? _userManager;
     private UserManager UserManager => _userManager ??= new UserManager(_serviceLocator);
-    private PersonaManager? _personaManager;
-    private PersonaManager PersonaManager => _personaManager ??= new PersonaManager(_serviceLocator);
-    private ChatManager? _chatManager;
-    private ChatManager ChatManager => _chatManager ??= new ChatManager(_serviceLocator);
-    private MessageManager? _messageManager;
-    private MessageManager MessageManager => _messageManager ??= new MessageManager(_serviceLocator);
+    private AgentManager? _agentManager;
+    private AgentManager AgentManager => _agentManager ??= new AgentManager(_serviceLocator);
     private ImageManager? _imageManager;
     private ImageManager ImageManager => _imageManager ??= new ImageManager(_serviceLocator);
     private GatewayFacade? _gatewayFacade;
     private GatewayFacade GatewayFacade => _gatewayFacade ??= new GatewayFacade(_serviceLocator);
-    private TopicManager? _topicManager;
-    private TopicManager TopicManager => _topicManager ??= new TopicManager(_serviceLocator);
     private CategoryManager? _categoryManager;
     private CategoryManager CategoryManager => _categoryManager ??= new CategoryManager(_serviceLocator);
+    private ChatManager? _chatManager;
+    private ChatManager ChatManager => _chatManager ??= new ChatManager(_serviceLocator);
+    private MessageManager? _messageManager;
+    private MessageManager MessageManager => _messageManager ??= new MessageManager(_serviceLocator);
     private TagManager? _tagManager;
     private TagManager TagManager => _tagManager ??= new TagManager(_serviceLocator);
+    private TopicManager? _topicManager;
+    private TopicManager TopicManager => _topicManager ??= new TopicManager(_serviceLocator);
     private AudioCacheManager? _audioCacheManager;
     private AudioCacheManager AudioCacheManager => _audioCacheManager ??= new AudioCacheManager(_serviceLocator);
-
+    
+    // New ATS Platform managers
+    private OrganizationManager? _organizationManager;
+    private OrganizationManager OrganizationManager => _organizationManager ??= new OrganizationManager(_serviceLocator);
+    private JobTypeManager? _jobTypeManager;
+    private JobTypeManager JobTypeManager => _jobTypeManager ??= new JobTypeManager(_serviceLocator);
+    private ApplicantManager? _applicantManager;
+    private ApplicantManager ApplicantManager => _applicantManager ??= new ApplicantManager(_serviceLocator);
+    private JobManager? _jobManager;
+    private JobManager JobManager => _jobManager ??= new JobManager(_serviceLocator);
+    private InterviewManager? _interviewManager;
+    private InterviewManager InterviewManager => _interviewManager ??= new InterviewManager(_serviceLocator);
+    private InterviewConfigurationManager? _interviewConfigurationManager;
+    private InterviewConfigurationManager InterviewConfigurationManager => _interviewConfigurationManager ??= new InterviewConfigurationManager(_serviceLocator);
+    private WebhookManager? _webhookManager;
+    private DataFacade? _webhookDataFacade;
+    private WebhookManager WebhookManager
+    {
+        get
+        {
+            if (_webhookManager == null)
+            {
+                _webhookDataFacade ??= new DataFacade(_serviceLocator.CreateConfigurationProvider().GetDbConnectionString());
+                _webhookManager = new WebhookManager(_webhookDataFacade);
+            }
+            return _webhookManager;
+        }
+    }
 
     public DomainFacade() : this(new ServiceLocator()) { }
 
@@ -34,21 +63,29 @@ public sealed partial class DomainFacade : IDisposable
     {
         _serviceLocator = serviceLocator ?? throw new ArgumentNullException(nameof(serviceLocator));
     }
+
     private void Dispose(bool disposing)
     {
         if (disposing && !_disposed)
         {
             _userManager?.Dispose();
-            _personaManager?.Dispose();
-            _chatManager?.Dispose();
-            _messageManager?.Dispose();
+            _agentManager?.Dispose();
             _imageManager?.Dispose();
             _gatewayFacade?.Dispose();
-            _topicManager?.Dispose();
             _categoryManager?.Dispose();
+            _chatManager?.Dispose();
+            _messageManager?.Dispose();
             _tagManager?.Dispose();
-            _conversationManager?.Dispose();
+            _topicManager?.Dispose();
             _audioCacheManager?.Dispose();
+            _organizationManager?.Dispose();
+            _jobTypeManager?.Dispose();
+            _applicantManager?.Dispose();
+            _jobManager?.Dispose();
+            _interviewManager?.Dispose();
+            _interviewConfigurationManager?.Dispose();
+            _webhookManager?.Dispose();
+            _conversationManager?.Dispose();
             _voiceManager?.Dispose();
             _disposed = true;
         }

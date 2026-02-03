@@ -37,10 +37,10 @@ internal static class TopicValidator
             errors.Add("CategoryId is required");
         }
 
-        // --- Validation for PersonaId ---
-        if (topic.PersonaId == Guid.Empty)
+        // --- Validation for AgentId ---
+        if (topic.AgentId == Guid.Empty)
         {
-            errors.Add("PersonaId is required");
+            errors.Add("AgentId is required");
         }
 
         // --- Validation for ContentUrl ---

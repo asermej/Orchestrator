@@ -48,27 +48,27 @@ internal sealed class TopicManager : IDisposable
     /// Searches for Topics
     /// </summary>
     /// <param name="name">Optional name to search for</param>
-    /// <param name="personaId">Optional persona ID to filter by</param>
+    /// <param name="agentId">Optional agent ID to filter by</param>
     /// <param name="pageNumber">Page number for pagination</param>
     /// <param name="pageSize">Page size for pagination</param>
     /// <returns>A paginated list of Topics</returns>
-    public async Task<PaginatedResult<Topic>> SearchTopics(string? name, Guid? personaId, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Topic>> SearchTopics(string? name, Guid? agentId, int pageNumber, int pageSize)
     {
-        return await DataFacade.SearchTopics(name, personaId, pageNumber, pageSize).ConfigureAwait(false);
+        return await DataFacade.SearchTopics(name, agentId, pageNumber, pageSize).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Searches for Topics with their tags included (optimized to avoid N+1 queries)
     /// </summary>
     /// <param name="name">Optional name to search for</param>
-    /// <param name="personaId">Optional persona ID to filter by</param>
+    /// <param name="agentId">Optional agent ID to filter by</param>
     /// <param name="pageNumber">Page number for pagination</param>
     /// <param name="pageSize">Page size for pagination</param>
     /// <returns>A tuple containing the paginated list of Topics and a dictionary mapping topic IDs to their tags</returns>
-    public async Task<(PaginatedResult<Topic> topics, Dictionary<Guid, List<Tag>> tagsByTopicId)> SearchTopicsWithTags(string? name, Guid? personaId, int pageNumber, int pageSize)
+    public async Task<(PaginatedResult<Topic> topics, Dictionary<Guid, List<Tag>> tagsByTopicId)> SearchTopicsWithTags(string? name, Guid? agentId, int pageNumber, int pageSize)
     {
         // Get topics
-        var topicsResult = await DataFacade.SearchTopics(name, personaId, pageNumber, pageSize).ConfigureAwait(false);
+        var topicsResult = await DataFacade.SearchTopics(name, agentId, pageNumber, pageSize).ConfigureAwait(false);
         
         // Get all tags for these topics in a single query (avoids N+1 problem)
         var topicIds = topicsResult.Items.Select(t => t.Id).ToArray();
@@ -219,7 +219,7 @@ internal sealed class TopicManager : IDisposable
     /// <returns>The file URL where the content was saved</returns>
     public async Task<string> SaveTopicTrainingContent(Guid topicId, string content)
     {
-        // Get the topic to verify it exists and get persona ID
+        // Get the topic to verify it exists and get agent ID
         var topic = await GetTopicById(topicId);
         if (topic == null)
         {
@@ -227,7 +227,7 @@ internal sealed class TopicManager : IDisposable
         }
 
         // Save the training content and get the file URL
-        var contentUrl = await StorageManager.SaveTopicTraining(topic.PersonaId, topicId, content);
+        var contentUrl = await StorageManager.SaveTopicTraining(topic.AgentId, topicId, content);
 
         // Update the topic's ContentUrl with the file URL
         topic.ContentUrl = contentUrl;

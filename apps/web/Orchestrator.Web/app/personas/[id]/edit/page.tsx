@@ -10,27 +10,27 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Header } from "@/components/header";
 import { ImageUpload } from "@/components/image-upload";
-import { ArrowLeft, Loader2, BookOpen, BookMarked, Save, AlertCircle } from "lucide-react";
+import { ArrowLeft, Loader2, BookOpen, Save, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { fetchPersonaById, updatePersona } from "./actions";
-import { PersonaItem } from "../../actions";
+import { fetchAgentById, updateAgent } from "./actions";
+import { AgentItem } from "../../actions";
 import { uploadImage } from "@/lib/upload-image";
 import { 
-  fetchPersonaTraining, 
-  updatePersonaTraining 
+  fetchAgentTraining, 
+  updateAgentTraining 
 } from "../train/actions";
 import { useVoiceInput } from "@/hooks/use-voice-input";
 import { VoiceInputToggle } from "@/components/voice-input-toggle";
 import { useServerAction } from "@/lib/use-server-action";
 
-export default function EditPersona() {
+export default function EditAgent() {
   const { user, isLoading: isUserLoading } = useUser();
   const router = useRouter();
   const params = useParams();
-  const personaId = params.id as string;
+  const agentId = params.id as string;
 
-  const [persona, setPersona] = useState<PersonaItem | null>(null);
-  const [isLoadingPersona, setIsLoadingPersona] = useState(true);
+  const [agent, setAgent] = useState<AgentItem | null>(null);
+  const [isLoadingAgent, setIsLoadingAgent] = useState(true);
   const [profileImageUrl, setProfileImageUrl] = useState<string>("");
 
   // Training state
@@ -43,16 +43,16 @@ export default function EditPersona() {
       if (profileImageUrl) {
         formData.set("profileImageUrl", profileImageUrl);
       }
-      await updatePersona(personaId, formData);
+      await updateAgent(agentId, formData);
     },
     {
-      successMessage: "Persona profile updated successfully!",
+      successMessage: "Agent profile updated successfully!",
       onSuccess: () => router.push("/personas"),
     }
   );
 
   const { execute: executeTrainingUpdate, isLoading: isSavingTraining } = useServerAction(
-    () => updatePersonaTraining(personaId, trainingContent),
+    () => updateAgentTraining(agentId, trainingContent),
     {
       successMessage: "Training data saved successfully!",
     }
@@ -86,30 +86,30 @@ export default function EditPersona() {
   }, [user, isUserLoading, router]);
 
   useEffect(() => {
-    if (user && personaId) {
-      loadPersona();
+    if (user && agentId) {
+      loadAgent();
     }
-  }, [user, personaId]);
+  }, [user, agentId]);
 
-  const loadPersona = async () => {
+  const loadAgent = async () => {
     try {
-      setIsLoadingPersona(true);
+      setIsLoadingAgent(true);
       setIsLoadingTraining(true);
       
-      // Load persona details and training data in parallel
+      // Load agent details and training data in parallel
       const [data, trainingData] = await Promise.all([
-        fetchPersonaById(personaId),
-        fetchPersonaTraining(personaId)
+        fetchAgentById(agentId),
+        fetchAgentTraining(agentId)
       ]);
       
-      setPersona(data);
+      setAgent(data);
       setProfileImageUrl(data.profileImageUrl || "");
       setTrainingContent(trainingData.trainingContent || "");
     } catch (err) {
-      console.error("Error loading persona:", err);
-      setError("Failed to load persona. Please try again.");
+      console.error("Error loading agent:", err);
+      setError("Failed to load agent. Please try again.");
     } finally {
-      setIsLoadingPersona(false);
+      setIsLoadingAgent(false);
       setIsLoadingTraining(false);
     }
   };
@@ -136,7 +136,7 @@ export default function EditPersona() {
   const isNearLimit = characterCount > MAX_GENERAL_TRAINING_LENGTH * 0.9;
   const isOverLimit = characterCount > MAX_GENERAL_TRAINING_LENGTH;
 
-  if (isUserLoading || isLoadingPersona) {
+  if (isUserLoading || isLoadingAgent) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -144,7 +144,7 @@ export default function EditPersona() {
     );
   }
 
-  if (!user || !persona) {
+  if (!user || !agent) {
     return null;
   }
 
@@ -161,7 +161,7 @@ export default function EditPersona() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
-            <h1 className="text-2xl font-semibold">Edit Persona</h1>
+            <h1 className="text-2xl font-semibold">Edit Agent</h1>
           </div>
         </div>
       </div>
@@ -169,29 +169,6 @@ export default function EditPersona() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
-          {/* Topic Knowledge Card */}
-          <Card className="mb-6 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <BookMarked className="h-5 w-5 text-primary" />
-                    <h3 className="font-semibold text-lg">Add Topic Knowledge</h3>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Add specific topics {persona.displayName} is knowledgeable about that others can discuss with them.
-                  </p>
-                </div>
-                <Link href={`/personas/${personaId}/train`}>
-                  <Button className="whitespace-nowrap">
-                    <BookMarked className="mr-2 h-4 w-4" />
-                    Add Topics
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* General Training Card */}
           <Card className="mb-6">
             <CardHeader>
@@ -201,7 +178,7 @@ export default function EditPersona() {
                   <CardTitle>General Training</CardTitle>
                   <CardDescription className="mt-2">
                     Provide background information, personality traits, knowledge, and characteristics 
-                    for {persona.displayName}. This training will be included in every conversation.
+                    for {agent.displayName}. This training will be included in every conversation.
                   </CardDescription>
                 </div>
               </div>
@@ -302,7 +279,7 @@ export default function EditPersona() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Edit {persona.displayName}</CardTitle>
+              <CardTitle>Edit {agent.displayName}</CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
@@ -314,41 +291,14 @@ export default function EditPersona() {
                   <Input
                     id="displayName"
                     name="displayName"
-                    placeholder="e.g., Yoda, John Smith, or Madonna"
-                    defaultValue={persona.displayName}
+                    placeholder="e.g., Alex, Jordan, or Sam"
+                    defaultValue={agent.displayName}
                     required
                     disabled={isSubmitting}
                   />
                   <p className="text-sm text-muted-foreground">
-                    This is how the persona will be identified. Must be unique.
+                    This is how the agent will be identified. Must be unique.
                   </p>
-                </div>
-
-                {/* First Name (Optional) */}
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input
-                    id="firstName"
-                    name="firstName"
-                    placeholder="Optional - e.g., John"
-                    defaultValue={persona.firstName || ""}
-                    disabled={isSubmitting}
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Optional. Leave blank for single-name personas.
-                  </p>
-                </div>
-
-                {/* Last Name (Optional) */}
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input
-                    id="lastName"
-                    name="lastName"
-                    placeholder="Optional - e.g., Smith"
-                    defaultValue={persona.lastName || ""}
-                    disabled={isSubmitting}
-                  />
                 </div>
 
                 {/* Profile Image Upload */}

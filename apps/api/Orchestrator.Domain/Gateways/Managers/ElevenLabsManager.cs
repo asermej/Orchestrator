@@ -263,54 +263,6 @@ internal sealed class ElevenLabsManager : IDisposable
     }
 
     /// <summary>
-    /// Creates a voice from a sample (Instant Voice Cloning). When UseFakeElevenLabs is true, returns deterministic fake voice ID.
-    /// </summary>
-    /// <param name="voiceName">Display name for the voice</param>
-    /// <param name="sampleAudioBytes">Raw audio bytes (e.g. MP3/WAV); caller downloads from blob if needed</param>
-    /// <param name="fileName">Suggested filename for the multipart upload (e.g. "sample.mp3")</param>
-    public async Task<VoiceCloneResult> CreateVoiceFromSampleAsync(string voiceName, byte[] sampleAudioBytes, string fileName = "sample.mp3", CancellationToken cancellationToken = default)
-    {
-        if (Config.UseFakeElevenLabs)
-        {
-            await Task.CompletedTask.ConfigureAwait(false);
-            return new VoiceCloneResult { VoiceId = "fake-cloned-voice-id", VoiceName = voiceName };
-        }
-
-        if (!Config.Enabled)
-        {
-            throw new ElevenLabsDisabledException();
-        }
-
-        try
-        {
-            var content = new MultipartFormDataContent();
-            content.Add(new StringContent(voiceName), "name");
-            content.Add(new ByteArrayContent(sampleAudioBytes), "files", fileName);
-
-            var response = await HttpClient.PostAsync("/v1/voices/add", content, cancellationToken).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                throw new ElevenLabsApiException($"ElevenLabs API returned error: {response.StatusCode} - {errorContent}");
-            }
-
-            var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-            var voiceId = root.TryGetProperty("voice_id", out var idEl) ? idEl.GetString() ?? "" : "";
-            return new VoiceCloneResult { VoiceId = voiceId, VoiceName = voiceName };
-        }
-        catch (HttpRequestException ex)
-        {
-            throw new ElevenLabsConnectionException($"Failed to connect to ElevenLabs API: {ex.Message}", ex);
-        }
-        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
-        {
-            throw new ElevenLabsConnectionException($"ElevenLabs API request timed out: {ex.Message}", ex);
-        }
-    }
-
-    /// <summary>
     /// Generates speech audio from text (non-streaming, returns complete audio).
     /// Use this for caching scenarios where you need the complete audio.
     /// </summary>

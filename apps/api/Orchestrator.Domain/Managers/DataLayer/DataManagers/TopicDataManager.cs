@@ -24,7 +24,7 @@ internal sealed class TopicDataManager
     public async Task<Topic?> GetById(System.Guid id)
     {
         const string sql = @"
-            SELECT id, name, description, category_id, persona_id, content_url, contribution_notes, created_by, created_at, updated_at, created_by, updated_by, is_deleted
+            SELECT id, name, description, category_id, agent_id, content_url, contribution_notes, created_by, created_at, updated_at, created_by, updated_by, is_deleted
             FROM topics
             WHERE id = @id AND is_deleted = false";
         using var connection = new NpgsqlConnection(_dbConnectionString);
@@ -39,9 +39,9 @@ internal sealed class TopicDataManager
         }
 
         const string sql = @"
-            INSERT INTO topics (id, name, description, category_id, persona_id, content_url, contribution_notes, created_by)
-            VALUES (@Id, @Name, @Description, @CategoryId, @PersonaId, @ContentUrl, @ContributionNotes, @CreatedBy)
-            RETURNING id, name, description, category_id, persona_id, content_url, contribution_notes, created_by, created_at, updated_at, created_by, updated_by, is_deleted";
+            INSERT INTO topics (id, name, description, category_id, agent_id, content_url, contribution_notes, created_by)
+            VALUES (@Id, @Name, @Description, @CategoryId, @AgentId, @ContentUrl, @ContributionNotes, @CreatedBy)
+            RETURNING id, name, description, category_id, agent_id, content_url, contribution_notes, created_by, created_at, updated_at, created_by, updated_by, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var newItem = await connection.QueryFirstOrDefaultAsync<Topic>(sql, topic);
@@ -56,13 +56,13 @@ internal sealed class TopicDataManager
                 name = @Name,
                 description = @Description,
                 category_id = @CategoryId,
-                persona_id = @PersonaId,
+                agent_id = @AgentId,
                 content_url = @ContentUrl,
                 contribution_notes = @ContributionNotes,
                 updated_at = CURRENT_TIMESTAMP,
                 updated_by = @UpdatedBy
             WHERE id = @Id AND is_deleted = false
-            RETURNING id, name, description, category_id, persona_id, content_url, contribution_notes, created_by, created_at, updated_at, created_by, updated_by, is_deleted";
+            RETURNING id, name, description, category_id, agent_id, content_url, contribution_notes, created_by, created_at, updated_at, created_by, updated_by, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var updatedItem = await connection.QueryFirstOrDefaultAsync<Topic>(sql, topic);
@@ -85,7 +85,7 @@ internal sealed class TopicDataManager
         return rowsAffected > 0;
     }
 
-    public async Task<PaginatedResult<Topic>> Search(string? name, Guid? personaId, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Topic>> Search(string? name, Guid? agentId, int pageNumber, int pageSize)
     {
         var whereClauses = new List<string>();
         var parameters = new DynamicParameters();
@@ -96,10 +96,10 @@ internal sealed class TopicDataManager
             parameters.Add("Name", $"%{name}%");
         }
 
-        if (personaId.HasValue)
+        if (agentId.HasValue)
         {
-            whereClauses.Add("persona_id = @PersonaId");
-            parameters.Add("PersonaId", personaId.Value);
+            whereClauses.Add("agent_id = @AgentId");
+            parameters.Add("AgentId", agentId.Value);
         }
 
         whereClauses.Add("is_deleted = false");
@@ -112,7 +112,7 @@ internal sealed class TopicDataManager
 
         var offset = (pageNumber - 1) * pageSize;
         var querySql = $@"
-            SELECT id, name, description, category_id, persona_id, content_url, contribution_notes, created_by, created_at, updated_at, created_by, updated_by, is_deleted
+            SELECT id, name, description, category_id, agent_id, content_url, contribution_notes, created_by, created_at, updated_at, created_by, updated_by, is_deleted
             FROM topics
             {whereSql}
             ORDER BY created_at DESC
@@ -218,7 +218,7 @@ internal sealed class TopicDataManager
         var countSql = $@"
             SELECT COUNT(DISTINCT t.id)
             FROM topics t
-            INNER JOIN personas p ON t.persona_id = p.id
+            INNER JOIN agents p ON t.agent_id = p.id
             WHERE {whereSql}";
 
         var totalCount = await connection.QueryFirstOrDefaultAsync<int>(countSql, parameters);
@@ -230,7 +230,7 @@ internal sealed class TopicDataManager
                 t.id,
                 t.name,
                 t.description,
-                t.persona_id,
+                t.agent_id,
                 t.category_id,
                 c.name as category_name,
                 p.id as author_id,
@@ -242,7 +242,7 @@ internal sealed class TopicDataManager
                 t.updated_at
             FROM topics t
             INNER JOIN categories c ON t.category_id = c.id
-            INNER JOIN personas p ON t.persona_id = p.id
+            INNER JOIN agents p ON t.agent_id = p.id
             LEFT JOIN (
                 SELECT topic_id, COUNT(DISTINCT chat_id) as chat_count
                 FROM chat_topics

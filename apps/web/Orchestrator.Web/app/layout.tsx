@@ -5,9 +5,9 @@ import { Toaster } from '@/components/ui/sonner';
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Surrova Application",
-  description: "AI Persona Creation Platform",
-  generator: "SurrovaApp",
+  title: "Orchestrator - AI Interviewer",
+  description: "AI-powered interview and recruiting platform",
+  generator: "Orchestrator",
 };
 
 // Force dynamic rendering since we need session/cookie access

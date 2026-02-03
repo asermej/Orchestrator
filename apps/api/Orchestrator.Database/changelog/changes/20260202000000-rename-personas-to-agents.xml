@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Step 1: Drop existing foreign key constraint on interviews.persona_id -->
+    <changeSet id="20260202000000-drop-fk-interviews-persona" author="system">
+        <dropForeignKeyConstraint baseTableName="interviews" constraintName="fk_interviews_persona"/>
+    </changeSet>
+
+    <!-- Step 2: Drop existing indexes on personas table -->
+    <changeSet id="20260202000000-drop-personas-indexes" author="system">
+        <dropIndex tableName="personas" indexName="idx_personas_organization_id"/>
+        <dropIndex tableName="personas" indexName="idx_personas_display_name"/>
+        <dropIndex tableName="personas" indexName="idx_personas_is_deleted"/>
+    </changeSet>
+
+    <!-- Step 3: Drop existing index on interviews.persona_id -->
+    <changeSet id="20260202000000-drop-interviews-persona-index" author="system">
+        <dropIndex tableName="interviews" indexName="idx_interviews_persona_id"/>
+    </changeSet>
+
+    <!-- Step 4: Rename the personas table to agents -->
+    <changeSet id="20260202000000-rename-personas-table" author="system">
+        <renameTable oldTableName="personas" newTableName="agents"/>
+    </changeSet>
+
+    <!-- Step 5: Rename persona_id column to agent_id in interviews table -->
+    <changeSet id="20260202000000-rename-persona-id-column" author="system">
+        <renameColumn tableName="interviews" oldColumnName="persona_id" newColumnName="agent_id" columnDataType="uuid"/>
+    </changeSet>
+
+    <!-- Step 6: Recreate indexes on agents table -->
+    <changeSet id="20260202000000-create-agents-indexes" author="system">
+        <createIndex tableName="agents" indexName="idx_agents_organization_id">
+            <column name="organization_id"/>
+        </createIndex>
+        <createIndex tableName="agents" indexName="idx_agents_display_name">
+            <column name="display_name"/>
+        </createIndex>
+        <createIndex tableName="agents" indexName="idx_agents_is_deleted">
+            <column name="is_deleted"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Step 7: Recreate index on interviews.agent_id -->
+    <changeSet id="20260202000000-create-interviews-agent-index" author="system">
+        <createIndex tableName="interviews" indexName="idx_interviews_agent_id">
+            <column name="agent_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Step 8: Recreate foreign key constraint with new name -->
+    <changeSet id="20260202000000-add-fk-interviews-agent" author="system">
+        <addForeignKeyConstraint 
+            baseTableName="interviews" 
+            baseColumnNames="agent_id"
+            constraintName="fk_interviews_agent"
+            referencedTableName="agents"
+            referencedColumnNames="id"/>
+    </changeSet>
+
+</databaseChangeLog>

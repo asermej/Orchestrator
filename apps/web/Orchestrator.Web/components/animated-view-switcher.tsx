@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Rss, Users, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type ViewMode = "feed" | "personas" | "popular";
+type ViewMode = "feed" | "agents" | "popular";
 
 interface ViewOption {
   id: ViewMode;
@@ -14,7 +14,7 @@ interface ViewOption {
 
 const viewOptions: ViewOption[] = [
   { id: "feed", label: "Topics", icon: Rss },
-  { id: "personas", label: "Personas", icon: Users },
+  { id: "agents", label: "Agents", icon: Users },
   { id: "popular", label: "Popular", icon: TrendingUp },
 ];
 

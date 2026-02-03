@@ -79,12 +79,4 @@ internal sealed partial class GatewayFacade
     {
         return await ElevenLabsManager.ListVoicesAsync(cancellationToken).ConfigureAwait(false);
     }
-
-    /// <summary>
-    /// Creates a voice from a sample (Instant Voice Cloning). Caller must provide sample bytes (e.g. from blob).
-    /// </summary>
-    public async Task<VoiceCloneResult> CreateVoiceFromSampleAsync(string voiceName, byte[] sampleAudioBytes, string fileName = "sample.mp3", CancellationToken cancellationToken = default)
-    {
-        return await ElevenLabsManager.CreateVoiceFromSampleAsync(voiceName, sampleAudioBytes, fileName, cancellationToken).ConfigureAwait(false);
-    }
 }

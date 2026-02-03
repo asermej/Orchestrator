@@ -16,9 +16,9 @@ public sealed partial class DomainFacade
         return await ChatManager.GetChatById(id);
     }
 
-    public async Task<PaginatedResult<Chat>> SearchChats(Guid? personaId, Guid? userId, string? title, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Chat>> SearchChats(Guid? agentId, Guid? userId, string? title, int pageNumber, int pageSize)
     {
-        return await ChatManager.SearchChats(personaId, userId, title, pageNumber, pageSize);
+        return await ChatManager.SearchChats(agentId, userId, title, pageNumber, pageSize);
     }
 
     public async Task<Chat> UpdateChat(Chat chat)

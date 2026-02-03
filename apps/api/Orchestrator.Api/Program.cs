@@ -130,6 +130,9 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddScoped<DomainFacade>();
 
+// Add memory cache for agent voice caching
+builder.Services.AddMemoryCache();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -148,7 +151,7 @@ if (app.Environment.IsDevelopment())
 // Note: Upload directory creation removed - images now stored in Azure Blob Storage
 
 // Create training-data directory if it doesn't exist
-var trainingDataPath = Path.Combine(Directory.GetCurrentDirectory(), "training-data", "personas");
+var trainingDataPath = Path.Combine(Directory.GetCurrentDirectory(), "training-data", "agents");
 if (!Directory.Exists(trainingDataPath))
 {
     Directory.CreateDirectory(trainingDataPath);
@@ -209,6 +212,10 @@ app.UseCors("AllowNext");
 
 // Serve static files from wwwroot (images now served via /api/v1/images/{key} from blob storage)
 app.UseStaticFiles();
+
+// API key authentication for ATS endpoints (before JWT auth so it gets first chance)
+app.UseApiKeyAuth();
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

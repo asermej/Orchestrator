@@ -16,8 +16,8 @@ internal sealed class MessageManager : IDisposable
     private DataFacade DataFacade => _dataFacade ??= new DataFacade(_serviceLocator.CreateConfigurationProvider().GetDbConnectionString());
     private GatewayFacade? _gatewayFacade;
     private GatewayFacade GatewayFacade => _gatewayFacade ??= new GatewayFacade(_serviceLocator);
-    private PersonaManager? _personaManager;
-    private PersonaManager PersonaManager => _personaManager ??= new PersonaManager(_serviceLocator);
+    private AgentManager? _agentManager;
+    private AgentManager AgentManager => _agentManager ??= new AgentManager(_serviceLocator);
     private TrainingStorageManager? _storageManager;
     private TrainingStorageManager StorageManager => _storageManager ??= new TrainingStorageManager();
     private ChatManager? _chatManager;
@@ -57,7 +57,7 @@ internal sealed class MessageManager : IDisposable
         
         var savedUserMessage = await DataFacade.AddMessage(userMessage);
 
-        // Get the Chat to extract the PersonaId
+        // Get the Chat to extract the AgentId
         var chat = await DataFacade.GetChatById(userMessage.ChatId);
         if (chat == null)
         {
@@ -68,7 +68,7 @@ internal sealed class MessageManager : IDisposable
         var chatHistory = await DataFacade.SearchMessages(userMessage.ChatId, null, null, 1, 50);
         
         // Generate AI response using OpenAI Gateway (passing chatId for topic context)
-        var aiResponseContent = await GenerateAIResponse(chat.PersonaId, userMessage.ChatId, chatHistory.Items);
+        var aiResponseContent = await GenerateAIResponse(chat.AgentId, userMessage.ChatId, chatHistory.Items);
         
         // Create and save the AI's response
         var aiMessage = new Message
@@ -93,24 +93,24 @@ internal sealed class MessageManager : IDisposable
     }
 
     /// <summary>
-    /// Generates an AI response using OpenAI based on persona characteristics, chat topics, and chat history
+    /// Generates an AI response using OpenAI based on agent characteristics, chat topics, and chat history
     /// </summary>
-    /// <param name="personaId">The persona ID to get characteristics from</param>
+    /// <param name="agentId">The agent ID to get characteristics from</param>
     /// <param name="chatId">The chat ID to get topic context from</param>
     /// <param name="chatHistory">Previous messages in the conversation</param>
     /// <returns>The AI-generated response</returns>
-    private async Task<string> GenerateAIResponse(Guid personaId, Guid chatId, IEnumerable<Message> chatHistory)
+    private async Task<string> GenerateAIResponse(Guid agentId, Guid chatId, IEnumerable<Message> chatHistory)
     {
         
-        // Get the Persona details to inform the AI about the character
-        var persona = await PersonaManager.GetPersonaById(personaId);
-        if (persona == null)
+        // Get the Agent details to inform the AI about the character
+        var agent = await AgentManager.GetAgentById(agentId);
+        if (agent == null)
         {
-            throw new MessageValidationException($"Persona with ID {personaId} not found.");
+            throw new MessageValidationException($"Agent with ID {agentId} not found.");
         }
 
-        // Get general training data for the persona
-        var generalTraining = await PersonaManager.GetPersonaTraining(personaId);
+        // Get general training data for the agent
+        var generalTraining = await AgentManager.GetAgentTraining(agentId);
         
         // Get all topics loaded into this conversation
         var chatTopics = await ChatManager.GetChatTopics(chatId);
@@ -138,8 +138,8 @@ internal sealed class MessageManager : IDisposable
             }
         }
         
-        // Build system prompt from persona characteristics, training, and topic context
-        var systemPrompt = BuildSystemPrompt(persona, generalTraining, topicContexts);
+        // Build system prompt from agent characteristics, training, and topic context
+        var systemPrompt = BuildSystemPrompt(agent, generalTraining, topicContexts);
 
         // Call OpenAI Gateway to generate response
         var aiResponse = await GatewayFacade.GenerateChatCompletion(systemPrompt, chatHistory);
@@ -148,28 +148,18 @@ internal sealed class MessageManager : IDisposable
     }
 
     /// <summary>
-    /// Builds a system prompt that defines the persona's behavior for the AI
+    /// Builds a system prompt that defines the agent's behavior for the AI
     /// </summary>
-    /// <param name="persona">The persona to build the prompt for</param>
-    /// <param name="generalTraining">Optional general training data for the persona</param>
+    /// <param name="agent">The agent to build the prompt for</param>
+    /// <param name="generalTraining">Optional general training data for the agent</param>
     /// <param name="topicContexts">Optional list of topic contexts loaded into the conversation</param>
     /// <returns>A system prompt string</returns>
-    private string BuildSystemPrompt(Persona persona, string? generalTraining = null, List<(string TopicName, string Content)>? topicContexts = null)
+    private string BuildSystemPrompt(Agent agent, string? generalTraining = null, List<(string TopicName, string Content)>? topicContexts = null)
     {
         var promptParts = new List<string>();
 
         // Start with the main identity
-        promptParts.Add($"You are {persona.DisplayName}.");
-
-        // Add real name if available
-        if (!string.IsNullOrWhiteSpace(persona.FirstName) || !string.IsNullOrWhiteSpace(persona.LastName))
-        {
-            var fullName = $"{persona.FirstName} {persona.LastName}".Trim();
-            if (!string.IsNullOrWhiteSpace(fullName))
-            {
-                promptParts.Add($"Your real name is {fullName}.");
-            }
-        }
+        promptParts.Add($"You are {agent.DisplayName}.");
 
         // Inject general training data if available
         if (!string.IsNullOrWhiteSpace(generalTraining))
@@ -240,7 +230,7 @@ internal sealed class MessageManager : IDisposable
     public void Dispose()
     {
         _gatewayFacade?.Dispose();
-        _personaManager?.Dispose();
+        _agentManager?.Dispose();
         _chatManager?.Dispose();
         // DataFacade doesn't implement IDisposable, so no disposal needed
     }

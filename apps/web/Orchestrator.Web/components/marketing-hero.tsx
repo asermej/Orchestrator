@@ -2,9 +2,9 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
 
 export function MarketingHero() {
-  const scrollToPersonas = () => {
-    const personasSection = document.getElementById("personas-section");
-    personasSection?.scrollIntoView({ behavior: "smooth" });
+  const scrollToAgents = () => {
+    const agentsSection = document.getElementById("agents-section");
+    agentsSection?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
@@ -22,7 +22,7 @@ export function MarketingHero() {
 
           {/* Headline */}
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight">
-            Chat with AI Personas
+            Chat with AI Agents
             <br />
             <span className="text-primary">Tailored to Your Needs</span>
           </h1>
@@ -44,9 +44,9 @@ export function MarketingHero() {
               size="lg" 
               variant="outline" 
               className="text-lg px-8 h-14"
-              onClick={scrollToPersonas}
+              onClick={scrollToAgents}
             >
-              Browse Personas
+              Browse Agents
             </Button>
           </div>
 
@@ -54,7 +54,7 @@ export function MarketingHero() {
           <div className="flex flex-wrap justify-center gap-8 pt-8 text-sm text-muted-foreground">
             <div className="text-center">
               <div className="text-2xl font-bold text-foreground">1000+</div>
-              <div>Active Personas</div>
+              <div>Active Agents</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-foreground">50K+</div>

@@ -2,18 +2,18 @@ import { auth0 } from "@/lib/auth0";
 import { redirect } from "next/navigation";
 import { ChatClient } from "./chat-client";
 import {
-  fetchPersonaById,
+  fetchAgentById,
   fetchChats,
-  fetchPersonaTopics,
+  fetchAgentTopics,
   fetchAllTopics,
   fetchAllCategories,
   fetchAllTags,
-  fetchPersonaCategories,
+  fetchAgentCategories,
   fetchChatMessages,
   fetchChatTopics,
 } from "./actions";
 
-export default async function PersonaChatPage({
+export default async function AgentChatPage({
   params,
   searchParams,
 }: {
@@ -27,7 +27,7 @@ export default async function PersonaChatPage({
   }
 
   // Await params and searchParams (Next.js 15 requirement)
-  const { id: personaId } = await params;
+  const { id: agentId } = await params;
   const { chatId, topicId } = await searchParams;
   const userId = session.user.sub;
   const chatIdFromUrl = chatId || null;
@@ -36,21 +36,21 @@ export default async function PersonaChatPage({
   try {
     // 2. Fetch all initial data in parallel
     const [
-      persona,
+      agent,
       chatsResponse,
-      personaTopics,
+      agentTopics,
       allTopics,
       categories,
       tags,
-      personaCategories,
+      agentCategories,
     ] = await Promise.all([
-      fetchPersonaById(personaId),
-      fetchChats(personaId, userId),
-      fetchPersonaTopics(personaId),
+      fetchAgentById(agentId),
+      fetchChats(agentId, userId),
+      fetchAgentTopics(agentId),
       fetchAllTopics(),
       fetchAllCategories(),
       fetchAllTags(),
-      fetchPersonaCategories(personaId),
+      fetchAgentCategories(agentId),
     ]);
 
     // 3. Sort chats by last message
@@ -94,15 +94,15 @@ export default async function PersonaChatPage({
     return (
       <ChatClient
         user={session.user}
-        personaId={personaId}
-        initialPersona={persona}
+        agentId={agentId}
+        initialAgent={agent}
         initialChats={chats}
         initialChatTopicsMap={chatTopicsMap}
-        initialPersonaTopics={personaTopics}
+        initialAgentTopics={agentTopics}
         initialAllTopics={allTopics}
         initialCategories={categories}
         initialTags={tags}
-        initialPersonaCategories={personaCategories}
+        initialAgentCategories={agentCategories}
         chatIdFromUrl={chatIdFromUrl}
         topicIdFromUrl={topicIdFromUrl}
         initialMessages={initialMessages}
@@ -110,8 +110,8 @@ export default async function PersonaChatPage({
       />
     );
   } catch (error) {
-    // Handle 404 or other errors - redirect to personas list
-    console.error("Error loading persona chat page:", error);
+    // Handle 404 or other errors - redirect to agents list
+    console.error("Error loading agent chat page:", error);
     redirect("/personas");
   }
 }

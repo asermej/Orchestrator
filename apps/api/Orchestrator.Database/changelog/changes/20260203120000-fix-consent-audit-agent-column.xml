@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Recreate consent_audit table with correct agent_id column (was dropped in ATS reset) -->
+    
+    <!-- Step 1: Create the table if it doesn't exist -->
+    <changeSet id="20260203120000-create-consent-audit-table" author="system">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="consent_audit"/>
+            </not>
+        </preConditions>
+        <comment>Audit table for voice cloning consent (required before IVC)</comment>
+        <createTable tableName="consent_audit">
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="user_id" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="agent_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="consent_text_version" type="varchar(500)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="attested" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp with time zone" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- Step 2: Create indexes -->
+    <changeSet id="20260203120000-create-consent-audit-agent-index" author="system">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists indexName="idx_consent_audit_agent_id" tableName="consent_audit"/>
+            </not>
+        </preConditions>
+        <createIndex tableName="consent_audit" indexName="idx_consent_audit_agent_id">
+            <column name="agent_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="20260203120000-create-consent-audit-user-index" author="system">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists indexName="idx_consent_audit_user_id" tableName="consent_audit"/>
+            </not>
+        </preConditions>
+        <createIndex tableName="consent_audit" indexName="idx_consent_audit_user_id">
+            <column name="user_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="20260203120000-create-consent-audit-created-index" author="system">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists indexName="idx_consent_audit_created_at" tableName="consent_audit"/>
+            </not>
+        </preConditions>
+        <createIndex tableName="consent_audit" indexName="idx_consent_audit_created_at">
+            <column name="created_at"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Step 3: Add foreign key constraint -->
+    <changeSet id="20260203120000-add-fk-consent-audit-agent" author="system">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <foreignKeyConstraintExists foreignKeyName="fk_consent_audit_agent" foreignKeyTableName="consent_audit"/>
+            </not>
+        </preConditions>
+        <addForeignKeyConstraint 
+            baseTableName="consent_audit" 
+            baseColumnNames="agent_id"
+            constraintName="fk_consent_audit_agent"
+            referencedTableName="agents"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+</databaseChangeLog>

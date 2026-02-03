@@ -18,17 +18,17 @@ public sealed partial class DomainFacade
     /// Saves user message, generates AI response, and streams TTS audio.
     /// </summary>
     /// <param name="chatId">The chat ID</param>
-    /// <param name="personaId">The persona ID for voice settings</param>
+    /// <param name="agentId">The agent ID for voice settings</param>
     /// <param name="userMessage">The user's text message (transcribed from speech)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Async enumerable of audio chunks (MP3 bytes)</returns>
     public async IAsyncEnumerable<byte[]> StreamAudioResponseAsync(
         Guid chatId,
-        Guid personaId,
+        Guid agentId,
         string userMessage,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        await foreach (var chunk in ConversationManager.StreamAudioResponseAsync(chatId, personaId, userMessage, cancellationToken).ConfigureAwait(false))
+        await foreach (var chunk in ConversationManager.StreamAudioResponseAsync(chatId, agentId, userMessage, cancellationToken).ConfigureAwait(false))
         {
             yield return chunk;
         }

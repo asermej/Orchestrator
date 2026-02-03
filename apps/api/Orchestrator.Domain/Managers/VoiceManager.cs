@@ -1,52 +1,27 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orchestrator.Domain;
 
 /// <summary>
-/// Orchestrates voice selection, consent audit, and voice cloning (IVC).
+/// Orchestrates voice selection and preview operations.
 /// </summary>
 internal sealed class VoiceManager : IDisposable
 {
-    private const int MinSampleDurationSeconds = 10;
-    private const int MaxSampleDurationSeconds = 300;
-    private const int CloneRateLimitHours = 24;
-    private const int CloneRateLimitPerPeriod = 5;
-
     private readonly ServiceLocatorBase _serviceLocator;
     private DataFacade? _dataFacade;
     private DataFacade DataFacade => _dataFacade ??= new DataFacade(_serviceLocator.CreateConfigurationProvider().GetDbConnectionString());
     private GatewayFacade? _gatewayFacade;
     private GatewayFacade GatewayFacade => _gatewayFacade ??= new GatewayFacade(_serviceLocator);
-    private PersonaManager? _personaManager;
-    private PersonaManager PersonaManager => _personaManager ??= new PersonaManager(_serviceLocator);
+    private AgentManager? _agentManager;
+    private AgentManager AgentManager => _agentManager ??= new AgentManager(_serviceLocator);
 
     public VoiceManager(ServiceLocatorBase serviceLocator)
     {
         _serviceLocator = serviceLocator ?? throw new ArgumentNullException(nameof(serviceLocator));
-    }
-
-    /// <summary>
-    /// Records consent for voice cloning (required before IVC).
-    /// </summary>
-    public async Task<Guid> RecordConsentAsync(string userId, Guid personaId, string? consentTextVersion, bool attested, CancellationToken cancellationToken = default)
-    {
-        if (!attested)
-        {
-            throw new VoiceSampleValidationException("Consent must be attested.");
-        }
-
-        var consent = new ConsentAudit
-        {
-            UserId = userId,
-            PersonaId = personaId,
-            ConsentTextVersion = consentTextVersion,
-            Attested = attested
-        };
-        var created = await DataFacade.AddConsentAudit(consent).ConfigureAwait(false);
-        return created.Id;
     }
 
     /// <summary>
@@ -59,122 +34,54 @@ internal sealed class VoiceManager : IDisposable
     }
 
     /// <summary>
-    /// Returns curated stock voices from the database (for Choose a voice).
+    /// Returns stock voices for "Choose a voice" - fetches directly from ElevenLabs API.
     /// </summary>
     public async Task<IReadOnlyList<StockVoice>> GetStockVoicesAsync(CancellationToken cancellationToken = default)
     {
-        return await DataFacade.GetStockVoicesAsync();
-    }
-
-    /// <summary>
-    /// Uploads voice sample bytes to Azure Blob (voice-samples container) and returns blob path for audit.
-    /// </summary>
-    public async Task<string> UploadVoiceSampleAsync(byte[] bytes, string fileName, string? contentType, CancellationToken cancellationToken = default)
-    {
-        var config = _serviceLocator.CreateConfigurationProvider();
-        var storage = new VoiceSampleStorageManager(config);
-        return await storage.UploadAsync(bytes, fileName, contentType ?? "audio/mpeg", cancellationToken).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Sets the persona's voice to the given voice (prebuilt or user-cloned).
-    /// </summary>
-    public async Task SelectPersonaVoiceAsync(Guid personaId, string voiceProvider, string voiceType, string voiceId, string? voiceName, CancellationToken cancellationToken = default)
-    {
-        var persona = await PersonaManager.GetPersonaById(personaId).ConfigureAwait(false);
-        if (persona == null)
+        // Fetch voices from ElevenLabs API and convert to StockVoice format
+        var elevenLabsVoices = await GatewayFacade.ListVoicesAsync(cancellationToken).ConfigureAwait(false);
+        
+        if (elevenLabsVoices == null || elevenLabsVoices.Count == 0)
         {
-            throw new PersonaNotFoundException($"Persona with ID {personaId} not found.");
+            return Array.Empty<StockVoice>();
         }
-
-        persona.ElevenLabsVoiceId = voiceId;
-        persona.VoiceProvider = voiceProvider;
-        persona.VoiceType = voiceType;
-        persona.VoiceName = voiceName ?? voiceId;
-        persona.VoiceCreatedAt = null;
-        persona.VoiceCreatedByUserId = null;
-        await DataFacade.UpdatePersona(persona).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Clones a voice from a sample (IVC). Validates consent, rate limit, and sample duration.
-    /// </summary>
-    /// <param name="sampleBlobUrl">Stored blob URL for audit (optional)</param>
-    /// <param name="sampleAudioBytes">Audio bytes to send to ElevenLabs (caller downloads from blob if needed)</param>
-    public async Task<VoiceCloneResult> CloneVoiceAsync(
-        string userId,
-        Guid personaId,
-        string voiceName,
-        string? sampleBlobUrl,
-        byte[] sampleAudioBytes,
-        int sampleDurationSeconds,
-        Guid consentRecordId,
-        string? styleLane = null,
-        CancellationToken cancellationToken = default)
-    {
-        var consent = await DataFacade.GetConsentAuditById(consentRecordId).ConfigureAwait(false);
-        if (consent == null || consent.UserId != userId || consent.PersonaId != personaId || !consent.Attested)
+        
+        // Convert ElevenLabsVoiceItem to StockVoice
+        var stockVoices = new List<StockVoice>();
+        var sortOrder = 0;
+        foreach (var voice in elevenLabsVoices.Where(v => v.VoiceType == "prebuilt"))
         {
-            throw new ConsentNotFoundException("Consent record not found or does not match.");
-        }
-
-        var successCount = await DataFacade.GetSuccessfulCloneCountByUserIdWithinHoursAsync(userId, CloneRateLimitHours).ConfigureAwait(false);
-        if (successCount >= CloneRateLimitPerPeriod)
-        {
-            throw new VoiceCloneRateLimitExceededException($"You can create up to {CloneRateLimitPerPeriod} voices per {CloneRateLimitHours} hours. Please try again later.");
-        }
-
-        if (sampleDurationSeconds < MinSampleDurationSeconds)
-        {
-            throw new VoiceSampleValidationException($"Sample must be at least {MinSampleDurationSeconds} seconds.");
-        }
-
-        if (sampleDurationSeconds > MaxSampleDurationSeconds)
-        {
-            throw new VoiceSampleValidationException($"Sample must be at most {MaxSampleDurationSeconds} seconds.");
-        }
-
-        var job = new VoiceCloneJob
-        {
-            UserId = userId,
-            PersonaId = personaId,
-            SampleBlobUrl = sampleBlobUrl,
-            SampleDurationSeconds = sampleDurationSeconds,
-            Status = "Pending",
-            StyleLane = styleLane
-        };
-        job = await DataFacade.AddVoiceCloneJob(job).ConfigureAwait(false);
-
-        try
-        {
-            var result = await GatewayFacade.CreateVoiceFromSampleAsync(voiceName, sampleAudioBytes, "sample.mp3", cancellationToken).ConfigureAwait(false);
-
-            job.Status = "Success";
-            job.ElevenLabsVoiceId = result.VoiceId;
-            job.ErrorMessage = null;
-            await DataFacade.UpdateVoiceCloneJob(job).ConfigureAwait(false);
-
-            var persona = await PersonaManager.GetPersonaById(personaId).ConfigureAwait(false);
-            if (persona != null)
+            stockVoices.Add(new StockVoice
             {
-                persona.ElevenLabsVoiceId = result.VoiceId;
-                persona.VoiceProvider = "elevenlabs";
-                persona.VoiceType = "user_cloned";
-                persona.VoiceName = result.VoiceName;
-                persona.VoiceCreatedAt = DateTime.UtcNow;
-                persona.VoiceCreatedByUserId = userId;
-                await DataFacade.UpdatePersona(persona).ConfigureAwait(false);
-            }
+                Id = Guid.NewGuid(),
+                VoiceId = voice.Id,
+                Name = voice.Name,
+                Description = voice.Category,
+                Tags = voice.Category,
+                PreviewText = voice.PreviewText ?? "Hello! I'm an AI interviewer.",
+                SortOrder = sortOrder++
+            });
+        }
+        
+        return stockVoices;
+    }
 
-            return result;
-        }
-        catch (Exception ex)
+    /// <summary>
+    /// Sets the agent's voice to the given prebuilt voice.
+    /// </summary>
+    public async Task SelectAgentVoiceAsync(Guid agentId, string voiceProvider, string voiceType, string voiceId, string? voiceName, CancellationToken cancellationToken = default)
+    {
+        var agent = await AgentManager.GetAgentById(agentId).ConfigureAwait(false);
+        if (agent == null)
         {
-            job.Status = "Failed";
-            job.ErrorMessage = ex.Message;
-            await DataFacade.UpdateVoiceCloneJob(job).ConfigureAwait(false);
-            throw;
+            throw new AgentNotFoundException($"Agent with ID {agentId} not found.");
         }
+
+        agent.ElevenlabsVoiceId = voiceId;
+        agent.VoiceProvider = voiceProvider;
+        agent.VoiceType = voiceType;
+        agent.VoiceName = voiceName ?? voiceId;
+        await DataFacade.UpdateAgent(agent).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -192,24 +99,105 @@ internal sealed class VoiceManager : IDisposable
     }
 
     /// <summary>
-    /// Previews the persona's current voice by generating a short TTS sample (uses existing TTS path).
+    /// Previews the agent's current voice by generating a short TTS sample (uses existing TTS path).
     /// </summary>
-    public async Task<byte[]> PreviewPersonaVoiceAsync(Guid personaId, string text, CancellationToken cancellationToken = default)
+    public async Task<byte[]> PreviewAgentVoiceAsync(Guid agentId, string text, CancellationToken cancellationToken = default)
     {
-        var persona = await PersonaManager.GetPersonaById(personaId).ConfigureAwait(false);
-        if (persona == null)
+        var agent = await AgentManager.GetAgentById(agentId).ConfigureAwait(false);
+        if (agent == null)
         {
-            throw new PersonaNotFoundException($"Persona with ID {personaId} not found.");
+            throw new AgentNotFoundException($"Agent with ID {agentId} not found.");
         }
 
         var config = GatewayFacade.GetElevenLabsConfig();
-        var voiceId = persona.ElevenLabsVoiceId ?? config.DefaultVoiceId;
+        var voiceId = agent.ElevenlabsVoiceId ?? config.DefaultVoiceId;
         return await PreviewVoiceAsync(voiceId, text, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Streams voice audio chunks as they are generated for low-latency playback.
+    /// </summary>
+    public async IAsyncEnumerable<byte[]> StreamVoiceAsync(string voiceId, string text, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var config = GatewayFacade.GetElevenLabsConfig();
+        if (!config.Enabled && !config.UseFakeElevenLabs)
+        {
+            throw new ElevenLabsDisabledException();
+        }
+
+        await foreach (var chunk in GatewayFacade.StreamSpeechAsync(text, voiceId, 0.5m, 0.75m, cancellationToken).ConfigureAwait(false))
+        {
+            yield return chunk;
+        }
+    }
+
+    /// <summary>
+    /// Warms up audio cache for interview questions by pre-generating TTS for all question texts.
+    /// </summary>
+    public async Task<InterviewAudioWarmupResult> WarmupInterviewAudioAsync(Guid interviewId, CancellationToken cancellationToken = default)
+    {
+        var result = new InterviewAudioWarmupResult { InterviewId = interviewId };
+
+        // Get the interview
+        var interview = await DataFacade.GetInterviewById(interviewId).ConfigureAwait(false);
+        if (interview == null)
+        {
+            throw new InterviewNotFoundException($"Interview with ID {interviewId} not found");
+        }
+
+        // Get the agent for voice settings
+        var agent = await AgentManager.GetAgentById(interview.AgentId).ConfigureAwait(false);
+        if (agent == null)
+        {
+            throw new AgentNotFoundException($"Agent with ID {interview.AgentId} not found");
+        }
+
+        var config = GatewayFacade.GetElevenLabsConfig();
+        var voiceId = agent.ElevenlabsVoiceId ?? config.DefaultVoiceId;
+        
+        // Get the job to find the job type
+        var job = await DataFacade.GetJobById(interview.JobId).ConfigureAwait(false);
+        if (job == null || !job.JobTypeId.HasValue)
+        {
+            return result; // No job type, no questions to warm up
+        }
+
+        // Get interview questions from job type
+        var questions = await DataFacade.GetInterviewQuestionsByJobTypeId(job.JobTypeId.Value).ConfigureAwait(false);
+        var questionList = questions.ToList();
+        result.TotalQuestions = questionList.Count;
+
+        // Pre-generate audio for each question
+        foreach (var question in questionList)
+        {
+            if (cancellationToken.IsCancellationRequested) break;
+            
+            try
+            {
+                // Generate audio (the cache manager handles checking/storing cache)
+                await GatewayFacade.GenerateSpeechAsync(
+                    question.QuestionText,
+                    voiceId,
+                    0.5m,
+                    0.75m,
+                    cancellationToken
+                ).ConfigureAwait(false);
+                
+                result.CachedQuestions++;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to warm up audio for question: {ex.Message}");
+                result.FailedQuestions++;
+            }
+        }
+
+        return result;
     }
 
     public void Dispose()
     {
         _gatewayFacade?.Dispose();
-        _personaManager?.Dispose();
+        _agentManager?.Dispose();
     }
 }

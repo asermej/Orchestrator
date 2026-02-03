@@ -42,9 +42,9 @@ export interface UseServerActionOptions<TResult = any> {
  * 
  * @example
  * ```tsx
- * const { execute, isLoading, error } = useServerAction(createPersona, {
- *   successMessage: 'Persona created successfully!',
- *   onSuccess: () => router.push('/personas')
+ * const { execute, isLoading, error } = useServerAction(createAgent, {
+ *   successMessage: 'Agent created successfully!',
+ *   onSuccess: () => router.push('/agents')
  * });
  * 
  * const handleSubmit = async (formData: FormData) => {

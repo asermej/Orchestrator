@@ -1,25 +1,18 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orchestrator.Domain;
 
 /// <summary>
-/// Domain facade partial for voice selection and cloning operations.
+/// Domain facade partial for voice selection and preview operations.
 /// </summary>
 public sealed partial class DomainFacade
 {
     private VoiceManager? _voiceManager;
     private VoiceManager VoiceManager => _voiceManager ??= new VoiceManager(_serviceLocator);
-
-    /// <summary>
-    /// Records consent for voice cloning (required before IVC).
-    /// </summary>
-    public async Task<Guid> RecordConsentAsync(string userId, Guid personaId, string? consentTextVersion, bool attested, CancellationToken cancellationToken = default)
-    {
-        return await VoiceManager.RecordConsentAsync(userId, personaId, consentTextVersion, attested, cancellationToken).ConfigureAwait(false);
-    }
 
     /// <summary>
     /// Returns available voices (prebuilt; fake mode returns deterministic list).
@@ -38,36 +31,11 @@ public sealed partial class DomainFacade
     }
 
     /// <summary>
-    /// Uploads voice sample bytes to Azure Blob (voice-samples container) and returns blob path for audit.
+    /// Sets the agent's voice to the given prebuilt voice.
     /// </summary>
-    public async Task<string> UploadVoiceSampleAsync(byte[] bytes, string fileName, string? contentType, CancellationToken cancellationToken = default)
+    public async Task SelectAgentVoiceAsync(Guid agentId, string voiceProvider, string voiceType, string voiceId, string? voiceName, CancellationToken cancellationToken = default)
     {
-        return await VoiceManager.UploadVoiceSampleAsync(bytes, fileName, contentType, cancellationToken).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Sets the persona's voice to the given voice.
-    /// </summary>
-    public async Task SelectPersonaVoiceAsync(Guid personaId, string voiceProvider, string voiceType, string voiceId, string? voiceName, CancellationToken cancellationToken = default)
-    {
-        await VoiceManager.SelectPersonaVoiceAsync(personaId, voiceProvider, voiceType, voiceId, voiceName, cancellationToken).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Clones a voice from a sample (IVC). Validates consent, rate limit, and sample duration.
-    /// </summary>
-    public async Task<VoiceCloneResult> CloneVoiceAsync(
-        string userId,
-        Guid personaId,
-        string voiceName,
-        string? sampleBlobUrl,
-        byte[] sampleAudioBytes,
-        int sampleDurationSeconds,
-        Guid consentRecordId,
-        string? styleLane = null,
-        CancellationToken cancellationToken = default)
-    {
-        return await VoiceManager.CloneVoiceAsync(userId, personaId, voiceName, sampleBlobUrl, sampleAudioBytes, sampleDurationSeconds, consentRecordId, styleLane, cancellationToken).ConfigureAwait(false);
+        await VoiceManager.SelectAgentVoiceAsync(agentId, voiceProvider, voiceType, voiceId, voiceName, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -79,10 +47,29 @@ public sealed partial class DomainFacade
     }
 
     /// <summary>
-    /// Previews the persona's current voice by generating a short TTS sample.
+    /// Previews the agent's current voice by generating a short TTS sample.
     /// </summary>
-    public async Task<byte[]> PreviewPersonaVoiceAsync(Guid personaId, string text, CancellationToken cancellationToken = default)
+    public async Task<byte[]> PreviewAgentVoiceAsync(Guid agentId, string text, CancellationToken cancellationToken = default)
     {
-        return await VoiceManager.PreviewPersonaVoiceAsync(personaId, text, cancellationToken).ConfigureAwait(false);
+        return await VoiceManager.PreviewAgentVoiceAsync(agentId, text, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Streams voice audio chunks as they are generated for low-latency playback.
+    /// </summary>
+    public async IAsyncEnumerable<byte[]> StreamVoiceAsync(string voiceId, string text, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await foreach (var chunk in VoiceManager.StreamVoiceAsync(voiceId, text, cancellationToken).ConfigureAwait(false))
+        {
+            yield return chunk;
+        }
+    }
+
+    /// <summary>
+    /// Warms up audio cache for interview questions by pre-generating TTS for all question texts.
+    /// </summary>
+    public async Task<InterviewAudioWarmupResult> WarmupInterviewAudioAsync(Guid interviewId, CancellationToken cancellationToken = default)
+    {
+        return await VoiceManager.WarmupInterviewAudioAsync(interviewId, cancellationToken).ConfigureAwait(false);
     }
 }

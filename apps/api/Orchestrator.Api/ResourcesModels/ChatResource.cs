@@ -16,9 +16,9 @@ public class ChatResource
     public Guid Id { get; set; }
 
     /// <summary>
-    /// The ID of the persona this chat is with
+    /// The ID of the agent this chat is with
     /// </summary>
-    public Guid PersonaId { get; set; }
+    public Guid AgentId { get; set; }
 
     /// <summary>
     /// The ID of the user who owns this chat
@@ -52,10 +52,10 @@ public class ChatResource
 public class CreateChatResource
 {
     /// <summary>
-    /// The ID of the persona this chat is with
+    /// The ID of the agent this chat is with
     /// </summary>
-    [Required(ErrorMessage = "PersonaId is required")]
-    public Guid PersonaId { get; set; }
+    [Required(ErrorMessage = "AgentId is required")]
+    public Guid AgentId { get; set; }
 
     /// <summary>
     /// The ID of the user who owns this chat
@@ -97,9 +97,9 @@ public class UpdateChatResource
 public class SearchChatRequest : PaginatedRequest
 {
     /// <summary>
-    /// Filter by PersonaId
+    /// Filter by AgentId
     /// </summary>
-    public Guid? PersonaId { get; set; }
+    public Guid? AgentId { get; set; }
 
     /// <summary>
     /// Filter by UserId

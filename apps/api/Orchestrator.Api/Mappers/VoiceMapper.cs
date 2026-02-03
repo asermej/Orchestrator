@@ -64,19 +64,4 @@ public static class VoiceMapper
             UserVoices = (userVoices ?? new List<ElevenLabsVoiceItem>()).Select(ToResource).Where(r => r != null).Cast<VoiceResource>().ToList()
         };
     }
-
-    /// <summary>
-    /// Maps a domain clone result to a resource model.
-    /// </summary>
-    public static CloneVoiceResponse? ToResource(VoiceCloneResult? result)
-    {
-        if (result == null)
-            return null;
-
-        return new CloneVoiceResponse
-        {
-            VoiceId = result.VoiceId,
-            VoiceName = result.VoiceName
-        };
-    }
 }

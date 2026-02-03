@@ -24,9 +24,9 @@ internal sealed partial class DataFacade
         return ChatDataManager.Delete(id);
     }
 
-    public Task<PaginatedResult<Chat>> SearchChats(Guid? personaId, Guid? userId, string? title, int pageNumber, int pageSize)
+    public Task<PaginatedResult<Chat>> SearchChats(Guid? agentId, Guid? userId, string? title, int pageNumber, int pageSize)
     {
-        return ChatDataManager.Search(personaId, userId, title, pageNumber, pageSize);
+        return ChatDataManager.Search(agentId, userId, title, pageNumber, pageSize);
     }
 }
 

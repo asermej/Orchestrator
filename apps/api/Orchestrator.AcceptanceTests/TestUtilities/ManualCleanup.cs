@@ -8,6 +8,9 @@ namespace Orchestrator.AcceptanceTests.TestUtilities;
 /// Manual test data cleanup utility.
 /// Run this test manually when you need to clean up the database.
 /// 
+/// NOTE: Regular tests should NOT use this. Tests should clean up only 
+/// the specific data they create by tracking entity IDs.
+/// 
 /// USAGE:
 /// 1. Open Test Explorer in Visual Studio or your IDE
 /// 2. Find this test class
@@ -23,7 +26,7 @@ public class ManualCleanup
     /// This is useful when:
     /// - Tests have been failing and leaving data behind
     /// - You want to start with a clean slate
-    /// - You're seeing leftover test data like "TestPersona638981699624283760"
+    /// - You're seeing leftover test data
     /// </summary>
     [TestMethod]
     public void CleanupDatabase_RemoveAllTestData()
@@ -35,62 +38,19 @@ public class ManualCleanup
         Console.WriteLine("========================================");
         Console.WriteLine("MANUAL DATABASE CLEANUP");
         Console.WriteLine("========================================");
-        Console.WriteLine($"Connection String: {connectionString}");
         Console.WriteLine();
         
         // Act
-        Console.WriteLine("Starting comprehensive cleanup...");
-        TestDataCleanup.CleanupAllTestData(connectionString);
-        
-        Console.WriteLine();
-        Console.WriteLine("Starting training file cleanup...");
-        TestDataCleanup.CleanupTestTrainingFiles();
+        Console.WriteLine("Starting cleanup of orphaned test data...");
+        TestDataCleanup.ManualCleanupAllTestData(connectionString);
         
         Console.WriteLine();
         Console.WriteLine("========================================");
         Console.WriteLine("CLEANUP COMPLETE");
         Console.WriteLine("========================================");
-        Console.WriteLine("Check the output above for details on what was cleaned up.");
-        Console.WriteLine();
         
         // Assert
         Assert.IsTrue(true, "Cleanup completed successfully");
-    }
-    
-    /// <summary>
-    /// AGGRESSIVE cleanup - removes ANY data that looks like test data.
-    /// Use this with CAUTION - it uses very permissive patterns.
-    /// </summary>
-    [TestMethod]
-    [TestCategory("AggressiveCleanup")]
-    public void CleanupDatabase_AggressiveRemoveAllTestData()
-    {
-        // Arrange
-        var serviceLocator = new ServiceLocatorForAcceptanceTesting();
-        var connectionString = serviceLocator.CreateConfigurationProvider().GetDbConnectionString();
-        
-        Console.WriteLine("========================================");
-        Console.WriteLine("⚠️  AGGRESSIVE DATABASE CLEANUP ⚠️");
-        Console.WriteLine("========================================");
-        Console.WriteLine("WARNING: This will remove ANY data that looks like test data!");
-        Console.WriteLine($"Connection String: {connectionString}");
-        Console.WriteLine();
-        
-        // Act
-        Console.WriteLine("Starting AGGRESSIVE cleanup...");
-        TestDataCleanup.AggressiveCleanup(connectionString);
-        
-        Console.WriteLine();
-        Console.WriteLine("Starting training file cleanup...");
-        TestDataCleanup.CleanupTestTrainingFiles();
-        
-        Console.WriteLine();
-        Console.WriteLine("========================================");
-        Console.WriteLine("AGGRESSIVE CLEANUP COMPLETE");
-        Console.WriteLine("========================================");
-        
-        // Assert
-        Assert.IsTrue(true, "Aggressive cleanup completed successfully");
     }
     
     /// <summary>
@@ -98,7 +58,6 @@ public class ManualCleanup
     /// Run this after cleanup to confirm no test data remains.
     /// </summary>
     [TestMethod]
-    [TestCategory("ManualCleanup")]
     public void VerifyDatabase_NoTestDataRemains()
     {
         // Arrange
@@ -112,67 +71,28 @@ public class ManualCleanup
         
         try
         {
-            // Check for test personas
-            Console.WriteLine("Checking for test personas...");
-            var personas = domainFacade.SearchPersonas(null, null, "Test", null, null, null, 1, 100).Result;
-            if (personas.TotalCount > 0)
+            // Check for test agents (using patterns that tests create)
+            Console.WriteLine("Checking for test agents...");
+            var agents = domainFacade.SearchAgents(null, "Test", null, null, 1, 100).Result;
+            var searchTestAgents = domainFacade.SearchAgents(null, "SearchTest_", null, null, 1, 100).Result;
+            var totalAgents = agents.TotalCount + searchTestAgents.TotalCount;
+            
+            if (totalAgents > 0)
             {
-                Console.WriteLine($"❌ Found {personas.TotalCount} test personas:");
-                foreach (var p in personas.Items)
-                {
-                    Console.WriteLine($"  - {p.DisplayName} (ID: {p.Id})");
-                }
+                Console.WriteLine($"❌ Found {totalAgents} test agents");
             }
             else
             {
-                Console.WriteLine("✅ No test personas found");
+                Console.WriteLine("✅ No test agents found");
             }
             Console.WriteLine();
             
-            // Check for test chats
-            Console.WriteLine("Checking for test chats...");
-            var chats = domainFacade.SearchChats(null, null, "Test", 1, 100).Result;
-            if (chats.TotalCount > 0)
-            {
-                Console.WriteLine($"❌ Found {chats.TotalCount} test chats:");
-                foreach (var c in chats.Items)
-                {
-                    Console.WriteLine($"  - {c.Title} (ID: {c.Id})");
-                }
-            }
-            else
-            {
-                Console.WriteLine("✅ No test chats found");
-            }
-            Console.WriteLine();
-            
-            // Check for test topics
-            Console.WriteLine("Checking for test topics...");
-            var topics = domainFacade.SearchTopics("Test", null, 1, 100).Result;
-            if (topics.TotalCount > 0)
-            {
-                Console.WriteLine($"❌ Found {topics.TotalCount} test topics:");
-                foreach (var t in topics.Items)
-                {
-                    Console.WriteLine($"  - {t.Name} (ID: {t.Id})");
-                }
-            }
-            else
-            {
-                Console.WriteLine("✅ No test topics found");
-            }
-            Console.WriteLine();
-            
-            // Check for test users
+            // Check for test users (SearchUsers searches by phone, email, lastName)
             Console.WriteLine("Checking for test users...");
-            var users = domainFacade.SearchUsers("Test", null, null, 1, 100).Result;
+            var users = domainFacade.SearchUsers(null, "@example.com", null, 1, 100).Result;
             if (users.TotalCount > 0)
             {
-                Console.WriteLine($"❌ Found {users.TotalCount} test users:");
-                foreach (var u in users.Items)
-                {
-                    Console.WriteLine($"  - {u.FirstName} {u.LastName} ({u.Email}) (ID: {u.Id})");
-                }
+                Console.WriteLine($"❌ Found {users.TotalCount} test users");
             }
             else
             {
@@ -185,9 +105,9 @@ public class ManualCleanup
             Console.WriteLine("========================================");
             
             // Assert
-            var totalTestData = personas.TotalCount + chats.TotalCount + topics.TotalCount + users.TotalCount;
+            var totalTestData = totalAgents + users.TotalCount;
             Assert.AreEqual(0, totalTestData, 
-                $"Database should be clean but found {totalTestData} test records. See output above for details.");
+                $"Database should be clean but found {totalTestData} test records.");
         }
         finally
         {
@@ -195,4 +115,3 @@ public class ManualCleanup
         }
     }
 }
-

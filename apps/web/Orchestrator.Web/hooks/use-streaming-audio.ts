@@ -13,7 +13,7 @@ interface UseStreamingAudioReturn {
   isStreaming: boolean;
   isPlaying: boolean;
   error: string | null;
-  streamResponse: (chatId: string, personaId: string, message: string) => Promise<void>;
+  streamResponse: (chatId: string, agentId: string, message: string) => Promise<void>;
   stopPlayback: () => void;
   playMessageAudio: (messageId: string) => Promise<void>;
 }
@@ -73,7 +73,7 @@ export function useStreamingAudio({
    * Input is text (already transcribed), output is streaming audio.
    */
   const streamResponse = useCallback(
-    async (chatId: string, personaId: string, message: string) => {
+    async (chatId: string, agentId: string, message: string) => {
       setError(null);
       setIsStreaming(true);
 
@@ -85,7 +85,7 @@ export function useStreamingAudio({
         const response = await fetch(voiceAudioUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chatId, personaId, message }),
+          body: JSON.stringify({ chatId, agentId, message }),
           signal: abortControllerRef.current.signal,
         });
 

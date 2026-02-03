@@ -91,7 +91,7 @@ export function TrendingSidebar() {
           <a href="#" className="hover:underline">Ads info</a>
         </div>
         <p className="text-xs text-muted-foreground mt-2">
-          © 2025 Surrova Platform
+          © 2026 Hireology
         </p>
       </div>
     </div>

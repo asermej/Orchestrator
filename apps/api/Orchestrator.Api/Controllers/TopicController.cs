@@ -109,7 +109,7 @@ public class TopicController : ControllerBase
         // Get topics with tags in a single optimized query (avoids N+1 problem)
         var (result, tagsByTopicId) = await _domainFacade.SearchTopicsWithTags(
             request.Name, 
-            request.PersonaId,
+            request.AgentId,
             request.PageNumber, 
             request.PageSize);
 
@@ -207,14 +207,14 @@ public class TopicController : ControllerBase
     [ProducesResponseType(typeof(TopicResource), 200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(401)]
-    public async Task<ActionResult<TopicResource>> GetOrCreateDailyBlog(string date, [FromQuery] Guid personaId, [FromQuery] string contentUrl, [FromQuery] string? createdBy = null)
+    public async Task<ActionResult<TopicResource>> GetOrCreateDailyBlog(string date, [FromQuery] Guid agentId, [FromQuery] string contentUrl, [FromQuery] string? createdBy = null)
     {
         if (!DateTime.TryParse(date, out var parsedDate))
         {
             return BadRequest($"Invalid date format: {date}. Expected format: yyyy-MM-dd");
         }
 
-        var topic = await _domainFacade.GetOrCreateDailyBlogTopic(parsedDate, personaId, contentUrl, createdBy);
+        var topic = await _domainFacade.GetOrCreateDailyBlogTopic(parsedDate, agentId, contentUrl, createdBy);
         var response = TopicMapper.ToResource(topic);
         
         return Ok(response);

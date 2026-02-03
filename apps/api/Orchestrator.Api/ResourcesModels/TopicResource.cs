@@ -30,9 +30,9 @@ public class TopicResource
     public Guid CategoryId { get; set; }
 
     /// <summary>
-    /// The ID of the persona that owns this topic
+    /// The ID of the agent that owns this topic
     /// </summary>
-    public Guid PersonaId { get; set; }
+    public Guid AgentId { get; set; }
 
     /// <summary>
     /// The storage URL pointing to the training content (file://, s3://, https://, etc.).
@@ -91,10 +91,10 @@ public class CreateTopicResource
     public Guid CategoryId { get; set; }
 
     /// <summary>
-    /// The ID of the persona that owns this topic (required)
+    /// The ID of the agent that owns this topic (required)
     /// </summary>
-    [Required(ErrorMessage = "PersonaId is required")]
-    public Guid PersonaId { get; set; }
+    [Required(ErrorMessage = "AgentId is required")]
+    public Guid AgentId { get; set; }
 
     /// <summary>
     /// The training content for this topic (required, up to 50,000 characters)
@@ -157,9 +157,9 @@ public class SearchTopicRequest : PaginatedRequest
     public string? Name { get; set; }
 
     /// <summary>
-    /// Filter by persona ID (topics owned by a specific persona)
+    /// Filter by agent ID (topics owned by a specific agent)
     /// </summary>
-    public Guid? PersonaId { get; set; }
+    public Guid? AgentId { get; set; }
 }
 
 /// <summary>

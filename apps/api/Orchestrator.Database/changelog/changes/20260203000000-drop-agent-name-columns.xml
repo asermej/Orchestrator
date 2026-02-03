@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260203000000-drop-agent-first-name" author="system">
+        <comment>Remove first_name column from agents table - agents only use display_name</comment>
+        <dropColumn tableName="agents" columnName="first_name"/>
+    </changeSet>
+
+    <changeSet id="20260203000000-drop-agent-last-name" author="system">
+        <comment>Remove last_name column from agents table - agents only use display_name</comment>
+        <dropColumn tableName="agents" columnName="last_name"/>
+    </changeSet>
+
+</databaseChangeLog>

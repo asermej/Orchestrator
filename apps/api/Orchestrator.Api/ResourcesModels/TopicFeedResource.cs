@@ -4,27 +4,27 @@ using Orchestrator.Api.Common;
 namespace Orchestrator.Api.ResourcesModels;
 
 /// <summary>
-/// Represents the Persona that owns a Topic for feed display
+/// Represents the Agent that owns a Topic for feed display
 /// </summary>
 public class TopicAuthorResource
 {
     /// <summary>
-    /// The unique identifier of the persona
+    /// The unique identifier of the agent
     /// </summary>
     public Guid Id { get; set; }
 
     /// <summary>
-    /// The first name of the persona
+    /// The first name of the agent
     /// </summary>
     public string FirstName { get; set; } = string.Empty;
 
     /// <summary>
-    /// The last name of the persona
+    /// The last name of the agent
     /// </summary>
     public string LastName { get; set; } = string.Empty;
 
     /// <summary>
-    /// The profile image URL of the persona
+    /// The profile image URL of the agent
     /// </summary>
     public string? ProfileImageUrl { get; set; }
 }
@@ -50,12 +50,12 @@ public class TopicFeedResource
     public string? Description { get; set; }
 
     /// <summary>
-    /// The ID of the persona that owns this topic
+    /// The ID of the agent that owns this topic
     /// </summary>
-    public Guid PersonaId { get; set; }
+    public Guid AgentId { get; set; }
 
     /// <summary>
-    /// The persona that owns this topic
+    /// The agent that owns this topic
     /// </summary>
     public TopicAuthorResource Author { get; set; } = null!;
 

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { AudioVisualizer } from "@/components/audio-visualizer";
 import { useVoiceInput } from "@/hooks/use-voice-input";
 import { useStreamingAudio } from "@/hooks/use-streaming-audio";
-import { PersonaAvatar } from "@/components/persona-avatar";
+import { AgentAvatar } from "@/components/agent-avatar";
 
 type ConversationState = "idle" | "listening" | "processing" | "speaking";
 
@@ -15,9 +15,9 @@ interface VoiceConversationModeProps {
   isOpen: boolean;
   onClose: () => void;
   chatId: string;
-  personaId: string;
-  personaName: string;
-  personaImageUrl?: string | null;
+  agentId: string;
+  agentName: string;
+  agentImageUrl?: string | null;
   onMessageSent?: (userMessage: string, aiResponse: string) => void;
 }
 
@@ -30,9 +30,9 @@ export function VoiceConversationMode({
   isOpen,
   onClose,
   chatId,
-  personaId,
-  personaName,
-  personaImageUrl,
+  agentId,
+  agentName,
+  agentImageUrl,
   onMessageSent,
 }: VoiceConversationModeProps) {
   const [state, setState] = useState<ConversationState>("idle");
@@ -101,13 +101,13 @@ export function VoiceConversationMode({
     transcriptRef.current = "";
 
     try {
-      await streamResponse(chatId, personaId, message);
+      await streamResponse(chatId, agentId, message);
       // Note: state will be set to "speaking" by onPlayStart callback
     } catch (err) {
       setState("idle");
       setError(err instanceof Error ? err.message : "Failed to get response");
     }
-  }, [chatId, personaId, streamResponse]);
+  }, [chatId, agentId, streamResponse]);
 
   // Start listening
   const startListening = useCallback(() => {
@@ -219,19 +219,19 @@ export function VoiceConversationMode({
             <X className="h-6 w-6" />
           </Button>
 
-          {/* Persona info */}
+          {/* Agent info */}
           <motion.div
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             className="flex flex-col items-center mb-8"
           >
-            <PersonaAvatar
-              imageUrl={personaImageUrl}
-              displayName={personaName}
+            <AgentAvatar
+              imageUrl={agentImageUrl}
+              displayName={agentName}
               size="lg"
             />
             <h2 className="mt-4 text-xl font-semibold text-white">
-              {personaName}
+              {agentName}
             </h2>
             <p className="text-sm text-white/60">
               {state === "idle" && "Tap to speak"}

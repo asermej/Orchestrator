@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260201150004-create-interview-questions-table" author="system">
+        <createTable tableName="interview_questions">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="job_type_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_interview_questions_job_type" references="job_types(id)"/>
+            </column>
+            <column name="question_text" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="question_order" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_required" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="follow_up_prompt" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <column name="max_follow_ups" type="integer" defaultValueNumeric="2">
+                <constraints nullable="false"/>
+            </column>
+            <!-- Audit fields -->
+            <column name="created_at" type="timestamp" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="updated_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_deleted" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="deleted_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="interview_questions" indexName="idx_interview_questions_job_type_id">
+            <column name="job_type_id"/>
+        </createIndex>
+
+        <createIndex tableName="interview_questions" indexName="idx_interview_questions_order">
+            <column name="job_type_id"/>
+            <column name="question_order"/>
+        </createIndex>
+
+        <createIndex tableName="interview_questions" indexName="idx_interview_questions_is_deleted">
+            <column name="is_deleted"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

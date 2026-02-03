@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260203120000-make-question-id-nullable" author="system">
+        <comment>Make question_id nullable and drop FK constraint to support test interviews that use configuration questions</comment>
+        
+        <!-- Drop the foreign key constraint -->
+        <dropForeignKeyConstraint 
+            baseTableName="interview_responses" 
+            constraintName="fk_interview_responses_question"/>
+        
+        <!-- Make the column nullable -->
+        <dropNotNullConstraint 
+            tableName="interview_responses" 
+            columnName="question_id" 
+            columnDataType="uuid"/>
+    </changeSet>
+
+</databaseChangeLog>

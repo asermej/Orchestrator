@@ -12,6 +12,14 @@ interface AudioVisualizerProps {
   className?: string;
 }
 
+// Global WeakMap to track which audio elements have been connected to MediaElementSourceNode
+// This persists across component remounts since the audio element is the same instance
+const connectedAudioElements = new WeakMap<HTMLAudioElement, {
+  audioContext: AudioContext;
+  analyser: AnalyserNode;
+  source: MediaElementAudioSourceNode;
+}>();
+
 /**
  * Audio visualizer component that displays a glowing ring animation.
  * The ring responds to audio frequencies when playing, pulses when listening,
@@ -26,30 +34,45 @@ export function AudioVisualizer({
   className = "",
 }: AudioVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const connectedRef = useRef<boolean>(false);
 
   // Initialize Web Audio API when audio element is available
   useEffect(() => {
-    if (!audioElement || connectedRef.current) return;
+    if (!audioElement) return;
+
+    // Check if this audio element is already connected
+    const existing = connectedAudioElements.get(audioElement);
+    if (existing) {
+      // Reuse existing connection
+      audioContextRef.current = existing.audioContext;
+      analyserRef.current = existing.analyser;
+      return;
+    }
 
     try {
-      // Create or resume audio context
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      analyserRef.current = audioContextRef.current.createAnalyser();
-      analyserRef.current.fftSize = 256;
-      analyserRef.current.smoothingTimeConstant = 0.8;
+      // Create new audio context and connections
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
 
       // Connect audio element to analyser
-      sourceRef.current = audioContextRef.current.createMediaElementSource(audioElement);
-      sourceRef.current.connect(analyserRef.current);
-      analyserRef.current.connect(audioContextRef.current.destination);
-      connectedRef.current = true;
+      const source = audioContext.createMediaElementSource(audioElement);
+      source.connect(analyser);
+      analyser.connect(audioContext.destination);
+
+      // Store the connection globally
+      connectedAudioElements.set(audioElement, { audioContext, analyser, source });
+
+      // Store refs for this component instance
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
     } catch (error) {
-      console.error("Failed to initialize audio context:", error);
+      // If connection fails (e.g., already connected elsewhere), just log and continue
+      // The visualizer will still work with animations, just without audio reactivity
+      console.warn("Failed to initialize audio context:", error);
     }
 
     return () => {
