@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import { useMicTest } from "@/hooks/use-mic-test";
@@ -25,18 +25,18 @@ export function MicTestCheck({
     await startTest();
   };
 
-  const handleTestComplete = (passed: boolean) => {
+  const handleTestComplete = useCallback((passed: boolean) => {
     if (onTestComplete) {
       onTestComplete(passed);
     }
-  };
+  }, [onTestComplete]);
 
   // Notify parent when test completes
   useEffect(() => {
     if (status === "passing" || status === "failed") {
       handleTestComplete(status === "passing");
     }
-  }, [status]);
+  }, [status, handleTestComplete]);
 
   return (
     <div className="w-full space-y-3">
@@ -45,6 +45,9 @@ export function MicTestCheck({
         <div className="flex items-center gap-2">
           <Mic className="w-5 h-5 text-white/70" />
           <span className="text-white/90 font-medium">Microphone Test</span>
+          {status === "pending" && (
+            <span className="text-xs text-yellow-400 font-medium">(Required)</span>
+          )}
         </div>
 
         <AnimatePresence mode="wait">
@@ -54,6 +57,7 @@ export function MicTestCheck({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              className="flex items-center gap-2"
             >
               <Button
                 onClick={handleStartTest}
@@ -62,6 +66,7 @@ export function MicTestCheck({
               >
                 Test Mic
               </Button>
+              <span className="text-xs text-white/50">Required</span>
             </motion.div>
           )}
 

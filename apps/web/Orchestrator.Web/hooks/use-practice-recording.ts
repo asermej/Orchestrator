@@ -56,18 +56,25 @@ export function usePracticeRecording(): PracticeRecordingResult {
   }, [stopVoiceRecording]);
 
   const startPractice = useCallback(() => {
-    // Clear previous transcript
+    // Clear previous transcript (ensure it's empty before starting)
     setTranscript("");
     transcriptRef.current = "";
 
-    // Start recording
-    setIsRecording(true);
-    startVoiceRecording();
+    // Small delay to ensure any previous audio processing is complete
+    setTimeout(() => {
+      // Clear transcript one more time right before starting
+      setTranscript("");
+      transcriptRef.current = "";
+      
+      // Start recording
+      setIsRecording(true);
+      startVoiceRecording();
 
-    // Auto-stop after 10 seconds
-    timeoutRef.current = setTimeout(() => {
-      stopPractice();
-    }, PRACTICE_DURATION_MS);
+      // Auto-stop after 10 seconds
+      timeoutRef.current = setTimeout(() => {
+        stopPractice();
+      }, PRACTICE_DURATION_MS);
+    }, 100);
   }, [startVoiceRecording, stopPractice]);
 
   const clearPractice = useCallback(() => {

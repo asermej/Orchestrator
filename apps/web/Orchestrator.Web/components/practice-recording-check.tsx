@@ -8,7 +8,6 @@ import { formatDuration } from "@/hooks/use-interview-state-machine";
 import { useState, useEffect } from "react";
 
 interface PracticeRecordingCheckProps {
-  agentId?: string;
   onPracticePrompt?: () => Promise<void>;
 }
 
@@ -20,7 +19,6 @@ const PRACTICE_DURATION_SEC = 10;
  * Shows live transcript preview and indicates this is practice (not saved).
  */
 export function PracticeRecordingCheck({
-  agentId,
   onPracticePrompt,
 }: PracticeRecordingCheckProps) {
   const { isRecording, transcript, startPractice, stopPractice, clearPractice } =
@@ -51,16 +49,22 @@ export function PracticeRecordingCheck({
   }, [isRecording, stopPractice]);
 
   const handleStartPractice = async () => {
-    // Play practice prompt first
+    // Clear any previous transcript first
+    clearPractice();
+    
+    // Play practice prompt first and wait for it to finish
     if (onPracticePrompt) {
       await onPracticePrompt();
     }
     setHasPlayedPrompt(true);
     
-    // Small delay before starting recording
+    // Wait a moment after audio ends, then start recording
+    // This ensures the mic doesn't pick up any echo/feedback from the prompt
     setTimeout(() => {
+      // Clear transcript again in case anything was captured during prompt
+      clearPractice();
       startPractice();
-    }, 500);
+    }, 300);
   };
 
   const handleStopPractice = () => {

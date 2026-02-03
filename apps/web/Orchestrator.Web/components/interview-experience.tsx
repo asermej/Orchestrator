@@ -379,6 +379,7 @@ export function InterviewExperience({
     }
     // If in PREP state, allow proceeding
     if (state === InterviewState.PREP) {
+      console.log("Switching to text response from PREP - enabling button");
       setAccommodationRequested(true);
       setMicTestPassed(true);
     }
@@ -400,7 +401,26 @@ export function InterviewExperience({
     isTextResponseModeRef.current = isTextResponseMode;
   }, [isTextResponseMode]);
 
-  const speakText = async (text: string) => {
+  const speakText = async (text: string, silentFail = false): Promise<void> => {
+    try {
+      await speakTextInternal(text, silentFail);
+    } catch (err) {
+      // Always reset state on error
+      setIsPlaying(false);
+      setCurrentSpokenText(null);
+      
+      // If silentFail is true, never throw - just log and return
+      if (silentFail) {
+        console.warn("Speech failed (silent):", err);
+        return;
+      }
+      
+      // Only throw if not silent fail
+      throw err;
+    }
+  };
+
+  const speakTextInternal = async (text: string, silentFail = false): Promise<void> => {
     // Only abort previous requests if we're not already in QUESTION_PLAYING state
     // This prevents interrupting audio that's about to play
     if (state !== InterviewState.QUESTION_PLAYING) {
@@ -427,9 +447,13 @@ export function InterviewExperience({
     
     if (supportsMediaSource) {
       try {
-        await speakTextStreaming(text);
+        await speakTextStreaming(text, silentFail);
         return;
       } catch (err) {
+        if (silentFail) {
+          // If silent fail, don't try blob fallback, just return
+          return;
+        }
         console.warn("Streaming playback failed or timed out, falling back to blob:", err);
         // Continue to blob fallback below
       }
@@ -447,7 +471,15 @@ export function InterviewExperience({
       });
 
       if (!response.ok) {
-        throw new Error("Failed to generate speech");
+        const error = new Error("Failed to generate speech");
+        // If silentFail, don't throw - just return
+        if (silentFail) {
+          console.warn("Speech generation failed (silent):", error);
+          setIsPlaying(false);
+          setCurrentSpokenText(null);
+          return;
+        }
+        throw error;
       }
 
       const audioBlob = await response.blob();
@@ -459,12 +491,29 @@ export function InterviewExperience({
       }
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
+      
+      // Reset playing state
+      setIsPlaying(false);
+      setCurrentSpokenText(null);
+      
+      // If silentFail is true (for practice), don't throw or show error
+      if (silentFail) {
+        console.warn("Audio playback failed (silent):", err);
+        return;
+      }
+      
       console.error("Speech error:", err);
-      stateMachine.handleError("audio_playback", "Failed to play audio. Please try again.");
+      // Only show error if we're in an interview state (not practice)
+      if (state === InterviewState.QUESTION_PLAYING || state === InterviewState.RECORDING) {
+        stateMachine.handleError("audio_playback", "Failed to play audio. Please try again.");
+      } else {
+        // For other states, just log and don't show error
+        console.warn("Audio playback failed (non-blocking):", err);
+      }
     }
   };
   
-  const speakTextStreaming = async (text: string) => {
+  const speakTextStreaming = async (text: string, silentFail = false) => {
     if (!agentId) return;
     
     // Set timeout for streaming initialization (2 seconds)
@@ -484,11 +533,21 @@ export function InterviewExperience({
       });
 
       if (!response.ok) {
-        throw new Error("Failed to stream speech");
+        const error = new Error("Failed to stream speech");
+        if (silentFail) {
+          console.warn("Streaming failed (silent):", error);
+          return;
+        }
+        throw error;
       }
 
       if (!response.body) {
-        throw new Error("No response body");
+        const error = new Error("No response body");
+        if (silentFail) {
+          console.warn("No response body (silent):", error);
+          return;
+        }
+        throw error;
       }
 
       const mediaSource = new MediaSource();
@@ -499,10 +558,15 @@ export function InterviewExperience({
       }
 
       // Set timeout for MediaSource initialization
-      const timeoutPromise = new Promise<void>((_, reject) => {
+      const timeoutPromise = new Promise<void>((resolve, reject) => {
         timeoutId = setTimeout(() => {
           streamingFailed = true;
-          reject(new Error("Streaming initialization timeout"));
+          if (silentFail) {
+            console.warn("Streaming timeout (silent)");
+            resolve(); // Resolve instead of reject for silent failures
+          } else {
+            reject(new Error("Streaming initialization timeout"));
+          }
         }, streamingTimeout);
       });
 
@@ -561,7 +625,12 @@ export function InterviewExperience({
 
               resolve();
             } catch (err) {
-              reject(err);
+              if (silentFail) {
+                console.warn("Streaming error (silent):", err);
+                resolve(); // Resolve instead of reject for silent failures
+              } else {
+                reject(err);
+              }
             }
           });
 
@@ -570,7 +639,12 @@ export function InterviewExperience({
               clearTimeout(timeoutId);
               timeoutId = null;
             }
-            reject(new Error("MediaSource error"));
+            if (silentFail) {
+              console.warn("MediaSource error (silent)");
+              resolve(); // Resolve instead of reject for silent failures
+            } else {
+              reject(new Error("MediaSource error"));
+            }
           });
         }),
         timeoutPromise
@@ -591,6 +665,12 @@ export function InterviewExperience({
           // Ignore cleanup errors
         }
         mediaSourceRef.current = null;
+      }
+      
+      // If silentFail, don't re-throw
+      if (silentFail) {
+        console.warn("Streaming failed (silent):", err);
+        return;
       }
       
       // Re-throw to trigger fallback in speakText
@@ -668,14 +748,45 @@ export function InterviewExperience({
     await speakText(greeting);
   };
 
-  // Practice prompt handler
-  const handlePracticePrompt = useCallback(async () => {
+  // Practice prompt handler - uses browser TTS (free, no API calls, no quota)
+  const handlePracticePrompt = useCallback(async (): Promise<void> => {
     const practiceText = "Please tell us about yourself in a few sentences.";
-    await speakText(practiceText);
+    
+    return new Promise<void>((resolve) => {
+      // Check if browser TTS is available
+      if (typeof window === "undefined" || !('speechSynthesis' in window)) {
+        // Fallback: just resolve immediately if no TTS support
+        resolve();
+        return;
+      }
+
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
+
+      // Use browser's built-in TTS (no API calls, no quota)
+      const utterance = new SpeechSynthesisUtterance(practiceText);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+
+      utterance.onend = () => {
+        // Small delay after speech ends to ensure audio is fully stopped
+        setTimeout(() => resolve(), 200);
+      };
+
+      utterance.onerror = () => {
+        // If TTS fails, still allow practice to continue
+        resolve();
+      };
+
+      // Speak the practice prompt
+      window.speechSynthesis.speak(utterance);
+    });
   }, []);
 
   // Handle accommodation request from PREP
   const handleRequestAccommodationFromPrep = useCallback(() => {
+    console.log("Accommodation requested from PREP");
     setAccommodationRequested(true);
     setAccommodationModalOpen(true);
   }, []);
@@ -795,12 +906,17 @@ export function InterviewExperience({
 
               {/* Preflight Checklist */}
               <div className="w-full mb-6 space-y-4">
-                <div className="bg-white/5 rounded-xl p-4 space-y-4 border border-white/10">
+                <div className={`rounded-xl p-4 space-y-4 border ${
+                  !micTestPassed && !accommodationRequested 
+                    ? "bg-yellow-500/5 border-yellow-500/30" 
+                    : "bg-white/5 border-white/10"
+                }`}>
                   <h3 className="text-white/90 font-semibold text-left mb-3">Preflight Checklist</h3>
                   
                   {/* Mic Test */}
                   <MicTestCheck
                     onTestComplete={(passed) => {
+                      console.log("Mic test completed, passed:", passed);
                       setMicTestPassed(passed);
                     }}
                     onRequestAccommodation={handleRequestAccommodationFromPrep}
@@ -809,7 +925,6 @@ export function InterviewExperience({
                   {/* Practice Recording */}
                   <div className="border-t border-white/10 pt-4">
                     <PracticeRecordingCheck
-                      agentId={agentId}
                       onPracticePrompt={handlePracticePrompt}
                     />
                   </div>
@@ -852,20 +967,27 @@ export function InterviewExperience({
               </Button>
 
               {/* Begin Interview Button */}
-              <Button
-                size="lg"
-                onClick={beginConversation}
-                disabled={!micTestPassed && !accommodationRequested}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Play className="w-5 h-5" />
-                Begin Interview
-              </Button>
-              {!micTestPassed && !accommodationRequested && (
-                <p className="text-xs text-white/50 mt-2">
-                  Please complete the microphone test or request an accommodation to continue
-                </p>
-              )}
+              <div className="w-full space-y-3">
+                {!micTestPassed && !accommodationRequested && (
+                  <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                    <p className="text-sm text-yellow-300 font-medium mb-1">
+                      Complete the microphone test above to continue
+                    </p>
+                    <p className="text-xs text-yellow-200/80">
+                      Click "Test Mic" in the Preflight Checklist, or request an accommodation if you need an alternative
+                    </p>
+                  </div>
+                )}
+                <Button
+                  size="lg"
+                  onClick={beginConversation}
+                  disabled={!micTestPassed && !accommodationRequested}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 disabled:opacity-50 disabled:cursor-not-allowed w-full"
+                >
+                  <Play className="w-5 h-5" />
+                  Begin Interview
+                </Button>
+              </div>
               
               {onExit && (
                 <Button
@@ -1399,7 +1521,7 @@ export function InterviewExperience({
                 <Button
                   variant="outline"
                   onClick={handleGoBack}
-                  className="border-white/20 text-white hover:bg-white/10"
+                  className="border-white/20 !text-white hover:bg-white/10 hover:!text-white bg-transparent"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back
@@ -1452,7 +1574,10 @@ export function InterviewExperience({
         onHumanAlternative={() => {
           // Human alternative is handled via alert in the modal
           // This allows proceeding if user requests human alternative
+          console.log("Human alternative requested - enabling button");
           setAccommodationRequested(true);
+          // Also set micTestPassed so button enables
+          setMicTestPassed(true);
         }}
         onTechnicalHelp={() => {
           // Technical help is handled via alert in the modal
