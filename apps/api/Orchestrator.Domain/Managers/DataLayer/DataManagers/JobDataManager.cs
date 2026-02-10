@@ -19,7 +19,7 @@ internal sealed class JobDataManager
     public async Task<Job?> GetById(Guid id)
     {
         const string sql = @"
-            SELECT id, organization_id, job_type_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted
+            SELECT id, organization_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted
             FROM jobs
             WHERE id = @id AND is_deleted = false";
         using var connection = new NpgsqlConnection(_dbConnectionString);
@@ -29,7 +29,7 @@ internal sealed class JobDataManager
     public async Task<Job?> GetByExternalId(Guid organizationId, string externalJobId)
     {
         const string sql = @"
-            SELECT id, organization_id, job_type_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted
+            SELECT id, organization_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted
             FROM jobs
             WHERE organization_id = @OrganizationId AND external_job_id = @ExternalJobId AND is_deleted = false";
         using var connection = new NpgsqlConnection(_dbConnectionString);
@@ -44,9 +44,9 @@ internal sealed class JobDataManager
         }
 
         const string sql = @"
-            INSERT INTO jobs (id, organization_id, job_type_id, external_job_id, title, description, status, location, created_by)
-            VALUES (@Id, @OrganizationId, @JobTypeId, @ExternalJobId, @Title, @Description, @Status, @Location, @CreatedBy)
-            RETURNING id, organization_id, job_type_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted";
+            INSERT INTO jobs (id, organization_id, external_job_id, title, description, status, location, created_by)
+            VALUES (@Id, @OrganizationId, @ExternalJobId, @Title, @Description, @Status, @Location, @CreatedBy)
+            RETURNING id, organization_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var newItem = await connection.QueryFirstOrDefaultAsync<Job>(sql, job);
@@ -58,7 +58,6 @@ internal sealed class JobDataManager
         const string sql = @"
             UPDATE jobs
             SET
-                job_type_id = @JobTypeId,
                 title = @Title,
                 description = @Description,
                 status = @Status,
@@ -66,7 +65,7 @@ internal sealed class JobDataManager
                 updated_at = CURRENT_TIMESTAMP,
                 updated_by = @UpdatedBy
             WHERE id = @Id AND is_deleted = false
-            RETURNING id, organization_id, job_type_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted";
+            RETURNING id, organization_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var updatedItem = await connection.QueryFirstOrDefaultAsync<Job>(sql, job);
@@ -89,7 +88,7 @@ internal sealed class JobDataManager
         return rowsAffected > 0;
     }
 
-    public async Task<PaginatedResult<Job>> Search(Guid? organizationId, Guid? jobTypeId, string? title, string? status, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Job>> Search(Guid? organizationId, string? title, string? status, int pageNumber, int pageSize)
     {
         var whereClauses = new List<string>();
         var parameters = new DynamicParameters();
@@ -98,12 +97,6 @@ internal sealed class JobDataManager
         {
             whereClauses.Add("organization_id = @OrganizationId");
             parameters.Add("OrganizationId", organizationId.Value);
-        }
-
-        if (jobTypeId.HasValue)
-        {
-            whereClauses.Add("job_type_id = @JobTypeId");
-            parameters.Add("JobTypeId", jobTypeId.Value);
         }
 
         if (!string.IsNullOrWhiteSpace(title))
@@ -128,7 +121,7 @@ internal sealed class JobDataManager
 
         var offset = (pageNumber - 1) * pageSize;
         var querySql = $@"
-            SELECT id, organization_id, job_type_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted
+            SELECT id, organization_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted
             FROM jobs
             {whereSql}
             ORDER BY created_at DESC

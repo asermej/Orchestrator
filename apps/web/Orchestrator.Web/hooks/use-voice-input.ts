@@ -39,6 +39,7 @@ export function useVoiceInput({
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
   const onStoppedRef = useRef<(() => void) | null>(null);
+  const hasTranscriptRef = useRef(false);
 
   // Check browser compatibility on mount
   useEffect(() => {
@@ -64,6 +65,7 @@ export function useVoiceInput({
         }
 
         if (transcript) {
+          hasTranscriptRef.current = true;
           onTranscript(transcript);
         }
       };
@@ -85,7 +87,13 @@ export function useVoiceInput({
             errorMessage = "No microphone found. Please check your audio devices.";
             break;
           case "network":
-            errorMessage = "Network error. Please check your connection.";
+            // Network errors are often false positives when user doesn't speak (timeout)
+            // If no transcript was received, treat it like "no-speech" for graceful handling
+            if (!hasTranscriptRef.current) {
+              errorMessage = "No speech detected. Please try again.";
+            } else {
+              errorMessage = "Network error. Please check your connection.";
+            }
             break;
           case "aborted":
             // User stopped recording or recognition was stopped; not an error
@@ -96,8 +104,10 @@ export function useVoiceInput({
             return;
         }
 
-        // Only log unexpected errors to console (not "aborted" or "no-speech")
-        if (event.error !== "no-speech") {
+        // Only log unexpected errors to console (not "aborted", "no-speech", or "network" without transcript)
+        const shouldLogError = event.error !== "no-speech" && 
+                               !(event.error === "network" && !hasTranscriptRef.current);
+        if (shouldLogError) {
           console.error("Speech recognition error:", event.error);
         }
 
@@ -143,6 +153,7 @@ export function useVoiceInput({
 
     try {
       setError(null);
+      hasTranscriptRef.current = false; // Reset transcript tracking when starting new recording
       recognitionRef.current.start();
       setIsRecording(true);
     } catch (e: any) {

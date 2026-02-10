@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260203063817-create-follow-up-selection-logs-table" author="system">
+        <createTable tableName="follow_up_selection_logs">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="interview_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_follow_up_selection_logs_interview" references="interviews(id)"/>
+            </column>
+            <column name="interview_question_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_follow_up_selection_logs_interview_question" references="interview_questions(id)"/>
+            </column>
+            <column name="answer_excerpt" type="varchar(300)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="candidate_template_ids_presented" type="uuid[]">
+                <constraints nullable="true"/>
+            </column>
+            <column name="selected_template_id" type="uuid">
+                <constraints nullable="true" foreignKeyName="fk_follow_up_selection_logs_template" references="follow_up_templates(id)"/>
+            </column>
+            <column name="matched_competency_tag" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="rationale" type="varchar(200)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="method" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="timestamp" type="timestamp" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <!-- Audit fields -->
+            <column name="created_at" type="timestamp" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="updated_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_deleted" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="deleted_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="follow_up_selection_logs" indexName="idx_follow_up_selection_logs_interview_id">
+            <column name="interview_id"/>
+        </createIndex>
+
+        <createIndex tableName="follow_up_selection_logs" indexName="idx_follow_up_selection_logs_interview_question_id">
+            <column name="interview_question_id"/>
+        </createIndex>
+
+        <createIndex tableName="follow_up_selection_logs" indexName="idx_follow_up_selection_logs_selected_template_id">
+            <column name="selected_template_id"/>
+        </createIndex>
+
+        <createIndex tableName="follow_up_selection_logs" indexName="idx_follow_up_selection_logs_is_deleted">
+            <column name="is_deleted"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

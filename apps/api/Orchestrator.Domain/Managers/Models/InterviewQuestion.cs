@@ -8,9 +8,6 @@ namespace Orchestrator.Domain;
 [Table("interview_questions")]
 public class InterviewQuestion : Entity
 {
-    [Column("job_type_id")]
-    public Guid JobTypeId { get; set; }
-
     [Column("question_text")]
     public string QuestionText { get; set; } = string.Empty;
 
@@ -25,4 +22,7 @@ public class InterviewQuestion : Entity
 
     [Column("max_follow_ups")]
     public int MaxFollowUps { get; set; } = 2;
+
+    [Column("follow_ups_enabled")]
+    public bool FollowUpsEnabled { get; set; } = true;
 }

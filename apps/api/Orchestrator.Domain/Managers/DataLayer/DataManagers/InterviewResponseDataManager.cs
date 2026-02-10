@@ -19,7 +19,7 @@ internal sealed class InterviewResponseDataManager
     public async Task<InterviewResponse?> GetById(Guid id)
     {
         const string sql = @"
-            SELECT id, interview_id, question_id, question_text, transcript, audio_url, duration_seconds, response_order, is_follow_up, ai_analysis, created_at, updated_at, is_deleted
+            SELECT id, interview_id, question_id, question_text, transcript, audio_url, duration_seconds, response_order, is_follow_up, follow_up_template_id, question_type, ai_analysis, created_at, updated_at, is_deleted
             FROM interview_responses
             WHERE id = @id AND is_deleted = false";
         using var connection = new NpgsqlConnection(_dbConnectionString);
@@ -29,7 +29,7 @@ internal sealed class InterviewResponseDataManager
     public async Task<IEnumerable<InterviewResponse>> GetByInterviewId(Guid interviewId)
     {
         const string sql = @"
-            SELECT id, interview_id, question_id, question_text, transcript, audio_url, duration_seconds, response_order, is_follow_up, ai_analysis, created_at, updated_at, is_deleted
+            SELECT id, interview_id, question_id, question_text, transcript, audio_url, duration_seconds, response_order, is_follow_up, follow_up_template_id, question_type, ai_analysis, created_at, updated_at, is_deleted
             FROM interview_responses
             WHERE interview_id = @InterviewId AND is_deleted = false
             ORDER BY response_order ASC";
@@ -45,9 +45,9 @@ internal sealed class InterviewResponseDataManager
         }
 
         const string sql = @"
-            INSERT INTO interview_responses (id, interview_id, question_id, question_text, transcript, audio_url, duration_seconds, response_order, is_follow_up, ai_analysis, created_by)
-            VALUES (@Id, @InterviewId, @QuestionId, @QuestionText, @Transcript, @AudioUrl, @DurationSeconds, @ResponseOrder, @IsFollowUp, @AiAnalysis, @CreatedBy)
-            RETURNING id, interview_id, question_id, question_text, transcript, audio_url, duration_seconds, response_order, is_follow_up, ai_analysis, created_at, updated_at, is_deleted";
+            INSERT INTO interview_responses (id, interview_id, question_id, question_text, transcript, audio_url, duration_seconds, response_order, is_follow_up, follow_up_template_id, question_type, ai_analysis, created_by)
+            VALUES (@Id, @InterviewId, @QuestionId, @QuestionText, @Transcript, @AudioUrl, @DurationSeconds, @ResponseOrder, @IsFollowUp, @FollowUpTemplateId, @QuestionType, @AiAnalysis, @CreatedBy)
+            RETURNING id, interview_id, question_id, question_text, transcript, audio_url, duration_seconds, response_order, is_follow_up, follow_up_template_id, question_type, ai_analysis, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var newItem = await connection.QueryFirstOrDefaultAsync<InterviewResponse>(sql, response);
@@ -66,7 +66,7 @@ internal sealed class InterviewResponseDataManager
                 updated_at = CURRENT_TIMESTAMP,
                 updated_by = @UpdatedBy
             WHERE id = @Id AND is_deleted = false
-            RETURNING id, interview_id, question_id, question_text, transcript, audio_url, duration_seconds, response_order, is_follow_up, ai_analysis, created_at, updated_at, is_deleted";
+            RETURNING id, interview_id, question_id, question_text, transcript, audio_url, duration_seconds, response_order, is_follow_up, follow_up_template_id, question_type, ai_analysis, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var updatedItem = await connection.QueryFirstOrDefaultAsync<InterviewResponse>(sql, response);

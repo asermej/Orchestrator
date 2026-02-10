@@ -29,17 +29,17 @@ public sealed partial class DomainFacade
     /// <summary>
     /// Gets or creates a Job by external ID
     /// </summary>
-    public async Task<Job> GetOrCreateJob(Guid organizationId, string externalJobId, string title, string? description, string? location, Guid? jobTypeId)
+    public async Task<Job> GetOrCreateJob(Guid organizationId, string externalJobId, string title, string? description, string? location)
     {
-        return await JobManager.GetOrCreateJob(organizationId, externalJobId, title, description, location, jobTypeId).ConfigureAwait(false);
+        return await JobManager.GetOrCreateJob(organizationId, externalJobId, title, description, location).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Searches for Jobs
     /// </summary>
-    public async Task<PaginatedResult<Job>> SearchJobs(Guid? organizationId, Guid? jobTypeId, string? title, string? status, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Job>> SearchJobs(Guid? organizationId, string? title, string? status, int pageNumber, int pageSize)
     {
-        return await JobManager.SearchJobs(organizationId, jobTypeId, title, status, pageNumber, pageSize).ConfigureAwait(false);
+        return await JobManager.SearchJobs(organizationId, title, status, pageNumber, pageSize).ConfigureAwait(false);
     }
 
     /// <summary>

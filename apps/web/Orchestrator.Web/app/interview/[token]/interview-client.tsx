@@ -83,9 +83,11 @@ export function InterviewClient({ token, interview }: InterviewClientProps) {
     questionId: string,
     questionText: string,
     transcript: string,
-    order: number
+    order: number,
+    isFollowUp?: boolean,
+    followUpTemplateId?: string
   ) => {
-    await fetch(`${apiUrl}/api/v1/interviews/by-token/${token}/responses`, {
+    const response = await fetch(`${apiUrl}/api/v1/interviews/by-token/${token}/responses`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -93,8 +95,15 @@ export function InterviewClient({ token, interview }: InterviewClientProps) {
         questionText,
         transcript,
         responseOrder: order,
+        isFollowUp: isFollowUp || false,
+        followUpTemplateId,
       }),
     });
+
+    if (response.ok) {
+      const data = await response.json();
+      return data; // Return FollowUpSelectionResponse
+    }
   }, [apiUrl, token]);
 
   const handleComplete = useCallback(async () => {

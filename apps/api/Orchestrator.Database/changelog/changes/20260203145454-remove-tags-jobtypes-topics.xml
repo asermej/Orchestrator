@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Remove Tags, JobTypes, and Topics - Drop tables and columns -->
+    
+    <!-- Drop junction table first (depends on both tags and topics) -->
+    <changeSet id="20260203145454-drop-topic-tags" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="topic_tags"/>
+        </preConditions>
+        <dropTable tableName="topic_tags"/>
+    </changeSet>
+
+    <!-- Drop chat_topics (depends on topics) -->
+    <changeSet id="20260203145454-drop-chat-topics" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="chat_topics"/>
+        </preConditions>
+        <dropTable tableName="chat_topics"/>
+    </changeSet>
+
+    <!-- Drop tags table -->
+    <changeSet id="20260203145454-drop-tags" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="tags"/>
+        </preConditions>
+        <dropTable tableName="tags"/>
+    </changeSet>
+
+    <!-- Drop topics table -->
+    <changeSet id="20260203145454-drop-topics" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="topics"/>
+        </preConditions>
+        <dropTable tableName="topics"/>
+    </changeSet>
+
+    <!-- Remove job_type_id column from jobs table -->
+    <changeSet id="20260203145454-remove-job-type-id-from-jobs" author="system">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="jobs" columnName="job_type_id"/>
+        </preConditions>
+        <dropForeignKeyConstraint baseTableName="jobs" constraintName="fk_jobs_job_type"/>
+        <dropIndex tableName="jobs" indexName="idx_jobs_job_type_id"/>
+        <dropColumn tableName="jobs" columnName="job_type_id"/>
+    </changeSet>
+
+    <!-- Remove job_type_id column from interview_questions table -->
+    <changeSet id="20260203145454-remove-job-type-id-from-interview-questions" author="system">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="interview_questions" columnName="job_type_id"/>
+        </preConditions>
+        <dropForeignKeyConstraint baseTableName="interview_questions" constraintName="fk_interview_questions_job_type"/>
+        <dropIndex tableName="interview_questions" indexName="idx_interview_questions_job_type_id"/>
+        <dropIndex tableName="interview_questions" indexName="idx_interview_questions_order"/>
+        <dropColumn tableName="interview_questions" columnName="job_type_id"/>
+        <!-- Recreate the order index without job_type_id -->
+        <createIndex tableName="interview_questions" indexName="idx_interview_questions_order">
+            <column name="question_order"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Drop job_types table last (after removing foreign keys) -->
+    <changeSet id="20260203145454-drop-job-types" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="job_types"/>
+        </preConditions>
+        <dropTable tableName="job_types"/>
+    </changeSet>
+
+</databaseChangeLog>

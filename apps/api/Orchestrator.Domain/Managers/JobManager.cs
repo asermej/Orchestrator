@@ -30,7 +30,7 @@ internal sealed class JobManager : IDisposable
         return await DataFacade.GetJobByExternalId(organizationId, externalJobId).ConfigureAwait(false);
     }
 
-    public async Task<Job> GetOrCreateJob(Guid organizationId, string externalJobId, string title, string? description, string? location, Guid? jobTypeId)
+    public async Task<Job> GetOrCreateJob(Guid organizationId, string externalJobId, string title, string? description, string? location)
     {
         var existing = await DataFacade.GetJobByExternalId(organizationId, externalJobId).ConfigureAwait(false);
         if (existing != null)
@@ -44,17 +44,16 @@ internal sealed class JobManager : IDisposable
             ExternalJobId = externalJobId,
             Title = title,
             Description = description,
-            Location = location,
-            JobTypeId = jobTypeId
+            Location = location
         };
 
         JobValidator.Validate(job);
         return await DataFacade.AddJob(job).ConfigureAwait(false);
     }
 
-    public async Task<PaginatedResult<Job>> SearchJobs(Guid? organizationId, Guid? jobTypeId, string? title, string? status, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Job>> SearchJobs(Guid? organizationId, string? title, string? status, int pageNumber, int pageSize)
     {
-        return await DataFacade.SearchJobs(organizationId, jobTypeId, title, status, pageNumber, pageSize).ConfigureAwait(false);
+        return await DataFacade.SearchJobs(organizationId, title, status, pageNumber, pageSize).ConfigureAwait(false);
     }
 
     public async Task<Job> UpdateJob(Job job)

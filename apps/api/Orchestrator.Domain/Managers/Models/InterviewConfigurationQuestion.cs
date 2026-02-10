@@ -26,6 +26,12 @@ public class InterviewConfigurationQuestion
     [Column("scoring_guidance")]
     public string? ScoringGuidance { get; set; }
 
+    [Column("follow_ups_enabled")]
+    public bool FollowUpsEnabled { get; set; } = true;
+
+    [Column("max_follow_ups")]
+    public int MaxFollowUps { get; set; } = 2;
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; }
 

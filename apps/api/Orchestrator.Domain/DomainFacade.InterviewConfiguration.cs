@@ -100,4 +100,43 @@ public sealed partial class DomainFacade
     {
         return await InterviewConfigurationManager.GetQuestionsByConfigurationId(configurationId).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Generates follow-up suggestions for an interview configuration question using AI
+    /// </summary>
+    public async Task<List<FollowUpSuggestion>> GenerateFollowUpSuggestionsForConfigQuestion(Guid configQuestionId)
+    {
+        var question = await GetInterviewConfigurationQuestionById(configQuestionId).ConfigureAwait(false);
+        if (question == null)
+        {
+            throw new InterviewConfigurationQuestionNotFoundException($"Interview configuration question with ID {configQuestionId} not found");
+        }
+
+        return await FollowUpManager.GenerateFollowUpSuggestionsForConfigQuestion(configQuestionId, question.Question).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gets all follow-up templates for an interview configuration question
+    /// </summary>
+    public async Task<IEnumerable<FollowUpTemplate>> GetFollowUpTemplatesByConfigQuestionId(Guid configQuestionId)
+    {
+        return await FollowUpDataFacade.GetFollowUpTemplatesByInterviewConfigurationQuestionId(configQuestionId).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gets an interview configuration question by ID
+    /// </summary>
+    public async Task<InterviewConfigurationQuestion?> GetInterviewConfigurationQuestionById(Guid questionId)
+    {
+        var dataFacade = new DataFacade(_serviceLocator.CreateConfigurationProvider().GetDbConnectionString());
+        return await dataFacade.GetInterviewConfigurationQuestionById(questionId).ConfigureAwait(false);
+    }
+}
+
+/// <summary>
+/// Exception thrown when an interview configuration question is not found
+/// </summary>
+public class InterviewConfigurationQuestionNotFoundException : Exception
+{
+    public InterviewConfigurationQuestionNotFoundException(string message) : base(message) { }
 }

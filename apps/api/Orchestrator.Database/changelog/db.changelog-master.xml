@@ -80,4 +80,15 @@
     
     <!-- Phase 8: Make interview_responses.question_id nullable for test interviews -->
     <include file="changes/20260203160000-make-interview-response-question-nullable.xml" relativeToChangelogFile="true"/>
+    
+    <!-- Phase 9: Follow-up Questions Feature -->
+    <include file="changes/20260203063816-create-follow-up-templates-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260203063817-create-follow-up-selection-logs-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260203063818-add-follow-ups-enabled-to-interview-questions.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260203063819-add-follow-up-template-id-to-interview-responses.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260203063820-add-follow-ups-to-interview-configuration-questions.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260203152841-add-interview-config-question-id-to-follow-up-templates.xml" relativeToChangelogFile="true"/>
+    
+    <!-- Remove Tags, JobTypes, and Topics -->
+    <include file="changes/20260203145454-remove-tags-jobtypes-topics.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog> 

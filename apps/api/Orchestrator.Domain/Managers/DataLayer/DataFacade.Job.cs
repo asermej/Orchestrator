@@ -29,8 +29,8 @@ internal sealed partial class DataFacade
         return JobDataManager.Delete(id);
     }
 
-    public Task<PaginatedResult<Job>> SearchJobs(Guid? organizationId, Guid? jobTypeId, string? title, string? status, int pageNumber, int pageSize)
+    public Task<PaginatedResult<Job>> SearchJobs(Guid? organizationId, string? title, string? status, int pageNumber, int pageSize)
     {
-        return JobDataManager.Search(organizationId, jobTypeId, title, status, pageNumber, pageSize);
+        return JobDataManager.Search(organizationId, title, status, pageNumber, pageSize);
     }
 }

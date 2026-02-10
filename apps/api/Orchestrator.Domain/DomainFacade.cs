@@ -22,18 +22,12 @@ public sealed partial class DomainFacade : IDisposable
     private ChatManager ChatManager => _chatManager ??= new ChatManager(_serviceLocator);
     private MessageManager? _messageManager;
     private MessageManager MessageManager => _messageManager ??= new MessageManager(_serviceLocator);
-    private TagManager? _tagManager;
-    private TagManager TagManager => _tagManager ??= new TagManager(_serviceLocator);
-    private TopicManager? _topicManager;
-    private TopicManager TopicManager => _topicManager ??= new TopicManager(_serviceLocator);
     private AudioCacheManager? _audioCacheManager;
     private AudioCacheManager AudioCacheManager => _audioCacheManager ??= new AudioCacheManager(_serviceLocator);
     
     // New ATS Platform managers
     private OrganizationManager? _organizationManager;
     private OrganizationManager OrganizationManager => _organizationManager ??= new OrganizationManager(_serviceLocator);
-    private JobTypeManager? _jobTypeManager;
-    private JobTypeManager JobTypeManager => _jobTypeManager ??= new JobTypeManager(_serviceLocator);
     private ApplicantManager? _applicantManager;
     private ApplicantManager ApplicantManager => _applicantManager ??= new ApplicantManager(_serviceLocator);
     private JobManager? _jobManager;
@@ -75,11 +69,8 @@ public sealed partial class DomainFacade : IDisposable
             _categoryManager?.Dispose();
             _chatManager?.Dispose();
             _messageManager?.Dispose();
-            _tagManager?.Dispose();
-            _topicManager?.Dispose();
             _audioCacheManager?.Dispose();
             _organizationManager?.Dispose();
-            _jobTypeManager?.Dispose();
             _applicantManager?.Dispose();
             _jobManager?.Dispose();
             _interviewManager?.Dispose();

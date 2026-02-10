@@ -52,8 +52,7 @@ public class AtsController : ControllerBase
             {
                 Title = resource.Title,
                 Description = resource.Description,
-                Location = resource.Location,
-                JobTypeId = resource.JobTypeId
+                Location = resource.Location
             };
             var updatedJob = JobMapper.ToDomain(update, existing);
             var updated = await _domainFacade.UpdateJob(updatedJob);
@@ -95,7 +94,6 @@ public class AtsController : ControllerBase
         var organizationId = GetOrganizationId();
         var result = await _domainFacade.SearchJobs(
             organizationId,
-            request.JobTypeId,
             request.Title,
             request.Status,
             request.PageNumber,

@@ -46,6 +46,8 @@ public static class InterviewMapper
             DurationSeconds = response.DurationSeconds,
             ResponseOrder = response.ResponseOrder,
             IsFollowUp = response.IsFollowUp,
+            FollowUpTemplateId = response.FollowUpTemplateId,
+            QuestionType = response.QuestionType,
             AiAnalysis = response.AiAnalysis,
             CreatedAt = response.CreatedAt
         };
@@ -94,7 +96,9 @@ public static class InterviewMapper
             AudioUrl = resource.AudioUrl,
             DurationSeconds = resource.DurationSeconds,
             ResponseOrder = resource.ResponseOrder,
-            IsFollowUp = resource.IsFollowUp
+            IsFollowUp = resource.IsFollowUp,
+            FollowUpTemplateId = resource.FollowUpTemplateId,
+            QuestionType = resource.IsFollowUp ? "followup" : "main"
         };
     }
 

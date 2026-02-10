@@ -19,22 +19,11 @@ internal sealed class InterviewQuestionDataManager
     public async Task<InterviewQuestion?> GetById(Guid id)
     {
         const string sql = @"
-            SELECT id, job_type_id, question_text, question_order, is_required, follow_up_prompt, max_follow_ups, created_at, updated_at, is_deleted
+            SELECT id, question_text, question_order, is_required, follow_up_prompt, max_follow_ups, follow_ups_enabled, created_at, updated_at, is_deleted
             FROM interview_questions
             WHERE id = @id AND is_deleted = false";
         using var connection = new NpgsqlConnection(_dbConnectionString);
         return await connection.QueryFirstOrDefaultAsync<InterviewQuestion>(sql, new { id });
-    }
-
-    public async Task<IEnumerable<InterviewQuestion>> GetByJobTypeId(Guid jobTypeId)
-    {
-        const string sql = @"
-            SELECT id, job_type_id, question_text, question_order, is_required, follow_up_prompt, max_follow_ups, created_at, updated_at, is_deleted
-            FROM interview_questions
-            WHERE job_type_id = @JobTypeId AND is_deleted = false
-            ORDER BY question_order ASC";
-        using var connection = new NpgsqlConnection(_dbConnectionString);
-        return await connection.QueryAsync<InterviewQuestion>(sql, new { JobTypeId = jobTypeId });
     }
 
     public async Task<InterviewQuestion> Add(InterviewQuestion question)
@@ -45,9 +34,9 @@ internal sealed class InterviewQuestionDataManager
         }
 
         const string sql = @"
-            INSERT INTO interview_questions (id, job_type_id, question_text, question_order, is_required, follow_up_prompt, max_follow_ups, created_by)
-            VALUES (@Id, @JobTypeId, @QuestionText, @QuestionOrder, @IsRequired, @FollowUpPrompt, @MaxFollowUps, @CreatedBy)
-            RETURNING id, job_type_id, question_text, question_order, is_required, follow_up_prompt, max_follow_ups, created_at, updated_at, is_deleted";
+            INSERT INTO interview_questions (id, question_text, question_order, is_required, follow_up_prompt, max_follow_ups, follow_ups_enabled, created_by)
+            VALUES (@Id, @QuestionText, @QuestionOrder, @IsRequired, @FollowUpPrompt, @MaxFollowUps, @FollowUpsEnabled, @CreatedBy)
+            RETURNING id, question_text, question_order, is_required, follow_up_prompt, max_follow_ups, follow_ups_enabled, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var newItem = await connection.QueryFirstOrDefaultAsync<InterviewQuestion>(sql, question);
@@ -64,16 +53,17 @@ internal sealed class InterviewQuestionDataManager
                 is_required = @IsRequired,
                 follow_up_prompt = @FollowUpPrompt,
                 max_follow_ups = @MaxFollowUps,
+                follow_ups_enabled = @FollowUpsEnabled,
                 updated_at = CURRENT_TIMESTAMP,
                 updated_by = @UpdatedBy
             WHERE id = @Id AND is_deleted = false
-            RETURNING id, job_type_id, question_text, question_order, is_required, follow_up_prompt, max_follow_ups, created_at, updated_at, is_deleted";
+            RETURNING id, question_text, question_order, is_required, follow_up_prompt, max_follow_ups, follow_ups_enabled, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var updatedItem = await connection.QueryFirstOrDefaultAsync<InterviewQuestion>(sql, question);
         if (updatedItem == null)
         {
-            throw new JobTypeNotFoundException("Interview question not found or already deleted.");
+            throw new InterviewQuestionNotFoundException("Interview question not found or already deleted.");
         }
         return updatedItem;
     }

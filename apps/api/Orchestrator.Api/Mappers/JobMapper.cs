@@ -12,7 +12,6 @@ public static class JobMapper
         {
             Id = job.Id,
             OrganizationId = job.OrganizationId,
-            JobTypeId = job.JobTypeId,
             ExternalJobId = job.ExternalJobId,
             Title = job.Title,
             Description = job.Description,
@@ -38,8 +37,7 @@ public static class JobMapper
             ExternalJobId = resource.ExternalJobId,
             Title = resource.Title,
             Description = resource.Description,
-            Location = resource.Location,
-            JobTypeId = resource.JobTypeId
+            Location = resource.Location
         };
     }
 
@@ -56,7 +54,6 @@ public static class JobMapper
             Description = resource.Description ?? existing.Description,
             Status = resource.Status ?? existing.Status,
             Location = resource.Location ?? existing.Location,
-            JobTypeId = resource.JobTypeId ?? existing.JobTypeId,
             CreatedAt = existing.CreatedAt,
             UpdatedAt = existing.UpdatedAt,
             CreatedBy = existing.CreatedBy

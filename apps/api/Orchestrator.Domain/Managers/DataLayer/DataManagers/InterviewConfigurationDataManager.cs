@@ -39,7 +39,7 @@ internal sealed class InterviewConfigurationDataManager
 
         const string questionsSql = @"
             SELECT id, interview_configuration_id, question, display_order, scoring_weight, scoring_guidance,
-                   created_at, updated_at
+                   follow_ups_enabled, max_follow_ups, created_at, updated_at
             FROM interview_configuration_questions
             WHERE interview_configuration_id = @id
             ORDER BY display_order";
@@ -188,9 +188,9 @@ internal sealed class InterviewConfigurationDataManager
         }
 
         const string sql = @"
-            INSERT INTO interview_configuration_questions (id, interview_configuration_id, question, display_order, scoring_weight, scoring_guidance)
-            VALUES (@Id, @InterviewConfigurationId, @Question, @DisplayOrder, @ScoringWeight, @ScoringGuidance)
-            RETURNING id, interview_configuration_id, question, display_order, scoring_weight, scoring_guidance, created_at, updated_at";
+            INSERT INTO interview_configuration_questions (id, interview_configuration_id, question, display_order, scoring_weight, scoring_guidance, follow_ups_enabled, max_follow_ups)
+            VALUES (@Id, @InterviewConfigurationId, @Question, @DisplayOrder, @ScoringWeight, @ScoringGuidance, @FollowUpsEnabled, @MaxFollowUps)
+            RETURNING id, interview_configuration_id, question, display_order, scoring_weight, scoring_guidance, follow_ups_enabled, max_follow_ups, created_at, updated_at";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var newItem = await connection.QueryFirstOrDefaultAsync<InterviewConfigurationQuestion>(sql, question);
@@ -206,9 +206,11 @@ internal sealed class InterviewConfigurationDataManager
                 display_order = @DisplayOrder,
                 scoring_weight = @ScoringWeight,
                 scoring_guidance = @ScoringGuidance,
+                follow_ups_enabled = @FollowUpsEnabled,
+                max_follow_ups = @MaxFollowUps,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = @Id
-            RETURNING id, interview_configuration_id, question, display_order, scoring_weight, scoring_guidance, created_at, updated_at";
+            RETURNING id, interview_configuration_id, question, display_order, scoring_weight, scoring_guidance, follow_ups_enabled, max_follow_ups, created_at, updated_at";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var updatedItem = await connection.QueryFirstOrDefaultAsync<InterviewConfigurationQuestion>(sql, question);
@@ -228,10 +230,21 @@ internal sealed class InterviewConfigurationDataManager
         return rowsAffected > 0;
     }
 
+    public async Task<InterviewConfigurationQuestion?> GetQuestionById(Guid questionId)
+    {
+        const string sql = @"
+            SELECT id, interview_configuration_id, question, display_order, scoring_weight, scoring_guidance, follow_ups_enabled, max_follow_ups, created_at, updated_at
+            FROM interview_configuration_questions
+            WHERE id = @questionId";
+
+        using var connection = new NpgsqlConnection(_dbConnectionString);
+        return await connection.QueryFirstOrDefaultAsync<InterviewConfigurationQuestion>(sql, new { questionId });
+    }
+
     public async Task<List<InterviewConfigurationQuestion>> GetQuestionsByConfigurationId(Guid configurationId)
     {
         const string sql = @"
-            SELECT id, interview_configuration_id, question, display_order, scoring_weight, scoring_guidance, created_at, updated_at
+            SELECT id, interview_configuration_id, question, display_order, scoring_weight, scoring_guidance, follow_ups_enabled, max_follow_ups, created_at, updated_at
             FROM interview_configuration_questions
             WHERE interview_configuration_id = @configurationId
             ORDER BY display_order";
@@ -249,6 +262,22 @@ internal sealed class InterviewConfigurationDataManager
 
         try
         {
+            // First, get the IDs of questions that will be deleted
+            const string getQuestionIdsSql = @"
+                SELECT id FROM interview_configuration_questions 
+                WHERE interview_configuration_id = @configurationId";
+            var questionIdsToDelete = (await connection.QueryAsync<Guid>(getQuestionIdsSql, new { configurationId }, transaction)).ToList();
+
+            // Nullify the foreign key in follow_up_templates for questions being deleted
+            if (questionIdsToDelete.Count > 0)
+            {
+                const string nullifyFollowUpsSql = @"
+                    UPDATE follow_up_templates 
+                    SET interview_configuration_question_id = NULL 
+                    WHERE interview_configuration_question_id = ANY(@questionIds)";
+                await connection.ExecuteAsync(nullifyFollowUpsSql, new { questionIds = questionIdsToDelete.ToArray() }, transaction);
+            }
+
             // Delete existing questions
             const string deleteSql = "DELETE FROM interview_configuration_questions WHERE interview_configuration_id = @configurationId";
             await connection.ExecuteAsync(deleteSql, new { configurationId }, transaction);
@@ -257,8 +286,8 @@ internal sealed class InterviewConfigurationDataManager
             if (questions.Count > 0)
             {
                 const string insertSql = @"
-                    INSERT INTO interview_configuration_questions (id, interview_configuration_id, question, display_order, scoring_weight, scoring_guidance)
-                    VALUES (@Id, @InterviewConfigurationId, @Question, @DisplayOrder, @ScoringWeight, @ScoringGuidance)";
+                    INSERT INTO interview_configuration_questions (id, interview_configuration_id, question, display_order, scoring_weight, scoring_guidance, follow_ups_enabled, max_follow_ups)
+                    VALUES (@Id, @InterviewConfigurationId, @Question, @DisplayOrder, @ScoringWeight, @ScoringGuidance, @FollowUpsEnabled, @MaxFollowUps)";
 
                 foreach (var question in questions)
                 {

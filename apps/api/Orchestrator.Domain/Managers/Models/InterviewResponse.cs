@@ -32,6 +32,12 @@ public class InterviewResponse : Entity
     [Column("is_follow_up")]
     public bool IsFollowUp { get; set; } = false;
 
+    [Column("follow_up_template_id")]
+    public Guid? FollowUpTemplateId { get; set; }
+
+    [Column("question_type")]
+    public string QuestionType { get; set; } = "main";
+
     [Column("ai_analysis")]
     public string? AiAnalysis { get; set; }
 }

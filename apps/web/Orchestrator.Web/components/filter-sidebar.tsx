@@ -13,20 +13,12 @@ interface Category {
   name: string;
 }
 
-interface Tag {
-  id: string;
-  name: string;
-}
-
 interface FilterSidebarProps {
   mode: "feed" | "agents";
   categories: Category[];
-  tags?: Tag[];
   selectedCategoryIds: string[];
-  selectedTagIds: string[];
   searchTerm: string;
   onCategoryChange: (categoryIds: string[]) => void;
-  onTagChange?: (tagIds: string[]) => void;
   onSearchChange: (search: string) => void;
   onClearFilters: () => void;
 }
@@ -34,12 +26,9 @@ interface FilterSidebarProps {
 export function FilterSidebar({
   mode,
   categories,
-  tags = [],
   selectedCategoryIds,
-  selectedTagIds,
   searchTerm,
   onCategoryChange,
-  onTagChange,
   onSearchChange,
   onClearFilters,
 }: FilterSidebarProps) {
@@ -52,14 +41,6 @@ export function FilterSidebar({
     onCategoryChange(newSelected);
   };
 
-  const handleTagToggle = (tagId: string) => {
-    if (!onTagChange) return;
-    const newSelected = selectedTagIds.includes(tagId)
-      ? selectedTagIds.filter((id) => id !== tagId)
-      : [...selectedTagIds, tagId];
-    onTagChange(newSelected);
-  };
-
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSearchChange(localSearch);
@@ -67,7 +48,6 @@ export function FilterSidebar({
 
   const hasActiveFilters =
     selectedCategoryIds.length > 0 ||
-    selectedTagIds.length > 0 ||
     searchTerm.length > 0;
 
   return (
@@ -138,32 +118,6 @@ export function FilterSidebar({
             </div>
           </div>
 
-          {/* Tags (only in feed mode) */}
-          {mode === "feed" && onTagChange && (
-            <div>
-              <h3 className="font-medium mb-3">Tags</h3>
-              <div className="space-y-2">
-                {tags.map((tag) => (
-                  <div key={tag.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`tag-${tag.id}`}
-                      checked={selectedTagIds.includes(tag.id)}
-                      onCheckedChange={() => handleTagToggle(tag.id)}
-                    />
-                    <Label
-                      htmlFor={`tag-${tag.id}`}
-                      className="text-sm font-normal cursor-pointer"
-                    >
-                      #{tag.name}
-                    </Label>
-                  </div>
-                ))}
-                {tags.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No tags available</p>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       </ScrollArea>
     </div>

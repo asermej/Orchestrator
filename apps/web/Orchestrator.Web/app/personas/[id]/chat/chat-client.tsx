@@ -17,15 +17,11 @@ import {
   sendMessage,
   updateChatTitle,
   deleteChat,
-  fetchChatTopics,
-  addTopicToChat,
   createChat,
   Chat,
   Message,
-  TopicItem,
   Category,
   AgentCategory,
-  TagItem,
 } from "./actions";
 import { AgentItem } from "../../actions";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -62,16 +58,10 @@ interface ChatClientProps {
   agentId: string;
   initialAgent: AgentItem;
   initialChats: Chat[];
-  initialChatTopicsMap: Map<string, TopicItem[]>;
-  initialAgentTopics: TopicItem[];
-  initialAllTopics: TopicItem[];
   initialCategories: Category[];
-  initialTags: TagItem[];
   initialAgentCategories: AgentCategory[];
   chatIdFromUrl: string | null;
-  topicIdFromUrl: string | null;
   initialMessages?: Message[];
-  initialLoadedTopics?: TopicItem[];
 }
 
 export function ChatClient({
@@ -79,16 +69,10 @@ export function ChatClient({
   agentId,
   initialAgent,
   initialChats,
-  initialChatTopicsMap,
-  initialAgentTopics,
-  initialAllTopics,
   initialCategories,
-  initialTags,
   initialAgentCategories,
   chatIdFromUrl,
-  topicIdFromUrl,
   initialMessages,
-  initialLoadedTopics,
 }: ChatClientProps) {
   const router = useRouter();
 
@@ -192,8 +176,8 @@ export function ChatClient({
     }
   );
 
-  const { execute: executeCreateChatWithTopic, isLoading: isCreatingChat } = useServerAction(
-    async (topicId: string | null, chatName: string) => {
+  const { execute: executeCreateChat, isLoading: isCreatingChat } = useServerAction(
+    async (chatName: string) => {
       if (!userId || !agentId || !agent) throw new Error("Session not ready");
 
       let newChat: Chat | null = null;
@@ -205,42 +189,6 @@ export function ChatClient({
         setPastChats((prev) => [newChat, ...prev]);
         setMessages([]);
         
-        // If a topic was selected, add it to the chat
-        if (topicId) {
-          try {
-            await addTopicToChat(newChat.id, topicId);
-            const chatTopics = await fetchChatTopics(newChat.id);
-            setLoadedTopics(chatTopics);
-            
-            // Update the topics map for the sidebar
-            setChatTopicsMap((prev) => {
-              const newMap = new Map(prev);
-              newMap.set(newChat.id, chatTopics);
-              return newMap;
-            });
-          } catch (topicError: any) {
-            // If adding topic fails (e.g., topic not trained), clean up the chat
-            console.error("Failed to add topic to chat:", topicError);
-            
-            // Delete the newly created chat since we couldn't add the topic
-            try {
-              await deleteChat(newChat.id);
-              setPastChats((prev) => prev.filter((chat) => chat.id !== newChat!.id));
-              setCurrentChat(null);
-            } catch (deleteError) {
-              console.error("Failed to delete chat after topic addition failure:", deleteError);
-            }
-            
-            // Re-throw with a more helpful message
-            const errorMessage = topicError.message || "Failed to add topic to chat";
-            if (errorMessage.includes("not been trained")) {
-              throw new Error("This topic doesn't have any training content yet. Please train the agent on this topic first before starting a conversation.");
-            }
-            throw new Error(errorMessage);
-          }
-        } else {
-          setLoadedTopics([]);
-        }
         
         // Update URL with new chat ID
         router.replace(`/personas/${agentId}/chat?chatId=${newChat.id}`, { scroll: false });
@@ -265,136 +213,34 @@ export function ChatClient({
     }
   );
 
-  const { execute: executeAddTopic, isLoading: isAddingTopic } = useServerAction(
-    async (topicId: string) => {
-      if (!currentChat) throw new Error("No active chat");
-      
-      await addTopicToChat(currentChat.id, topicId);
-      
-      const chatTopics = await fetchChatTopics(currentChat.id);
-      setLoadedTopics(chatTopics);
-    },
-    {
-      successMessage: "Topic added to chat!",
-    }
-  );
-
-  // Topic management state
-  const [loadedTopics, setLoadedTopics] = useState<TopicItem[]>(initialLoadedTopics || []);
-  const [agentTopics] = useState<TopicItem[]>(initialAgentTopics);
-  const [availableTopics] = useState<TopicItem[]>(initialAllTopics);
   const [allCategories] = useState<Category[]>(initialCategories);
-  const [allTags] = useState<TagItem[]>(initialTags);
   const [agentCategories] = useState<AgentCategory[]>(initialAgentCategories);
 
   // Sidebar mode state
-  const [sidebarMode, setSidebarMode] = useState<'chats' | 'topics'>('topics');
+  const [sidebarMode, setSidebarMode] = useState<'chats'>('chats');
   
   // Track if we're creating a chat from URL to prevent duplicates
   const isCreatingChatFromUrl = useRef(false);
-  
-  // Topic filtering and sorting state
-  const [topicSearchQuery, setTopicSearchQuery] = useState("");
-  const [topicSortOrder, setTopicSortOrder] = useState<'chronological' | 'alphabetical'>('chronological');
-  const [topicFilterCategory, setTopicFilterCategory] = useState<string | null>(null);
-  const [topicFilterTags, setTopicFilterTags] = useState<string[]>([]);
 
   // Simplified chat creation state
   const [showChatNameDialog, setShowChatNameDialog] = useState(false);
-  const [selectedTopicForNewChat, setSelectedTopicForNewChat] = useState<TopicItem | null>(null);
   const [newChatName, setNewChatName] = useState("");
-
-  // Chat topics cache for sidebar
-  const [chatTopicsMap, setChatTopicsMap] = useState<Map<string, TopicItem[]>>(initialChatTopicsMap);
 
   // Get user ID from Auth0 sub claim
   const userId = user?.sub;
 
-  // Helper function: Generate default chat name based on topic
-  const generateDefaultChatName = (topic?: TopicItem): string => {
-    if (topic) {
-      return `${topic.name} Discussion`;
-    }
-    return "New Conversation";
-  };
-
-  // Helper function: Filter and sort topics
-  const filterAndSortTopics = (
-    topics: TopicItem[],
-    searchQuery: string,
-    categoryFilter: string | null,
-    tagFilter: string[],
-    sortOrder: 'chronological' | 'alphabetical'
-  ): TopicItem[] => {
-    let filtered = [...topics];
-
-    // Apply search filter (matches name or description)
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((topic) => {
-        const matchesName = topic.name.toLowerCase().includes(query);
-        const matchesDescription = topic.description?.toLowerCase().includes(query) || false;
-        
-        return matchesName || matchesDescription;
-      });
-    }
-
-    // Apply category filter
-    if (categoryFilter) {
-      filtered = filtered.filter((topic) => {
-        return topic.categoryId === categoryFilter;
-      });
-    }
-
-    // Apply tag filter (topics must have at least one of the selected tags)
-    if (tagFilter.length > 0) {
-      filtered = filtered.filter((topic) => {
-        if (!topic.tags) return false;
-        
-        return topic.tags.some(tag => tagFilter.includes(tag.id));
-      });
-    }
-
-    // Apply sort order
-    filtered.sort((a, b) => {
-      if (sortOrder === 'alphabetical') {
-        return a.name.localeCompare(b.name);
-      } else {
-        // Chronological (newest first based on createdAt)
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      }
-    });
-
-    return filtered;
-  };
-
-  // Helper function: Create chat with optional topic
-  const createChatWithTopic = async (topicId: string | null, chatName: string) => {
-    await executeCreateChatWithTopic(topicId, chatName);
-  };
-
   const createNewChat = async () => {
-    await executeCreateChatWithTopic(null, "New Conversation");
+    await executeCreateChat("New Conversation");
   };
 
-  // Handler: Select topic from sidebar (or General Discussion with null)
-  const handleSelectTopicFromSidebar = (topic: TopicItem | null) => {
-    setSelectedTopicForNewChat(topic);
-    const defaultName = generateDefaultChatName(topic || undefined);
-    setNewChatName(defaultName);
-    setShowChatNameDialog(true);
-  };
-
-  // Handler: Create chat with selected name and topic
+  // Handler: Create chat with selected name
   const handleCreateChatWithName = async () => {
     if (!newChatName.trim()) return;
     
     setShowChatNameDialog(false);
-    await createChatWithTopic(selectedTopicForNewChat?.id || null, newChatName.trim());
+    await executeCreateChat(newChatName.trim());
     
-    // Switch back to chats mode and reset state
-    setSidebarMode('chats');
-    setSelectedTopicForNewChat(null);
+    // Reset state
     setNewChatName("");
   };
 
@@ -403,14 +249,10 @@ export function ChatClient({
       setIsLoadingMessages(true);
       setCurrentChat(chat);
       
-      // Load messages and topics for this chat in parallel
-      const [messagesResponse, chatTopics] = await Promise.all([
-        fetchChatMessages(chat.id),
-        fetchChatTopics(chat.id),
-      ]);
+      // Load messages for this chat
+      const messagesResponse = await fetchChatMessages(chat.id);
       
       setMessages(messagesResponse.items);
-      setLoadedTopics(chatTopics);
       
       // Update URL with current chat ID
       router.replace(`/personas/${agentId}/chat?chatId=${chat.id}`, { scroll: false });
@@ -485,12 +327,12 @@ export function ChatClient({
 
   // Initial load effect - handle URL params and initial chat
   useEffect(() => {
-    if (topicIdFromUrl && !isCreatingChatFromUrl.current) {
+    if (false && !isCreatingChatFromUrl.current) {
       // Handle topic selection from URL (from "Chat Now" button)
       // Automatically create chat and have agent kick off the conversation
-      const selectedTopic = agentTopics.find(t => t.id === topicIdFromUrl);
+      const selectedTopic = null;
       if (selectedTopic) {
-        const defaultName = generateDefaultChatName(selectedTopic);
+        const defaultName = "New Conversation";
         
         // Mark that we're creating a chat to prevent duplicates
         isCreatingChatFromUrl.current = true;
@@ -504,44 +346,23 @@ export function ChatClient({
             setPastChats((prev) => [newChat, ...prev]);
             setMessages([]);
             
-            // Add the topic to the chat
-            await addTopicToChat(newChat.id, selectedTopic.id);
-            const chatTopics = await fetchChatTopics(newChat.id);
-            setLoadedTopics(chatTopics);
-            
-            // Update the topics map for the sidebar
-            setChatTopicsMap((prev) => {
-              const newMap = new Map(prev);
-              newMap.set(newChat.id, chatTopics);
-              return newMap;
-            });
-            
             // Switch to chats view to show the newly created chat
             setSidebarMode('chats');
             
-            // Update URL with new chat ID (this removes topicId from URL)
+            // Update URL with new chat ID
             router.replace(`/personas/${agentId}/chat?chatId=${newChat.id}`, { scroll: false });
           } catch (error) {
             console.error("Failed to auto-create chat:", error);
             isCreatingChatFromUrl.current = false;
-            // Fallback to showing the dialog
-            setSelectedTopicForNewChat(selectedTopic);
-            setNewChatName(defaultName);
-            setShowChatNameDialog(true);
-            setSidebarMode('topics');
           }
         })();
-      } else {
-        // Fallback to creating a general chat if topic not found
-        createNewChat();
       }
-    } else if (chatIdFromUrl && initialMessages && initialLoadedTopics !== undefined) {
+    } else if (chatIdFromUrl && initialMessages) {
       // Load initial chat from URL
       const chat = initialChats.find(c => c.id === chatIdFromUrl);
       if (chat) {
         setCurrentChat(chat);
         setMessages(initialMessages);
-        setLoadedTopics(initialLoadedTopics);
       } else if (initialChats.length > 0) {
         // Chat not found, load most recent
         loadChat(initialChats[0]);
@@ -592,33 +413,10 @@ export function ChatClient({
                 </div>
               </div>
 
-              {/* Mode Toggle */}
-              <div className="flex gap-1 p-1 bg-muted rounded-lg">
-                <Button
-                  variant={sidebarMode === 'topics' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="flex-1 h-8 text-xs"
-                  onClick={() => setSidebarMode('topics')}
-                >
-                  <MessageSquarePlus className="mr-1.5 h-3.5 w-3.5 flex-shrink-0" />
-                  <span className="truncate">Topics</span>
-                </Button>
-                <Button
-                  variant={sidebarMode === 'chats' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="flex-1 h-8 text-xs"
-                  onClick={() => setSidebarMode('chats')}
-                >
-                  <MessageSquare className="mr-1.5 h-3.5 w-3.5 flex-shrink-0" />
-                  <span className="truncate">Chats</span>
-                </Button>
-              </div>
             </div>
 
-            {/* Sidebar Content - Changes based on mode */}
-            {sidebarMode === 'chats' ? (
-              /* Chats Mode */
-              <ScrollArea className="flex-1">
+            {/* Sidebar Content */}
+            <ScrollArea className="flex-1">
                 <div className="p-2 space-y-1">
                   <p className="text-xs font-medium text-muted-foreground px-2 py-1.5">
                     Conversation history
@@ -696,223 +494,12 @@ export function ChatClient({
                         <p className="text-xs text-muted-foreground mt-1">
                           {new Date(chat.lastMessageAt).toLocaleDateString()}
                         </p>
-                        {/* Topic badges */}
-                        {chatTopicsMap.has(chat.id) && chatTopicsMap.get(chat.id)!.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {chatTopicsMap.get(chat.id)!.slice(0, 2).map((topic) => (
-                              <span
-                                key={topic.id}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs border border-primary/20"
-                              >
-                                <BookMarked className="h-2.5 w-2.5" />
-                                {topic.name}
-                              </span>
-                            ))}
-                            {chatTopicsMap.get(chat.id)!.length > 2 && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-xs">
-                                +{chatTopicsMap.get(chat.id)!.length - 2} more
-                              </span>
-                            )}
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>
                   ))}
                 </div>
               </ScrollArea>
-            ) : (
-              /* Topics Mode - Topics List */
-              <>
-                {/* Search and Filter Controls */}
-                <div className="p-3 border-b space-y-2">
-                  {/* Search Input */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search topics..."
-                      value={topicSearchQuery}
-                      onChange={(e) => setTopicSearchQuery(e.target.value)}
-                      className="pl-9 h-9"
-                    />
-                    {topicSearchQuery && (
-                      <button
-                        onClick={() => setTopicSearchQuery("")}
-                        className="absolute right-3 top-1/2 -translate-y-1/2"
-                      >
-                        <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Category and Tag Filters */}
-                  <div className="flex gap-2">
-                    {/* Category Filter */}
-                    {allCategories.length > 0 && (
-                      <Select value={topicFilterCategory || "all"} onValueChange={(value) => setTopicFilterCategory(value === "all" ? null : value)}>
-                        <SelectTrigger className="h-8 text-xs flex-1">
-                          <SelectValue placeholder="All Categories" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Categories</SelectItem>
-                          {allCategories.map((category) => (
-                            <SelectItem key={category.id} value={category.id}>
-                              {category.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-
-                    {/* Tag Filter */}
-                    <Select 
-                      value={topicFilterTags.length > 0 ? topicFilterTags[0] : "all"} 
-                      onValueChange={(value) => {
-                        if (value === "all") {
-                          setTopicFilterTags([]);
-                        } else {
-                          // For now, single select. Could expand to multi-select later
-                          setTopicFilterTags([value]);
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-xs flex-1">
-                        <SelectValue placeholder="All Tags" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Tags</SelectItem>
-                        {allTags.length === 0 ? (
-                          <SelectItem value="none" disabled>
-                            No tags found - add tags to topics first
-                          </SelectItem>
-                        ) : (
-                          allTags
-                            .sort((a, b) => a.name.localeCompare(b.name))
-                            .map((tag) => (
-                              <SelectItem key={tag.id} value={tag.id}>
-                                {tag.name}
-                              </SelectItem>
-                            ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Sort Links */}
-                  <div className="flex items-center gap-1 text-xs">
-                    <button
-                      onClick={() => setTopicSortOrder('chronological')}
-                      className={cn(
-                        "px-2 py-1 rounded transition-colors",
-                        topicSortOrder === 'chronological'
-                          ? "font-semibold text-primary underline underline-offset-2"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      Chronological
-                    </button>
-                    <span className="text-muted-foreground">|</span>
-                    <button
-                      onClick={() => setTopicSortOrder('alphabetical')}
-                      className={cn(
-                        "px-2 py-1 rounded transition-colors",
-                        topicSortOrder === 'alphabetical'
-                          ? "font-semibold text-primary underline underline-offset-2"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      Alphabetical
-                    </button>
-                  </div>
-                </div>
-
-                {/* Topics List */}
-                <ScrollArea className="flex-1">
-                  <div className="p-2 space-y-1">
-                    {/* General Discussion Card */}
-                    <button
-                      key="general-discussion"
-                      onClick={() => handleSelectTopicFromSidebar(null)}
-                      className="w-full text-left p-3 rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors"
-                    >
-                      <div className="flex items-start gap-2">
-                        <MessageSquare className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-primary">General Discussion</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Start a conversation without loading specific topic knowledge
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-
-                    {/* Filtered Topics */}
-                    {(() => {
-                      const filteredTopics = filterAndSortTopics(
-                        agentTopics,
-                        topicSearchQuery,
-                        topicFilterCategory,
-                        topicFilterTags,
-                        topicSortOrder
-                      );
-
-                      if (filteredTopics.length === 0) {
-                        return (
-                          <div key="empty" className="text-center py-8 px-4">
-                            <p className="text-sm text-muted-foreground">
-                              {agentTopics.length === 0 
-                                ? "No topics available yet."
-                                : "No topics match your search."}
-                            </p>
-                          </div>
-                        );
-                      }
-
-                      return filteredTopics.map((topic) => {
-                          const category = allCategories.find(c => c.id === topic.categoryId);
-                          const hasNoContent = !topic.contentUrl || topic.contentUrl.trim() === '';
-                          
-                          return (
-                            <button
-                              key={topic.id}
-                              onClick={() => handleSelectTopicFromSidebar(topic)}
-                              className="w-full text-left p-3 rounded-lg border hover:bg-accent transition-colors"
-                            >
-                              <div className="space-y-2">
-                                <div className="flex items-start gap-2">
-                                  <BookMarked className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-sm">{topic.name}</p>
-                                    {topic.description && (
-                                      <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                                        {topic.description}
-                                      </p>
-                                    )}
-                                    {hasNoContent && (
-                                      <p className="text-xs text-amber-600 dark:text-amber-500 mt-1 flex items-center gap-1">
-                                        <span className="inline-block w-1 h-1 rounded-full bg-amber-600 dark:bg-amber-500"></span>
-                                        No training content yet
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                                {category && (
-                                  <div className="flex items-center gap-1">
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-xs">
-                                      <FolderOpen className="h-2.5 w-2.5" />
-                                      {category.name}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </button>
-                          );
-                        });
-                    })()}
-                  </div>
-                </ScrollArea>
-              </>
-            )}
           </div>
         </div>
 
@@ -1208,12 +795,6 @@ export function ChatClient({
               />
             </div>
 
-            {selectedTopicForNewChat && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 text-primary text-sm border border-primary/20">
-                <BookMarked className="h-4 w-4" />
-                <span>Topic: {selectedTopicForNewChat.name}</span>
-              </div>
-            )}
           </div>
 
           <DialogFooter className="mt-4">

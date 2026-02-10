@@ -10,7 +10,6 @@ public class JobResource
 {
     public Guid Id { get; set; }
     public Guid OrganizationId { get; set; }
-    public Guid? JobTypeId { get; set; }
     public string ExternalJobId { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
@@ -35,8 +34,6 @@ public class CreateJobResource
     public string? Description { get; set; }
 
     public string? Location { get; set; }
-
-    public Guid? JobTypeId { get; set; }
 }
 
 /// <summary>
@@ -52,8 +49,6 @@ public class UpdateJobResource
     public string? Location { get; set; }
 
     public string? Status { get; set; }
-
-    public Guid? JobTypeId { get; set; }
 }
 
 /// <summary>
@@ -62,7 +57,6 @@ public class UpdateJobResource
 public class SearchJobRequest : PaginatedRequest
 {
     public Guid? OrganizationId { get; set; }
-    public Guid? JobTypeId { get; set; }
     public string? Title { get; set; }
     public string? Status { get; set; }
 }

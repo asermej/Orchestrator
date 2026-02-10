@@ -104,6 +104,8 @@ public class InterviewResponseResource
     public int? DurationSeconds { get; set; }
     public int ResponseOrder { get; set; }
     public bool IsFollowUp { get; set; }
+    public Guid? FollowUpTemplateId { get; set; }
+    public string QuestionType { get; set; } = "main";
     public string? AiAnalysis { get; set; }
     public DateTime CreatedAt { get; set; }
 }
@@ -130,6 +132,8 @@ public class CreateInterviewResponseResource
     public int ResponseOrder { get; set; }
 
     public bool IsFollowUp { get; set; }
+
+    public Guid? FollowUpTemplateId { get; set; }
 }
 
 /// <summary>

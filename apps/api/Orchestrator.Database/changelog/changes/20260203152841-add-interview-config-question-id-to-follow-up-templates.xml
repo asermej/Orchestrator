@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260203152841-add-interview-config-question-id-to-follow-up-templates" author="system">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists indexName="idx_follow_up_templates_interview_config_question_id"/>
+            </not>
+        </preConditions>
+        
+        <!-- Note: interview_configuration_question_id column already exists from initial table creation (20260203063816) -->
+        <!-- Just add the index if it doesn't exist -->
+        <createIndex tableName="follow_up_templates" indexName="idx_follow_up_templates_interview_config_question_id">
+            <column name="interview_configuration_question_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

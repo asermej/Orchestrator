@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Header } from "@/components/header";
-import { ArrowLeft, Loader2, Plus, Trash2, GripVertical, Play, Save } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, Trash2, GripVertical, Play, Save, Sparkles, CheckCircle2, X, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { 
   fetchInterviewConfigurationById, 
@@ -20,16 +20,42 @@ import {
   deleteInterviewConfiguration,
   fetchAgentsForConfiguration, 
   AgentItem,
-  InterviewConfigurationItem 
+  InterviewConfigurationItem,
+  generateFollowUpsForConfigQuestion,
+  approveFollowUpsForConfigQuestion,
+  getFollowUpsForConfigQuestion,
+  deleteFollowUpForConfigQuestion,
+  FollowUpTemplate,
+  FollowUpSuggestion
 } from "../actions";
 import { useServerAction } from "@/lib/use-server-action";
 import { AgentAvatar } from "@/components/agent-avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface QuestionInput {
   id: string;
   question: string;
   scoringWeight: number;
   scoringGuidance: string;
+  followUpsEnabled?: boolean;
+  maxFollowUps?: number;
 }
 
 export default function EditInterviewConfigurationPage() {
@@ -50,6 +76,14 @@ export default function EditInterviewConfigurationPage() {
   const [scoringRubric, setScoringRubric] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [questions, setQuestions] = useState<QuestionInput[]>([]);
+  
+  // Follow-up state
+  const [followUpDialogOpen, setFollowUpDialogOpen] = useState<{ [key: number]: boolean }>({});
+  const [generatingFollowUps, setGeneratingFollowUps] = useState<{ [key: number]: boolean }>({});
+  const [followUpSuggestions, setFollowUpSuggestions] = useState<{ [key: number]: FollowUpSuggestion[] }>({});
+  const [selectedSuggestions, setSelectedSuggestions] = useState<{ [key: number]: Set<string> }>({});
+  const [approvedFollowUps, setApprovedFollowUps] = useState<{ [key: string]: FollowUpTemplate[] }>({});
+  const [loadingFollowUps, setLoadingFollowUps] = useState<{ [key: string]: boolean }>({});
 
   const { execute: executeUpdate, isLoading: isUpdating } = useServerAction(
     async () => {
@@ -115,10 +149,19 @@ export default function EditInterviewConfigurationPage() {
               id: q.id,
               question: q.question,
               scoringWeight: q.scoringWeight,
-              scoringGuidance: q.scoringGuidance || ""
+              scoringGuidance: q.scoringGuidance || "",
+              followUpsEnabled: true,
+              maxFollowUps: 2
             }))
-          : [{ id: crypto.randomUUID(), question: "", scoringWeight: 1, scoringGuidance: "" }]
+          : [{ id: crypto.randomUUID(), question: "", scoringWeight: 1, scoringGuidance: "", followUpsEnabled: true, maxFollowUps: 2 }]
       );
+      
+      // Load approved follow-ups for each question
+      for (const question of data.questions || []) {
+        if (question.id) {
+          await loadApprovedFollowUps(question.id);
+        }
+      }
     } catch (err) {
       console.error("Error loading configuration:", err);
       router.push("/interview-configurations");
@@ -152,10 +195,99 @@ export default function EditInterviewConfigurationPage() {
     }
   };
 
-  const updateQuestion = (id: string, field: keyof QuestionInput, value: string | number) => {
+  const updateQuestion = (id: string, field: keyof QuestionInput, value: string | number | boolean) => {
     setQuestions(questions.map(q => 
       q.id === id ? { ...q, [field]: value } : q
     ));
+  };
+
+  const loadApprovedFollowUps = async (questionId: string) => {
+    try {
+      setLoadingFollowUps(prev => ({ ...prev, [questionId]: true }));
+      const followUps = await getFollowUpsForConfigQuestion(questionId);
+      setApprovedFollowUps(prev => ({ ...prev, [questionId]: followUps.filter(f => f.isApproved) }));
+    } catch (err) {
+      console.error("Error loading follow-ups:", err);
+    } finally {
+      setLoadingFollowUps(prev => ({ ...prev, [questionId]: false }));
+    }
+  };
+
+  const handleGenerateFollowUps = async (questionIndex: number) => {
+    const question = questions[questionIndex];
+    
+    if (!question.question.trim()) {
+      return;
+    }
+
+    try {
+      setGeneratingFollowUps(prev => ({ ...prev, [questionIndex]: true }));
+      
+      let questionId = question.id;
+
+      // If question doesn't have an id, save the configuration first
+      if (!questionId || questionId.startsWith('crypto.randomUUID')) {
+        await executeUpdate();
+        // Reload to get the saved question IDs
+        const data = await fetchInterviewConfigurationById(configId);
+        const savedQuestion = data.questions.find((q, idx) => idx === questionIndex);
+        if (savedQuestion?.id) {
+          questionId = savedQuestion.id;
+          updateQuestion(question.id, "id", questionId);
+        } else {
+          throw new Error("Failed to save question. Please try again.");
+        }
+      }
+
+      const suggestions = await generateFollowUpsForConfigQuestion(questionId);
+      setFollowUpSuggestions(prev => ({ ...prev, [questionIndex]: suggestions }));
+      setSelectedSuggestions(prev => ({ ...prev, [questionIndex]: new Set() }));
+      setFollowUpDialogOpen(prev => ({ ...prev, [questionIndex]: true }));
+    } catch (err: any) {
+      console.error("Error generating follow-ups:", err);
+    } finally {
+      setGeneratingFollowUps(prev => ({ ...prev, [questionIndex]: false }));
+    }
+  };
+
+  const handleApproveFollowUps = async (questionIndex: number) => {
+    const question = questions[questionIndex];
+    if (!question.id) return;
+
+    const selected = selectedSuggestions[questionIndex];
+    if (!selected || selected.size === 0) return;
+
+    try {
+      await approveFollowUpsForConfigQuestion(Array.from(selected));
+      setFollowUpDialogOpen(prev => ({ ...prev, [questionIndex]: false }));
+      setFollowUpSuggestions(prev => ({ ...prev, [questionIndex]: [] }));
+      setSelectedSuggestions(prev => ({ ...prev, [questionIndex]: new Set() }));
+      await loadApprovedFollowUps(question.id);
+    } catch (err: any) {
+      console.error("Error approving follow-ups:", err);
+    }
+  };
+
+  const handleDeleteFollowUp = async (questionId: string, templateId: string) => {
+    try {
+      await deleteFollowUpForConfigQuestion(templateId);
+      await loadApprovedFollowUps(questionId);
+    } catch (err: any) {
+      console.error("Error deleting follow-up:", err);
+    }
+  };
+
+  const toggleSuggestionSelection = (questionIndex: number, suggestionId: string) => {
+    setSelectedSuggestions(prev => {
+      const current = prev[questionIndex] || new Set();
+      const updated = new Set(current);
+      if (updated.has(suggestionId)) {
+        updated.delete(suggestionId);
+      } else {
+        updated.add(suggestionId);
+      }
+      return { ...prev, [questionIndex]: updated };
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -313,22 +445,11 @@ export default function EditInterviewConfigurationPage() {
           {/* Questions */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Interview Questions</CardTitle>
-                  <CardDescription>
-                    Manage questions that will be asked during the interview
-                  </CardDescription>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={addQuestion}
-                  disabled={isUpdating}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Question
-                </Button>
+              <div>
+                <CardTitle>Interview Questions</CardTitle>
+                <CardDescription>
+                  Manage questions that will be asked during the interview
+                </CardDescription>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -342,13 +463,37 @@ export default function EditInterviewConfigurationPage() {
                     <div className="flex-1 space-y-4">
                       <div className="space-y-2">
                         <Label>Question *</Label>
-                        <Textarea
-                          value={q.question}
-                          onChange={(e) => updateQuestion(q.id, "question", e.target.value)}
-                          placeholder="Enter your interview question..."
-                          rows={2}
-                          disabled={isUpdating}
-                        />
+                        <div className="flex gap-2 items-start">
+                          <Textarea
+                            value={q.question}
+                            onChange={(e) => updateQuestion(q.id, "question", e.target.value)}
+                            placeholder="Enter your interview question..."
+                            rows={2}
+                            disabled={isUpdating}
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleGenerateFollowUps(index)}
+                            disabled={generatingFollowUps[index] || !q.question.trim() || isUpdating}
+                            className="gap-2 mt-0"
+                            title="Generate AI-powered follow-up questions for this question"
+                          >
+                            {generatingFollowUps[index] ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Generating...
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="h-4 w-4" />
+                                Generate Follow-ups
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
@@ -372,6 +517,87 @@ export default function EditInterviewConfigurationPage() {
                           />
                         </div>
                       </div>
+                      
+                      <div className="flex gap-4 items-center text-sm">
+                        <label className="flex items-center gap-2">
+                          Max follow-ups:
+                          <Input
+                            type="number"
+                            min={0}
+                            max={2}
+                            value={Math.min(q.maxFollowUps || 2, 2)}
+                            onChange={(e) => {
+                              const value = Math.min(Math.max(parseInt(e.target.value) || 0, 0), 2);
+                              updateQuestion(q.id, "maxFollowUps", value);
+                            }}
+                            className="w-16 h-8"
+                            disabled={isUpdating}
+                          />
+                          <span className="text-xs text-muted-foreground">(max 2)</span>
+                        </label>
+                      </div>
+
+                      {/* Follow-ups section - Always visible */}
+                      <div className="mt-4 pt-4 border-t space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">Follow-up Questions</span>
+                          {q.id && approvedFollowUps[q.id] && approvedFollowUps[q.id].length > 0 && (
+                            <span className="text-xs text-muted-foreground bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                              {approvedFollowUps[q.id].length} approved
+                            </span>
+                          )}
+                        </div>
+
+                        {q.id && approvedFollowUps[q.id] && approvedFollowUps[q.id].length > 0 && (
+                          <div className="space-y-2">
+                            {approvedFollowUps[q.id].map((followUp) => (
+                              <div key={followUp.id} className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded-md">
+                                <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium">{followUp.canonicalText}</p>
+                                  {followUp.competencyTag && (
+                                    <span className="text-xs text-muted-foreground mt-1 inline-block">
+                                      Tag: {followUp.competencyTag}
+                                    </span>
+                                  )}
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-destructive hover:text-destructive"
+                                  onClick={() => handleDeleteFollowUp(q.id, followUp.id)}
+                                  disabled={isUpdating}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {q.id && (!approvedFollowUps[q.id] || approvedFollowUps[q.id].length === 0) && (
+                          <div className="p-3 bg-muted/30 rounded-md border border-dashed">
+                            <p className="text-xs text-muted-foreground">
+                              No approved follow-ups yet. Click "Generate Follow-ups" above to create AI suggestions.
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1 italic">
+                              Only approved follow-ups can be asked during interviews.
+                            </p>
+                          </div>
+                        )}
+
+                        {!q.id && (
+                          <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                            <p className="text-xs text-blue-700">
+                              💡 Click "Generate Follow-ups" above to save this question and create follow-up suggestions.
+                            </p>
+                            <p className="text-xs text-blue-600 mt-1 italic">
+                              Only approved follow-ups can be asked during interviews.
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <Button
                       type="button"
@@ -386,8 +612,87 @@ export default function EditInterviewConfigurationPage() {
                   </div>
                 </div>
               ))}
+              
+              {/* Add Question button at the bottom */}
+              <div className="pt-4 border-t">
+                <Button type="button" variant="outline" onClick={addQuestion} className="gap-2 w-full" disabled={isUpdating}>
+                  <Plus className="h-4 w-4" />
+                  Add Question
+                </Button>
+              </div>
             </CardContent>
           </Card>
+
+          {/* Follow-up Generation Dialogs */}
+          {questions.map((question, index) => (
+            <Dialog
+              key={index}
+              open={followUpDialogOpen[index] || false}
+              onOpenChange={(open) => setFollowUpDialogOpen(prev => ({ ...prev, [index]: open }))}
+            >
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Review Follow-up Suggestions</DialogTitle>
+                  <DialogDescription>
+                    Select the follow-up questions you want to approve. Only approved follow-ups can be asked during interviews.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3 py-4">
+                  {followUpSuggestions[index]?.map((suggestion) => (
+                    <div
+                      key={suggestion.id}
+                      className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                        selectedSuggestions[index]?.has(suggestion.id)
+                          ? "bg-primary/10 border-primary"
+                          : "bg-background hover:bg-muted/50"
+                      }`}
+                      onClick={() => toggleSuggestionSelection(index, suggestion.id)}
+                    >
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedSuggestions[index]?.has(suggestion.id) || false}
+                          onChange={() => toggleSuggestionSelection(index, suggestion.id)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium">{suggestion.canonicalText}</p>
+                          {suggestion.competencyTag && (
+                            <span className="text-xs text-muted-foreground mt-1 inline-block">
+                              Tag: {suggestion.competencyTag}
+                            </span>
+                          )}
+                          {suggestion.triggerHints && suggestion.triggerHints.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {suggestion.triggerHints.map((hint, i) => (
+                                <span key={i} className="text-xs bg-muted px-2 py-0.5 rounded">
+                                  {hint}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setFollowUpDialogOpen(prev => ({ ...prev, [index]: false }))}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => handleApproveFollowUps(index)}
+                    disabled={!selectedSuggestions[index] || selectedSuggestions[index].size === 0}
+                  >
+                    Approve Selected ({selectedSuggestions[index]?.size || 0})
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          ))}
 
           {/* Scoring Rubric */}
           <Card>

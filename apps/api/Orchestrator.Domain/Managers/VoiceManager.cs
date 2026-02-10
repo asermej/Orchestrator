@@ -157,14 +157,13 @@ internal sealed class VoiceManager : IDisposable
         
         // Get the job to find the job type
         var job = await DataFacade.GetJobById(interview.JobId).ConfigureAwait(false);
-        if (job == null || !job.JobTypeId.HasValue)
+        if (job == null)
         {
-            return result; // No job type, no questions to warm up
+            return result; // No job, no questions to warm up
         }
 
         // Get interview questions from job type
-        var questions = await DataFacade.GetInterviewQuestionsByJobTypeId(job.JobTypeId.Value).ConfigureAwait(false);
-        var questionList = questions.ToList();
+        var questionList = new List<InterviewQuestion>();
         result.TotalQuestions = questionList.Count;
 
         // Pre-generate audio for each question

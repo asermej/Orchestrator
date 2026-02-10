@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260203063819-add-follow-up-template-id-to-interview-responses" author="system">
+        <addColumn tableName="interview_responses">
+            <column name="follow_up_template_id" type="uuid">
+                <constraints nullable="true" foreignKeyName="fk_interview_responses_follow_up_template" references="follow_up_templates(id)"/>
+            </column>
+            <column name="question_type" type="varchar(20)" defaultValue="main">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+
+        <createIndex tableName="interview_responses" indexName="idx_interview_responses_follow_up_template_id">
+            <column name="follow_up_template_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

@@ -11,9 +11,6 @@ public class Job : Entity
     [Column("organization_id")]
     public Guid OrganizationId { get; set; }
 
-    [Column("job_type_id")]
-    public Guid? JobTypeId { get; set; }
-
     [Column("external_job_id")]
     public string ExternalJobId { get; set; } = string.Empty;
 

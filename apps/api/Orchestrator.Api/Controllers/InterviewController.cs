@@ -4,6 +4,7 @@ using Orchestrator.Domain;
 using Orchestrator.Api.ResourcesModels;
 using Orchestrator.Api.Mappers;
 using Orchestrator.Api.Common;
+using System.Diagnostics;
 
 namespace Orchestrator.Api.Controllers;
 
@@ -78,10 +79,6 @@ public class InterviewController : ControllerBase
 
         // Get questions from job type
         IEnumerable<InterviewQuestion> questions = new List<InterviewQuestion>();
-        if (job?.JobTypeId != null)
-        {
-            questions = await _domainFacade.GetInterviewQuestionsByJobTypeId(job.JobTypeId.Value);
-        }
 
         var response = new InterviewDetailResource
         {
@@ -101,7 +98,7 @@ public class InterviewController : ControllerBase
             Job = job != null ? JobMapper.ToResource(job) : null,
             Applicant = applicant != null ? ApplicantMapper.ToResource(applicant) : null,
             Agent = agent != null ? AgentMapper.ToResource(agent) : null,
-            Questions = questions.Select(JobTypeMapper.ToQuestionResource).ToList(),
+            Questions = new List<InterviewQuestionResource>(),
             Responses = responses.Select(InterviewMapper.ToResponseResource).ToList(),
             Result = result != null ? InterviewMapper.ToResultResource(result) : null
         };
@@ -179,9 +176,9 @@ public class InterviewController : ControllerBase
     /// </summary>
     [HttpPost("by-token/{token}/responses")]
     [AllowAnonymous]
-    [ProducesResponseType(typeof(InterviewResponseResource), 201)]
+    [ProducesResponseType(typeof(FollowUpSelectionResponseResource), 201)]
     [ProducesResponseType(404)]
-    public async Task<ActionResult<InterviewResponseResource>> AddResponse(string token, [FromBody] CreateInterviewResponseResource resource)
+    public async Task<ActionResult<FollowUpSelectionResponseResource>> AddResponse(string token, [FromBody] CreateInterviewResponseResource resource)
     {
         var interview = await _domainFacade.GetInterviewByToken(token);
         if (interview == null)
@@ -190,8 +187,71 @@ public class InterviewController : ControllerBase
         }
 
         var response = InterviewMapper.ToResponseDomain(resource, interview.Id);
+        
+        // Set question type based on is_follow_up
+        if (resource.IsFollowUp)
+        {
+            response.QuestionType = "followup";
+            // If FollowUpTemplateId is provided, use it
+            if (resource.FollowUpTemplateId.HasValue)
+            {
+                response.FollowUpTemplateId = resource.FollowUpTemplateId;
+            }
+        }
+        else
+        {
+            response.QuestionType = "main";
+        }
+
         var created = await _domainFacade.AddInterviewResponse(response);
-        return Created($"/api/v1/interview/{interview.Id}/responses/{created.Id}", InterviewMapper.ToResponseResource(created));
+
+        // Check if we should ask a follow-up question
+        string nextQuestionType = "main";
+        FollowUpSelectionResult? followUpResult = null;
+        FollowUpTemplate? selectedTemplate = null;
+
+        // Only check for follow-up if this was a main question (not already a follow-up)
+        if (!resource.IsFollowUp && resource.QuestionId.HasValue)
+        {
+            try
+            {
+                followUpResult = await _domainFacade.SelectAndReturnFollowUp(
+                    interview.Id,
+                    resource.QuestionId.Value,
+                    resource.Transcript ?? string.Empty);
+
+                if (followUpResult.SelectedTemplateId.HasValue)
+                {
+                    selectedTemplate = await _domainFacade.GetFollowUpTemplateById(followUpResult.SelectedTemplateId.Value);
+                    nextQuestionType = "followup";
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log but don't fail the response save
+                Debug.WriteLine($"Error selecting follow-up: {ex.Message}");
+            }
+        }
+
+        // Check if interview is complete (all main questions answered)
+        var allResponses = await _domainFacade.GetInterviewResponsesByInterviewId(interview.Id);
+        var mainQuestionResponses = allResponses.Where(r => r.QuestionType == "main").ToList();
+        
+        // Get questions from job
+        var job = await _domainFacade.GetJobById(interview.JobId);
+        int totalMainQuestions = 0;
+
+        if (mainQuestionResponses.Count >= totalMainQuestions && nextQuestionType != "followup")
+        {
+            nextQuestionType = "complete";
+        }
+
+        var followUpResponse = FollowUpMapper.ToResource(
+            followUpResult ?? new FollowUpSelectionResult { SelectedTemplateId = null },
+            selectedTemplate,
+            nextQuestionType);
+
+        return Created($"/api/v1/interview/{interview.Id}/responses/{created.Id}", followUpResponse);
     }
 
     /// <summary>

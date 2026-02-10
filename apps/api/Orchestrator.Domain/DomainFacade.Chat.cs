@@ -30,20 +30,5 @@ public sealed partial class DomainFacade
     {
         return await ChatManager.DeleteChat(id);
     }
-
-    public async Task<IEnumerable<ChatTopic>> GetChatTopics(Guid chatId)
-    {
-        return await ChatManager.GetChatTopics(chatId);
-    }
-
-    public async Task<ChatTopic> AddTopicToChat(Guid chatId, Guid topicId)
-    {
-        return await ChatManager.AddTopicToChat(chatId, topicId);
-    }
-
-    public async Task<bool> RemoveTopicFromChat(Guid chatId, Guid topicId)
-    {
-        return await ChatManager.RemoveTopicFromChat(chatId, topicId);
-    }
 }
 

@@ -192,84 +192,12 @@ export interface AgentCategory {
 
 // Chat Topic Types and Actions
 
-export interface ChatTopic {
-  id: string;
-  chatId: string;
-  topicId: string;
-  addedAt: string;
-}
-
-export interface TagItem {
-  id: string;
-  name: string;
-}
-
-export interface TopicItem {
-  id: string;
-  name: string;
-  description?: string;
-  agentId: string;
-  contentUrl: string;
-  contributionNotes?: string;
-  categoryId: string;
-  tags?: TagItem[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-/**
- * Fetches all topics loaded in a chat
- * Note: API returns TopicResource[] (full topic objects), not ChatTopic[] (join table records)
- */
-export async function fetchChatTopics(chatId: string): Promise<TopicItem[]> {
-  return await apiGet<TopicItem[]>(`/chat/${chatId}/topics`);
-}
-
-/**
- * Adds a topic to a chat
- * Note: API returns TopicResource (full topic object), not ChatTopic (join table record)
- */
-export async function addTopicToChat(chatId: string, topicId: string): Promise<TopicItem> {
-  const payload = { topicId };
-  return await apiPost<TopicItem>(`/chat/${chatId}/topics`, payload);
-}
-
-/**
- * Removes a topic from a chat
- */
-export async function removeTopicFromChat(chatId: string, topicId: string): Promise<void> {
-  await apiDelete(`/chat/${chatId}/topics/${topicId}`);
-}
-
-/**
- * Fetches all topics for an agent
- */
-export async function fetchAgentTopics(agentId: string): Promise<TopicItem[]> {
-  const data = await apiGet<{items: TopicItem[]}>(`/topic?agentId=${agentId}&pageSize=100`);
-  return data.items || [];
-}
-
-/**
- * Fetches all available topics
- */
-export async function fetchAllTopics(): Promise<TopicItem[]> {
-  const data = await apiGet<{items: TopicItem[]}>('/topic?pageSize=100');
-  return data.items || [];
-}
 
 /**
  * Fetches all available categories
  */
 export async function fetchAllCategories(): Promise<Category[]> {
   const data = await apiGet<{items: Category[]}>('/category?pageSize=100');
-  return data.items || [];
-}
-
-/**
- * Fetches all available tags
- */
-export async function fetchAllTags(): Promise<TagItem[]> {
-  const data = await apiGet<{items: TagItem[]}>('/tag?pageSize=100');
   return data.items || [];
 }
 

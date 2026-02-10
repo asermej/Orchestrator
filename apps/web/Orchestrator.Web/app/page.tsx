@@ -68,7 +68,7 @@ export default async function HomePage() {
             Welcome back, {session.user.name || session.user.email}
           </h1>
           <p className="text-slate-600 mt-2">
-            Manage your AI agents, job types, and interviews.
+            Manage your AI agents, interview configurations, and interviews.
           </p>
         </div>
         

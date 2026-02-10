@@ -142,3 +142,52 @@ export async function fetchAgentsForConfiguration(): Promise<AgentItem[]> {
   const data = await apiGet<{ items: AgentItem[] }>("/Agent?PageSize=100");
   return data.items || [];
 }
+
+// Follow-up question types and functions
+export interface FollowUpTemplate {
+  id: string;
+  competencyTag?: string | null;
+  triggerHints?: string[] | null;
+  canonicalText: string;
+  allowParaphrase: boolean;
+  isApproved: boolean;
+  createdBy?: string | null;
+}
+
+export interface FollowUpSuggestion {
+  id: string;
+  competencyTag?: string | null;
+  triggerHints?: string[] | null;
+  canonicalText: string;
+  isApproved: boolean;
+}
+
+/**
+ * Generate follow-up suggestions for an interview configuration question
+ */
+export async function generateFollowUpsForConfigQuestion(questionId: string): Promise<FollowUpSuggestion[]> {
+  const data = await apiPost<FollowUpSuggestion[]>(`/InterviewConfigurationQuestion/${questionId}/follow-ups/generate`, {});
+  return data;
+}
+
+/**
+ * Approve follow-up templates
+ */
+export async function approveFollowUpsForConfigQuestion(templateIds: string[]): Promise<void> {
+  await apiPost(`/InterviewConfigurationQuestion/follow-ups/approve`, { templateIds });
+}
+
+/**
+ * Get all follow-up templates for an interview configuration question
+ */
+export async function getFollowUpsForConfigQuestion(questionId: string): Promise<FollowUpTemplate[]> {
+  const data = await apiGet<FollowUpTemplate[]>(`/InterviewConfigurationQuestion/${questionId}/follow-ups`);
+  return data;
+}
+
+/**
+ * Delete a follow-up template
+ */
+export async function deleteFollowUpForConfigQuestion(templateId: string): Promise<void> {
+  await apiDelete(`/InterviewConfigurationQuestion/follow-ups/${templateId}`);
+}

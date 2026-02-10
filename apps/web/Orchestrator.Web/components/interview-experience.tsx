@@ -18,6 +18,18 @@ import { Eye, EyeOff, HelpCircle, ExternalLink } from "lucide-react";
 export interface InterviewQuestion {
   id: string;
   text: string;
+  isFollowUp?: boolean;
+  followUpTemplateId?: string;
+  followUpNumber?: number;
+  maxFollowUps?: number;
+}
+
+export interface FollowUpSelectionResponse {
+  selectedTemplateId?: string;
+  questionText?: string;
+  matchedCompetencyTag?: string;
+  rationale?: string;
+  nextQuestionType: "followup" | "main" | "complete";
 }
 
 export interface InterviewExperienceProps {
@@ -26,7 +38,7 @@ export interface InterviewExperienceProps {
   agentName: string;
   agentImageUrl?: string;
   applicantName?: string;
-  onSaveResponse: (questionId: string, questionText: string, transcript: string, order: number) => Promise<void>;
+  onSaveResponse: (questionId: string, questionText: string, transcript: string, order: number, isFollowUp?: boolean, followUpTemplateId?: string) => Promise<FollowUpSelectionResponse | void>;
   onComplete: () => Promise<void>;
   onExit?: () => void;
   onBegin?: () => Promise<void>;
@@ -48,6 +60,8 @@ export function InterviewExperience({
   onBegin,
 }: InterviewExperienceProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [followUpQuestions, setFollowUpQuestions] = useState<InterviewQuestion[]>([]);
+  const [followUpCounts, setFollowUpCounts] = useState<{ [questionId: string]: number }>({});
   const [transcript, setTranscript] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSpokenText, setCurrentSpokenText] = useState<string | null>(null);
@@ -90,10 +104,20 @@ export function InterviewExperience({
     }
   }, [playbackSpeed]);
 
-  const currentQuestion = questions[currentQuestionIndex];
-  const isLastQuestion = currentQuestionIndex >= questions.length - 1;
-  const totalQuestions = questions.length;
+  // Combine main questions with dynamically inserted follow-ups
+  const allQuestions = [...questions, ...followUpQuestions];
+  const currentQuestion = allQuestions[currentQuestionIndex] || questions[currentQuestionIndex];
+  const isLastQuestion = currentQuestionIndex >= allQuestions.length - 1;
+  const totalQuestions = allQuestions.length;
   const progressPercent = totalQuestions > 0 ? ((currentQuestionIndex + 1) / totalQuestions) * 100 : 0;
+  
+  // Get follow-up indicator text
+  const getQuestionIndicator = () => {
+    if (currentQuestion?.isFollowUp && currentQuestion.followUpNumber) {
+      return `Follow-up ${currentQuestion.followUpNumber} of ${currentQuestion.maxFollowUps || 2}`;
+    }
+    return `Question ${currentQuestionIndex + 1} of ${totalQuestions}`;
+  };
   
   // Pre-generate greeting text
   const getGreetingText = useCallback(() => {
@@ -145,6 +169,29 @@ export function InterviewExperience({
         } else {
           // Only show error if not actively recording (shouldn't happen, but safety check)
           stateMachine.handleError("no_speech", err);
+        }
+      } else if (err.includes("Network") || err.includes("network")) {
+        // Handle "network" errors gracefully - often false positives when user doesn't speak
+        // If no transcript was received, the hook already returns "No speech detected" message
+        // But we still need to handle cases where it might be a real network error
+        // Auto-restart recording to provide seamless experience
+        if (isTextResponseModeRef.current) {
+          return; // Silently ignore - user is using text input
+        }
+        
+        const currentState = stateMachine.state;
+        if (currentState === InterviewState.RECORDING) {
+          // Silently restart recording - user can continue speaking
+          setTimeout(() => {
+            // Check state again to ensure we're still recording before restarting
+            // Also check we're not in text mode (user might have switched)
+            if (stateMachine.state === InterviewState.RECORDING && !isTextResponseModeRef.current) {
+              startRecording();
+            }
+          }, 500);
+        } else {
+          // Only show error if not actively recording (shouldn't happen, but safety check)
+          stateMachine.handleError("network", err);
         }
       } else {
         stateMachine.handleError("network", err);
@@ -224,21 +271,66 @@ export function InterviewExperience({
     stateMachine.startProcessing();
     setProcessingMessage("Saving your response");
 
-    // Save the response (don't fail the interview if this fails)
+    const isFollowUp = currentQuestion.isFollowUp || false;
+    const followUpTemplateId = currentQuestion.followUpTemplateId;
+
+    // Save the response and get next question info
+    let followUpResponse: FollowUpSelectionResponse | void;
     try {
-      await onSaveResponse(
+      followUpResponse = await onSaveResponse(
         currentQuestion.id,
         currentQuestion.text,
         message,
-        currentQuestionIndex
+        currentQuestionIndex,
+        isFollowUp,
+        followUpTemplateId
       );
     } catch (err) {
       // Log but continue - the interview flow is more important than persisting each response
       console.warn("Failed to save response (continuing anyway):", err);
+      followUpResponse = undefined;
     }
 
-    // Move to next question or complete
-    if (isLastQuestion) {
+    // Handle follow-up selection response
+    if (followUpResponse && followUpResponse.nextQuestionType === "followup" && followUpResponse.questionText) {
+      // Insert follow-up question
+      const mainQuestionId = currentQuestion.isFollowUp ? questions[currentQuestionIndex - 1]?.id : currentQuestion.id;
+      const currentFollowUpCount = followUpCounts[mainQuestionId || ""] || 0;
+      const newFollowUpCount = currentFollowUpCount + 1;
+
+      const followUpQuestion: InterviewQuestion = {
+        id: followUpResponse.selectedTemplateId || `followup-${Date.now()}`,
+        text: followUpResponse.questionText,
+        isFollowUp: true,
+        followUpTemplateId: followUpResponse.selectedTemplateId,
+        followUpNumber: newFollowUpCount,
+        maxFollowUps: questions.find(q => q.id === mainQuestionId)?.maxFollowUps || 2
+      };
+
+      // Add follow-up to follow-up questions array
+      setFollowUpQuestions(prev => [...prev, followUpQuestion]);
+      
+      // Update follow-up count
+      setFollowUpCounts(prev => ({ ...prev, [mainQuestionId || ""]: newFollowUpCount }));
+      
+      // Move to follow-up question (it's at the end of allQuestions array)
+      const allQuestionsCount = questions.length + followUpQuestions.length + 1;
+      const nextIndex = allQuestionsCount - 1;
+      setCurrentQuestionIndex(nextIndex);
+      setTranscript("");
+      transcriptRef.current = "";
+
+      stateMachine.completeProcessing(false);
+      
+      // Small delay to ensure state transition completes before audio starts
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      await speakText(followUpQuestion.text);
+      return;
+    }
+
+    // Move to next main question or complete
+    if (followUpResponse?.nextQuestionType === "complete" || isLastQuestion) {
       await handleComplete();
     } else {
       const nextIndex = currentQuestionIndex + 1;
@@ -282,7 +374,7 @@ export function InterviewExperience({
         await speakText(nextQuestionText);
       }
     }
-  }, [currentQuestion, currentQuestionIndex, isLastQuestion, questions, onSaveResponse, stateMachine]);
+  }, [currentQuestion, currentQuestionIndex, isLastQuestion, questions, onSaveResponse, stateMachine, followUpCounts]);
 
   const handleComplete = useCallback(async () => {
     stateMachine.completeProcessing(true);
@@ -1012,7 +1104,7 @@ export function InterviewExperience({
             >
               <div className="mb-6 text-center">
                 <p className="text-sm text-white/60 mb-2">
-                  Question {currentQuestionIndex + 1} of {totalQuestions}
+                  {getQuestionIndicator()}
                 </p>
                 <Progress value={progressPercent} className="w-48 h-1.5 bg-white/10" />
               </div>
@@ -1084,7 +1176,7 @@ export function InterviewExperience({
             >
               <div className="mb-6 text-center">
                 <p className="text-sm text-white/60 mb-2">
-                  Question {currentQuestionIndex + 1} of {totalQuestions}
+                  {getQuestionIndicator()}
                 </p>
                 <Progress value={progressPercent} className="w-48 h-1.5 bg-white/10" />
               </div>
@@ -1214,7 +1306,7 @@ export function InterviewExperience({
             >
               <div className="mb-6 text-center">
                 <p className="text-sm text-white/60 mb-2">
-                  Question {currentQuestionIndex + 1} of {totalQuestions}
+                  {getQuestionIndicator()}
                 </p>
                 <Progress value={progressPercent} className="w-48 h-1.5 bg-white/10" />
               </div>
@@ -1369,7 +1461,7 @@ export function InterviewExperience({
             >
               <div className="mb-6 text-center">
                 <p className="text-sm text-white/60 mb-2">
-                  Question {currentQuestionIndex + 1} of {totalQuestions}
+                  {getQuestionIndicator()}
                 </p>
                 <Progress value={progressPercent} className="w-48 h-1.5 bg-white/10" />
               </div>
@@ -1425,7 +1517,7 @@ export function InterviewExperience({
             >
               <div className="mb-8 text-center">
                 <p className="text-sm text-white/60 mb-2">
-                  Question {currentQuestionIndex + 1} of {totalQuestions}
+                  {getQuestionIndicator()}
                 </p>
                 <Progress value={progressPercent} className="w-48 h-1.5 bg-white/10" />
               </div>

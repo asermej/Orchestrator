@@ -112,31 +112,8 @@ internal sealed class MessageManager : IDisposable
         // Get general training data for the agent
         var generalTraining = await AgentManager.GetAgentTraining(agentId);
         
-        // Get all topics loaded into this conversation
-        var chatTopics = await ChatManager.GetChatTopics(chatId);
-        
         // Load topic content for each topic
         var topicContexts = new List<(string TopicName, string Content)>();
-        
-        foreach (var chatTopic in chatTopics)
-        {
-            // Get topic details
-            var topic = await DataFacade.GetTopicById(chatTopic.TopicId);
-            if (topic != null)
-            {
-                // Get training content for this topic from ContentUrl
-                string? topicContent = null;
-                if (!string.IsNullOrWhiteSpace(topic.ContentUrl))
-                {
-                    topicContent = await StorageManager.GetTrainingFromUrl(topic.ContentUrl);
-                }
-                
-                if (!string.IsNullOrWhiteSpace(topicContent))
-                {
-                    topicContexts.Add((topic.Name, topicContent));
-                }
-            }
-        }
         
         // Build system prompt from agent characteristics, training, and topic context
         var systemPrompt = BuildSystemPrompt(agent, generalTraining, topicContexts);

@@ -62,6 +62,11 @@ internal sealed partial class DataFacade
         return InterviewConfigurationDataManager.GetQuestionsByConfigurationId(configurationId);
     }
 
+    public Task<InterviewConfigurationQuestion?> GetInterviewConfigurationQuestionById(Guid questionId)
+    {
+        return InterviewConfigurationDataManager.GetQuestionById(questionId);
+    }
+
     public Task ReplaceInterviewConfigurationQuestions(Guid configurationId, List<InterviewConfigurationQuestion> questions)
     {
         return InterviewConfigurationDataManager.ReplaceQuestions(configurationId, questions);

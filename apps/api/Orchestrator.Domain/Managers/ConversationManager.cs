@@ -291,21 +291,8 @@ internal sealed class ConversationManager : IDisposable
         }
 
         var generalTraining = await AgentManager.GetAgentTraining(agentId).ConfigureAwait(false);
-        var chatTopics = await ChatManager.GetChatTopics(chatId).ConfigureAwait(false);
         
         var topicContexts = new List<(string TopicName, string Content)>();
-        foreach (var chatTopic in chatTopics)
-        {
-            var topic = await DataFacade.GetTopicById(chatTopic.TopicId).ConfigureAwait(false);
-            if (topic != null && !string.IsNullOrWhiteSpace(topic.ContentUrl))
-            {
-                var topicContent = await StorageManager.GetTrainingFromUrl(topic.ContentUrl).ConfigureAwait(false);
-                if (!string.IsNullOrWhiteSpace(topicContent))
-                {
-                    topicContexts.Add((topic.Name, topicContent));
-                }
-            }
-        }
 
         var systemPrompt = BuildSystemPrompt(agent, generalTraining, topicContexts);
         return await GatewayFacade.GenerateChatCompletion(systemPrompt, chatHistory).ConfigureAwait(false);
