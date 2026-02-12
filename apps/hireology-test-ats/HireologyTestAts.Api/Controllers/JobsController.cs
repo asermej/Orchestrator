@@ -1,63 +1,63 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using HireologyTestAts.Api.Models;
-using HireologyTestAts.Api.Services;
+using HireologyTestAts.Api.Mappers;
+using HireologyTestAts.Api.ResourceModels;
+using HireologyTestAts.Domain;
 
 namespace HireologyTestAts.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/v1/[controller]")]
 [Produces("application/json")]
 [Authorize]
 public class JobsController : ControllerBase
 {
-    private readonly JobsRepository _jobs;
-    private readonly OrchestratorSyncService _orchestrator;
-    private readonly ICurrentUserService _currentUser;
-    private readonly UserAccessService _userAccess;
-    private readonly UserSessionsRepository _sessions;
+    private readonly DomainFacade _domainFacade;
 
-    public JobsController(JobsRepository jobs, OrchestratorSyncService orchestrator, ICurrentUserService currentUser, UserAccessService userAccess, UserSessionsRepository sessions)
+    public JobsController(DomainFacade domainFacade)
     {
-        _jobs = jobs;
-        _orchestrator = orchestrator;
-        _currentUser = currentUser;
-        _userAccess = userAccess;
-        _sessions = sessions;
+        _domainFacade = domainFacade;
     }
 
     [HttpGet]
     [ProducesResponseType(typeof(JobListResponse), 200)]
-    public async Task<ActionResult<JobListResponse>> List([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20, [FromQuery] Guid? organizationId = null, CancellationToken ct = default)
+    public async Task<ActionResult<JobListResponse>> List([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20, [FromQuery] Guid? organizationId = null)
     {
         IReadOnlyList<Guid>? orgFilter = null;
-        var user = await _currentUser.GetCurrentUserAsync(ct);
-        if (user != null)
+        var auth0Sub = GetAuth0Sub();
+        if (!string.IsNullOrEmpty(auth0Sub))
         {
-            var allowedOrgIds = await _userAccess.GetAllowedOrganizationIdsAsync(user.Id, ct);
-            if (organizationId.HasValue)
+            var user = await _domainFacade.GetUserByAuth0Sub(auth0Sub);
+            if (user != null)
             {
-                if (!allowedOrgIds.Contains(organizationId.Value))
-                    return Forbid();
-                orgFilter = new[] { organizationId.Value };
-            }
-            else
-            {
-                var selectedId = await _sessions.GetSelectedOrganizationIdAsync(user.Id, ct);
-                if (selectedId.HasValue && allowedOrgIds.Contains(selectedId.Value))
-                    orgFilter = new[] { selectedId.Value };
-                else if (allowedOrgIds.Count > 0)
-                    orgFilter = allowedOrgIds;
+                var allowedOrgIds = await _domainFacade.GetAllowedOrganizationIds(user.Id);
+                if (organizationId.HasValue)
+                {
+                    if (!allowedOrgIds.Contains(organizationId.Value))
+                        return Forbid();
+                    orgFilter = new[] { organizationId.Value };
+                }
+                else
+                {
+                    var selectedId = await _domainFacade.GetSelectedOrganizationId(user.Id);
+                    if (selectedId.HasValue && allowedOrgIds.Contains(selectedId.Value))
+                        orgFilter = new[] { selectedId.Value };
+                    else if (allowedOrgIds.Count > 0)
+                        orgFilter = allowedOrgIds;
+                }
             }
         }
         else if (organizationId.HasValue)
+        {
             orgFilter = new[] { organizationId.Value };
+        }
 
-        var items = await _jobs.ListAsync(pageNumber, pageSize, orgFilter, ct);
-        var totalCount = await _jobs.CountAsync(orgFilter, ct);
+        var items = await _domainFacade.GetJobs(pageNumber, pageSize, orgFilter);
+        var totalCount = await _domainFacade.GetJobCount(orgFilter);
         return Ok(new JobListResponse
         {
-            Items = items,
+            Items = JobMapper.ToResource(items),
             TotalCount = totalCount,
             PageNumber = pageNumber,
             PageSize = pageSize
@@ -65,150 +65,115 @@ public class JobsController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    [ProducesResponseType(typeof(JobItem), 200)]
+    [ProducesResponseType(typeof(JobResource), 200)]
     [ProducesResponseType(404)]
-    public async Task<ActionResult<JobItem>> GetById(Guid id, CancellationToken ct = default)
+    public async Task<ActionResult<JobResource>> GetById(Guid id)
     {
-        var job = await _jobs.GetByIdAsync(id, ct);
-        if (job == null) return NotFound();
-        var user = await _currentUser.GetCurrentUserAsync(ct);
-        if (user != null && job.OrganizationId.HasValue)
+        var job = await _domainFacade.GetJobById(id);
+
+        var auth0Sub = GetAuth0Sub();
+        if (!string.IsNullOrEmpty(auth0Sub) && job.OrganizationId.HasValue)
         {
-            var canAccess = await _userAccess.CanAccessOrganizationAsync(user.Id, job.OrganizationId.Value, ct);
-            if (!canAccess) return Forbid();
+            var user = await _domainFacade.GetUserByAuth0Sub(auth0Sub);
+            if (user != null)
+            {
+                var canAccess = await _domainFacade.CanAccessOrganization(user.Id, job.OrganizationId.Value);
+                if (!canAccess) return Forbid();
+            }
         }
-        return Ok(job);
+
+        return Ok(JobMapper.ToResource(job));
     }
 
     [HttpPost]
-    [ProducesResponseType(typeof(JobItem), 201)]
+    [ProducesResponseType(typeof(JobResource), 201)]
     [ProducesResponseType(400)]
-    public async Task<ActionResult<JobItem>> Create([FromBody] CreateJobRequest request, CancellationToken ct = default)
+    public async Task<ActionResult<JobResource>> Create([FromBody] CreateJobResource resource)
     {
-        if (string.IsNullOrWhiteSpace(request.ExternalJobId) || string.IsNullOrWhiteSpace(request.Title))
-            return BadRequest("ExternalJobId and Title are required");
+        var job = JobMapper.ToDomain(resource);
 
-        var organizationId = request.OrganizationId;
-        var user = await _currentUser.GetCurrentUserAsync(ct);
-        if (user != null)
+        // Resolve organization from user session if not provided
+        var auth0Sub = GetAuth0Sub();
+        if (!string.IsNullOrEmpty(auth0Sub))
         {
-            if (!organizationId.HasValue)
+            var user = await _domainFacade.GetUserByAuth0Sub(auth0Sub);
+            if (user != null)
             {
-                var selectedId = await _sessions.GetSelectedOrganizationIdAsync(user.Id, ct);
-                organizationId = selectedId;
-            }
-            if (organizationId.HasValue)
-            {
-                var canAccess = await _userAccess.CanAccessOrganizationAsync(user.Id, organizationId.Value, ct);
-                if (!canAccess) return BadRequest("You do not have access to the specified organization.");
+                if (!job.OrganizationId.HasValue)
+                {
+                    var selectedId = await _domainFacade.GetSelectedOrganizationId(user.Id);
+                    job.OrganizationId = selectedId;
+                }
+                if (job.OrganizationId.HasValue)
+                {
+                    var canAccess = await _domainFacade.CanAccessOrganization(user.Id, job.OrganizationId.Value);
+                    if (!canAccess)
+                        throw new AccessDeniedException("You do not have access to the specified organization.");
+                }
             }
         }
 
-        var existing = await _jobs.GetByExternalIdAsync(request.ExternalJobId, ct);
-        if (existing != null)
-            return BadRequest($"Job with ExternalJobId '{request.ExternalJobId}' already exists");
-
-        var job = new JobItem
-        {
-            ExternalJobId = request.ExternalJobId.Trim(),
-            Title = request.Title.Trim(),
-            Description = request.Description?.Trim(),
-            Location = request.Location?.Trim(),
-            Status = request.Status ?? "active",
-            OrganizationId = organizationId
-        };
-        var created = await _jobs.CreateAsync(job, ct);
-
-        await _orchestrator.SyncJobToOrchestratorAsync(created, ct);
-
-        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        var created = await _domainFacade.CreateJob(job);
+        var response = JobMapper.ToResource(created);
+        return CreatedAtAction(nameof(GetById), new { id = response.Id }, response);
     }
 
     [HttpPut("{id:guid}")]
-    [ProducesResponseType(typeof(JobItem), 200)]
+    [ProducesResponseType(typeof(JobResource), 200)]
     [ProducesResponseType(404)]
-    public async Task<ActionResult<JobItem>> Update(Guid id, [FromBody] UpdateJobRequest request, CancellationToken ct = default)
+    public async Task<ActionResult<JobResource>> Update(Guid id, [FromBody] UpdateJobResource resource)
     {
-        var existing = await _jobs.GetByIdAsync(id, ct);
-        if (existing == null) return NotFound();
-
-        var user = await _currentUser.GetCurrentUserAsync(ct);
-        if (user != null && existing.OrganizationId.HasValue)
+        // Check access on existing job
+        var existing = await _domainFacade.GetJobById(id);
+        var auth0Sub = GetAuth0Sub();
+        if (!string.IsNullOrEmpty(auth0Sub) && existing.OrganizationId.HasValue)
         {
-            var canAccess = await _userAccess.CanAccessOrganizationAsync(user.Id, existing.OrganizationId.Value, ct);
-            if (!canAccess) return Forbid();
-        }
-
-        existing.Title = request.Title ?? existing.Title;
-        existing.Description = request.Description ?? existing.Description;
-        existing.Location = request.Location ?? existing.Location;
-        existing.Status = request.Status ?? existing.Status;
-        if (request.OrganizationId.HasValue)
-        {
+            var user = await _domainFacade.GetUserByAuth0Sub(auth0Sub);
             if (user != null)
             {
-                var canAccess = await _userAccess.CanAccessOrganizationAsync(user.Id, request.OrganizationId.Value, ct);
-                if (!canAccess) return BadRequest("You do not have access to the specified organization.");
+                var canAccess = await _domainFacade.CanAccessOrganization(user.Id, existing.OrganizationId.Value);
+                if (!canAccess) return Forbid();
+
+                // Also check access on target org if changing
+                if (resource.OrganizationId.HasValue)
+                {
+                    var canAccessTarget = await _domainFacade.CanAccessOrganization(user.Id, resource.OrganizationId.Value);
+                    if (!canAccessTarget)
+                        throw new AccessDeniedException("You do not have access to the specified organization.");
+                }
             }
-            existing.OrganizationId = request.OrganizationId;
         }
 
-        var updated = await _jobs.UpdateAsync(existing, ct);
-        if (updated == null) return NotFound();
-
-        await _orchestrator.SyncJobToOrchestratorAsync(updated, ct);
-
-        return Ok(updated);
+        var updates = JobMapper.ToDomain(resource);
+        var updated = await _domainFacade.UpdateJob(id, updates);
+        return Ok(JobMapper.ToResource(updated));
     }
 
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(204)]
     [ProducesResponseType(404)]
-    public async Task<ActionResult> Delete(Guid id, CancellationToken ct = default)
+    public async Task<ActionResult> Delete(Guid id)
     {
-        var existing = await _jobs.GetByIdAsync(id, ct);
-        if (existing == null) return NotFound();
-
-        var user = await _currentUser.GetCurrentUserAsync(ct);
-        if (user != null && existing.OrganizationId.HasValue)
+        // Check access
+        var existing = await _domainFacade.GetJobById(id);
+        var auth0Sub = GetAuth0Sub();
+        if (!string.IsNullOrEmpty(auth0Sub) && existing.OrganizationId.HasValue)
         {
-            var canAccess = await _userAccess.CanAccessOrganizationAsync(user.Id, existing.OrganizationId.Value, ct);
-            if (!canAccess) return Forbid();
+            var user = await _domainFacade.GetUserByAuth0Sub(auth0Sub);
+            if (user != null)
+            {
+                var canAccess = await _domainFacade.CanAccessOrganization(user.Id, existing.OrganizationId.Value);
+                if (!canAccess) return Forbid();
+            }
         }
 
-        var externalId = existing.ExternalJobId;
-        var deleted = await _jobs.DeleteAsync(id, ct);
-        if (!deleted) return NotFound();
-
-        await _orchestrator.DeleteJobFromOrchestratorAsync(externalId, ct);
-
+        await _domainFacade.DeleteJob(id);
         return NoContent();
     }
-}
 
-public class JobListResponse
-{
-    public IReadOnlyList<JobItem> Items { get; set; } = Array.Empty<JobItem>();
-    public int TotalCount { get; set; }
-    public int PageNumber { get; set; }
-    public int PageSize { get; set; }
-}
-
-public class CreateJobRequest
-{
-    public string ExternalJobId { get; set; } = string.Empty;
-    public string Title { get; set; } = string.Empty;
-    public string? Description { get; set; }
-    public string? Location { get; set; }
-    public string? Status { get; set; }
-    public Guid? OrganizationId { get; set; }
-}
-
-public class UpdateJobRequest
-{
-    public string? Title { get; set; }
-    public string? Description { get; set; }
-    public string? Location { get; set; }
-    public string? Status { get; set; }
-    public Guid? OrganizationId { get; set; }
+    private string? GetAuth0Sub()
+    {
+        return User?.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User?.FindFirstValue("sub");
+    }
 }

@@ -1,6 +1,6 @@
 ---
 description: "ACTIVE: DomainFacadeTests rules - Acceptance testing through DomainFacade"
-globs: apps/api/Orchestrator.AcceptanceTests/Domain/DomainFacadeTests*.cs
+globs: apps/orchestrator/Orchestrator.AcceptanceTests/Domain/DomainFacadeTests*.cs
 alwaysApply: false
 ---
 

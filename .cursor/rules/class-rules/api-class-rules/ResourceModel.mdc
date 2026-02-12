@@ -1,6 +1,6 @@
 ---
 description: "ACTIVE: ResourceModel rules - API request/response DTOs"
-globs: apps/api/Orchestrator.Api/ResourcesModels/*Resource.cs
+globs: apps/orchestrator/Orchestrator.Api/ResourcesModels/*Resource.cs
 alwaysApply: false
 ---
 

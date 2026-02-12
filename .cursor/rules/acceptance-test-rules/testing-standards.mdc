@@ -1,6 +1,6 @@
 ---
 description: Custom test doubles and DomainFacade-only testing standards
-globs: apps/api/Orchestrator.AcceptanceTests/**/*
+globs: apps/orchestrator/Orchestrator.AcceptanceTests/**/*
 alwaysApply: false
 ---
 

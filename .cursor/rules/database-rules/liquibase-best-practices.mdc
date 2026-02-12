@@ -1,6 +1,6 @@
 ---
 description: Critical naming conventions and best practices for Liquibase migrations
-globs: apps/api/Orchestrator.Database/**/*
+globs: apps/orchestrator/Orchestrator.Database/**/*
 alwaysApply: false
 ---
 

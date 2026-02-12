@@ -1,25 +1,23 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using HireologyTestAts.Api.Models;
-using HireologyTestAts.Api.Services;
+using HireologyTestAts.Api.Mappers;
+using HireologyTestAts.Api.ResourceModels;
+using HireologyTestAts.Domain;
 
 namespace HireologyTestAts.Api.Controllers;
 
 [ApiController]
-[Route("api/me")]
+[Route("api/v1/me")]
 [Produces("application/json")]
 [Authorize]
 public class MeController : ControllerBase
 {
-    private readonly ICurrentUserService _currentUser;
-    private readonly UserAccessService _userAccess;
-    private readonly UserSessionsRepository _sessions;
+    private readonly DomainFacade _domainFacade;
 
-    public MeController(ICurrentUserService currentUser, UserAccessService userAccess, UserSessionsRepository sessions)
+    public MeController(DomainFacade domainFacade)
     {
-        _currentUser = currentUser;
-        _userAccess = userAccess;
-        _sessions = sessions;
+        _domainFacade = domainFacade;
     }
 
     /// <summary>
@@ -28,20 +26,25 @@ public class MeController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(MeResponse), 200)]
     [ProducesResponseType(401)]
-    public async Task<ActionResult<MeResponse>> Get(CancellationToken ct = default)
+    public async Task<ActionResult<MeResponse>> Get()
     {
-        var user = await _currentUser.GetCurrentUserAsync(ct);
-        if (user == null) return Unauthorized();
+        var auth0Sub = GetAuth0Sub();
+        if (string.IsNullOrEmpty(auth0Sub)) return Unauthorized();
 
-        var groups = await _userAccess.GetAccessibleGroupsAsync(user.Id, ct);
-        var organizations = await _userAccess.GetAccessibleOrganizationsAsync(user.Id, ct);
-        var selectedOrganizationId = await _sessions.GetSelectedOrganizationIdAsync(user.Id, ct);
+        var email = User?.FindFirstValue(ClaimTypes.Email) ?? User?.FindFirstValue("email");
+        var name = User?.FindFirstValue(ClaimTypes.Name) ?? User?.FindFirstValue("name");
+
+        var user = await _domainFacade.GetOrCreateUser(auth0Sub, email, name);
+
+        var groups = await _domainFacade.GetAccessibleGroups(user.Id);
+        var organizations = await _domainFacade.GetAccessibleOrganizations(user.Id);
+        var selectedOrganizationId = await _domainFacade.GetSelectedOrganizationId(user.Id);
 
         return Ok(new MeResponse
         {
-            User = user,
-            AccessibleGroups = groups,
-            AccessibleOrganizations = organizations,
+            User = UserMapper.ToResource(user),
+            AccessibleGroups = GroupMapper.ToResource(groups),
+            AccessibleOrganizations = OrganizationMapper.ToResource(organizations),
             CurrentContext = new MeContextResponse { SelectedOrganizationId = selectedOrganizationId }
         });
     }
@@ -52,12 +55,17 @@ public class MeController : ControllerBase
     [HttpGet("context")]
     [ProducesResponseType(typeof(MeContextResponse), 200)]
     [ProducesResponseType(401)]
-    public async Task<ActionResult<MeContextResponse>> GetContext(CancellationToken ct = default)
+    public async Task<ActionResult<MeContextResponse>> GetContext()
     {
-        var user = await _currentUser.GetCurrentUserAsync(ct);
-        if (user == null) return Unauthorized();
+        var auth0Sub = GetAuth0Sub();
+        if (string.IsNullOrEmpty(auth0Sub)) return Unauthorized();
 
-        var selectedOrganizationId = await _sessions.GetSelectedOrganizationIdAsync(user.Id, ct);
+        var email = User?.FindFirstValue(ClaimTypes.Email) ?? User?.FindFirstValue("email");
+        var name = User?.FindFirstValue(ClaimTypes.Name) ?? User?.FindFirstValue("name");
+
+        var user = await _domainFacade.GetOrCreateUser(auth0Sub, email, name);
+
+        var selectedOrganizationId = await _domainFacade.GetSelectedOrganizationId(user.Id);
         return Ok(new MeContextResponse { SelectedOrganizationId = selectedOrganizationId });
     }
 
@@ -68,37 +76,23 @@ public class MeController : ControllerBase
     [ProducesResponseType(typeof(MeContextResponse), 200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(401)]
-    public async Task<ActionResult<MeContextResponse>> SetContext([FromBody] SetContextRequest request, CancellationToken ct = default)
+    public async Task<ActionResult<MeContextResponse>> SetContext([FromBody] SetContextResource resource)
     {
-        var user = await _currentUser.GetCurrentUserAsync(ct);
-        if (user == null) return Unauthorized();
+        var auth0Sub = GetAuth0Sub();
+        if (string.IsNullOrEmpty(auth0Sub)) return Unauthorized();
 
-        if (request.SelectedOrganizationId.HasValue)
-        {
-            var canAccess = await _userAccess.CanAccessOrganizationAsync(user.Id, request.SelectedOrganizationId.Value, ct);
-            if (!canAccess)
-                return BadRequest("You do not have access to this organization.");
-        }
+        var email = User?.FindFirstValue(ClaimTypes.Email) ?? User?.FindFirstValue("email");
+        var name = User?.FindFirstValue(ClaimTypes.Name) ?? User?.FindFirstValue("name");
 
-        await _sessions.SetSelectedOrganizationIdAsync(user.Id, request.SelectedOrganizationId, ct);
-        return Ok(new MeContextResponse { SelectedOrganizationId = request.SelectedOrganizationId });
+        var user = await _domainFacade.GetOrCreateUser(auth0Sub, email, name);
+
+        await _domainFacade.SetSelectedOrganizationId(user.Id, resource.SelectedOrganizationId);
+        return Ok(new MeContextResponse { SelectedOrganizationId = resource.SelectedOrganizationId });
     }
-}
 
-public class MeResponse
-{
-    public UserItem User { get; set; } = null!;
-    public IReadOnlyList<GroupItem> AccessibleGroups { get; set; } = Array.Empty<GroupItem>();
-    public IReadOnlyList<OrganizationItem> AccessibleOrganizations { get; set; } = Array.Empty<OrganizationItem>();
-    public MeContextResponse CurrentContext { get; set; } = null!;
-}
-
-public class MeContextResponse
-{
-    public Guid? SelectedOrganizationId { get; set; }
-}
-
-public class SetContextRequest
-{
-    public Guid? SelectedOrganizationId { get; set; }
+    private string? GetAuth0Sub()
+    {
+        return User?.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User?.FindFirstValue("sub");
+    }
 }

@@ -1,6 +1,6 @@
 ---
 description: "ACTIVE: DataFacade rules - Internal data access entry point"
-globs: apps/api/Orchestrator.Domain/Managers/DataLayer/DataFacade*.cs
+globs: apps/orchestrator/Orchestrator.Domain/Managers/DataLayer/DataFacade*.cs
 alwaysApply: false
 ---
 

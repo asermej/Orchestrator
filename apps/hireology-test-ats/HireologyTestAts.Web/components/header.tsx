@@ -31,7 +31,7 @@ export function Header() {
   const loadMe = async () => {
     setLoading(true);
     try {
-      const data = await testAtsApi.get<MeResponse>("/api/me");
+      const data = await testAtsApi.get<MeResponse>("/api/v1/me");
       setMe(data);
     } catch {
       setMe(null);
@@ -46,7 +46,7 @@ export function Header() {
 
   const setContext = async (organizationId: string | null) => {
     try {
-      await testAtsApi.put("/api/me/context", {
+      await testAtsApi.put("/api/v1/me/context", {
         selectedOrganizationId: organizationId || undefined,
       });
       await loadMe();

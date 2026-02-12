@@ -1,6 +1,6 @@
 build:
-	dotnet build apps/Orchestrator.sln
-	cd apps/web/Orchestrator.Web && npm install && npm run build
+	dotnet build apps/orchestrator/Orchestrator.sln
+	cd apps/orchestrator/Orchestrator.Web && npm install && npm run build
 
 # Build Hireology Test ATS (API + Web only; no DB step)
 build-test-ats:
@@ -8,10 +8,14 @@ build-test-ats:
 	cd apps/hireology-test-ats/HireologyTestAts.Web && npm install && npm run build
 
 test:
-	dotnet test apps/api/Orchestrator.AcceptanceTests/Orchestrator.AcceptanceTests.csproj --verbosity normal
+	dotnet test apps/orchestrator/Orchestrator.AcceptanceTests/Orchestrator.AcceptanceTests.csproj --verbosity normal
+
+# Run Hireology Test ATS acceptance tests
+test-test-ats:
+	dotnet test apps/hireology-test-ats/HireologyTestAts.AcceptanceTests/HireologyTestAts.AcceptanceTests.csproj --verbosity normal
 
 db-update:
-	liquibase --defaultsFile=apps/api/Orchestrator.Database/liquibase/config/liquibase.properties --changelog-file=apps/api/Orchestrator.Database/changelog/db.changelog-master.xml update
+	liquibase --defaultsFile=apps/orchestrator/Orchestrator.Database/liquibase/config/liquibase.properties --changelog-file=apps/orchestrator/Orchestrator.Database/changelog/db.changelog-master.xml update
 
 db-connect:
 	psql -h localhost -U postgres -d orchestrator
@@ -27,15 +31,15 @@ db-test-ats-update:
 # Dev targets: real ElevenLabs = dev-api, dev, start. Fake voice (no key) = dev-api-fake, dev-fake, start-fake.
 # Start ONLY the API server (useful for running in separate terminal)
 dev-api:
-	cd apps/api/Orchestrator.Api && ASPNETCORE_ENVIRONMENT=Development dotnet run
+	cd apps/orchestrator/Orchestrator.Api && ASPNETCORE_ENVIRONMENT=Development dotnet run
 
 # Run API with fake ElevenLabs (no API key needed)
 dev-api-fake:
-	cd apps/api/Orchestrator.Api && ASPNETCORE_ENVIRONMENT=Development Voice__UseFakeElevenLabs=true dotnet run
+	cd apps/orchestrator/Orchestrator.Api && ASPNETCORE_ENVIRONMENT=Development Voice__UseFakeElevenLabs=true dotnet run
 
 # Start ONLY the web server (useful for running in separate terminal)
 dev-web:
-	cd apps/web/Orchestrator.Web && npm run dev
+	cd apps/orchestrator/Orchestrator.Web && npm run dev
 
 # Start both API and web applications in development mode (no build)
 dev:
@@ -49,12 +53,12 @@ dev:
 	sleep 1
 
 	echo "🚀 Starting API server..."
-	cd apps/api/Orchestrator.Api
+	cd apps/orchestrator/Orchestrator.Api
 	ASPNETCORE_ENVIRONMENT=Development dotnet run 2>&1 | sed 's/^/[🔵 API] /' &
 	API_PID=$!
 
 	echo "🌐 Starting web server..."
-	cd ../../../apps/web/Orchestrator.Web
+	cd ../Orchestrator.Web
 	npm run dev 2>&1 | sed 's/^/[🟢 WEB] /' &
 	WEB_PID=$!
 
@@ -85,12 +89,12 @@ dev-fake:
 	sleep 1
 
 	echo "🚀 Starting API server (fake voice)..."
-	cd apps/api/Orchestrator.Api
+	cd apps/orchestrator/Orchestrator.Api
 	ASPNETCORE_ENVIRONMENT=Development Voice__UseFakeElevenLabs=true dotnet run 2>&1 | sed 's/^/[🔵 API] /' &
 	API_PID=$!
 
 	echo "🌐 Starting web server..."
-	cd ../../../apps/web/Orchestrator.Web
+	cd ../Orchestrator.Web
 	npm run dev 2>&1 | sed 's/^/[🟢 WEB] /' &
 	WEB_PID=$!
 
@@ -151,11 +155,11 @@ dev-all:
 	sleep 1
 
 	echo "🚀 Starting Orchestrator API (5000)..."
-	(cd apps/api/Orchestrator.Api && ASPNETCORE_ENVIRONMENT=Development dotnet run 2>&1 | sed 's/^/[🔵 API] /') &
+	(cd apps/orchestrator/Orchestrator.Api && ASPNETCORE_ENVIRONMENT=Development dotnet run 2>&1 | sed 's/^/[🔵 API] /') &
 	ORCH_API_PID=$!
 
 	echo "🌐 Starting Orchestrator Web (3000)..."
-	(cd apps/web/Orchestrator.Web && npm run dev 2>&1 | sed 's/^/[🟢 WEB] /') &
+	(cd apps/orchestrator/Orchestrator.Web && npm run dev 2>&1 | sed 's/^/[🟢 WEB] /') &
 	ORCH_WEB_PID=$!
 
 	echo "🚀 Starting Hireology Test ATS API (5001)..."
@@ -200,11 +204,11 @@ start-all:
 	sleep 1
 
 	echo "🚀 Starting Orchestrator API (5000)..."
-	(cd apps/api/Orchestrator.Api && ASPNETCORE_ENVIRONMENT=Development dotnet run 2>&1 | sed 's/^/[🔵 API] /') &
+	(cd apps/orchestrator/Orchestrator.Api && ASPNETCORE_ENVIRONMENT=Development dotnet run 2>&1 | sed 's/^/[🔵 API] /') &
 	ORCH_API_PID=$!
 
 	echo "🌐 Starting Orchestrator Web (3000)..."
-	(cd apps/web/Orchestrator.Web && npm run dev 2>&1 | sed 's/^/[🟢 WEB] /') &
+	(cd apps/orchestrator/Orchestrator.Web && npm run dev 2>&1 | sed 's/^/[🟢 WEB] /') &
 	ORCH_WEB_PID=$!
 
 	echo "🚀 Starting Hireology Test ATS API (5001)..."
@@ -247,12 +251,12 @@ start:
 	just build
 
 	echo "🚀 Starting API server..."
-	cd apps/api/Orchestrator.Api
+	cd apps/orchestrator/Orchestrator.Api
 	ASPNETCORE_ENVIRONMENT=Development dotnet run 2>&1 | sed 's/^/[🔵 API] /' &
 	API_PID=$!
 
 	echo "🌐 Starting web server..."
-	cd ../../../apps/web/Orchestrator.Web
+	cd ../Orchestrator.Web
 	npm run dev 2>&1 | sed 's/^/[🟢 WEB] /' &
 	WEB_PID=$!
 
@@ -286,12 +290,12 @@ start-fake:
 	just build
 
 	echo "🚀 Starting API server (fake voice)..."
-	cd apps/api/Orchestrator.Api
+	cd apps/orchestrator/Orchestrator.Api
 	ASPNETCORE_ENVIRONMENT=Development Voice__UseFakeElevenLabs=true dotnet run 2>&1 | sed 's/^/[🔵 API] /' &
 	API_PID=$!
 
 	echo "🌐 Starting web server..."
-	cd ../../../apps/web/Orchestrator.Web
+	cd ../Orchestrator.Web
 	npm run dev 2>&1 | sed 's/^/[🟢 WEB] /' &
 	WEB_PID=$!
 

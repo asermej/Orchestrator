@@ -1,6 +1,6 @@
 ---
 description: "ACTIVE: Validator rules - Business validation logic"
-globs: apps/api/Orchestrator.Domain/Managers/Validators/*Validator.cs
+globs: apps/orchestrator/Orchestrator.Domain/Managers/Validators/*Validator.cs
 alwaysApply: false
 ---
 

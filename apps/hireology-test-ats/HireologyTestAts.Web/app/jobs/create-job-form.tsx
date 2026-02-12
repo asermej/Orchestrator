@@ -30,7 +30,7 @@ export function CreateJobForm({ onClose, onSaved }: CreateJobFormProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    testAtsApi.get<MeResponse>("/api/me").then((me) => {
+    testAtsApi.get<MeResponse>("/api/v1/me").then((me) => {
       setOrganizations(me.accessibleOrganizations);
       if (me.currentContext?.selectedOrganizationId) {
         setOrganizationId(me.currentContext.selectedOrganizationId);
@@ -49,7 +49,7 @@ export function CreateJobForm({ onClose, onSaved }: CreateJobFormProps) {
     setSaving(true);
     setError(null);
     try {
-      await testAtsApi.post("/api/jobs", {
+      await testAtsApi.post("/api/v1/jobs", {
         externalJobId: externalJobId.trim(),
         title: title.trim(),
         description: description.trim() || null,

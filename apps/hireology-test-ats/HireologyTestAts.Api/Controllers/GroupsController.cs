@@ -1,84 +1,68 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using HireologyTestAts.Api.Models;
-using HireologyTestAts.Api.Services;
+using HireologyTestAts.Api.Mappers;
+using HireologyTestAts.Api.ResourceModels;
+using HireologyTestAts.Domain;
 
 namespace HireologyTestAts.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/v1/[controller]")]
 [Produces("application/json")]
 [Authorize]
 public class GroupsController : ControllerBase
 {
-    private readonly GroupsRepository _groups;
+    private readonly DomainFacade _domainFacade;
 
-    public GroupsController(GroupsRepository groups)
+    public GroupsController(DomainFacade domainFacade)
     {
-        _groups = groups;
+        _domainFacade = domainFacade;
     }
 
     [HttpGet]
-    [ProducesResponseType(typeof(IReadOnlyList<GroupItem>), 200)]
-    public async Task<ActionResult<IReadOnlyList<GroupItem>>> List(CancellationToken ct = default)
+    [ProducesResponseType(typeof(IReadOnlyList<GroupResource>), 200)]
+    public async Task<ActionResult<IReadOnlyList<GroupResource>>> List()
     {
-        var items = await _groups.ListAsync(ct);
-        return Ok(items);
+        var groups = await _domainFacade.GetGroups();
+        return Ok(GroupMapper.ToResource(groups));
     }
 
     [HttpGet("{id:guid}")]
-    [ProducesResponseType(typeof(GroupItem), 200)]
+    [ProducesResponseType(typeof(GroupResource), 200)]
     [ProducesResponseType(404)]
-    public async Task<ActionResult<GroupItem>> GetById(Guid id, CancellationToken ct = default)
+    public async Task<ActionResult<GroupResource>> GetById(Guid id)
     {
-        var item = await _groups.GetByIdAsync(id, ct);
-        if (item == null) return NotFound();
-        return Ok(item);
+        var group = await _domainFacade.GetGroupById(id);
+        return Ok(GroupMapper.ToResource(group));
     }
 
     [HttpPost]
-    [ProducesResponseType(typeof(GroupItem), 201)]
+    [ProducesResponseType(typeof(GroupResource), 201)]
     [ProducesResponseType(400)]
-    public async Task<ActionResult<GroupItem>> Create([FromBody] CreateGroupRequest request, CancellationToken ct = default)
+    public async Task<ActionResult<GroupResource>> Create([FromBody] CreateGroupResource resource)
     {
-        if (string.IsNullOrWhiteSpace(request.Name))
-            return BadRequest("Name is required");
-
-        var group = new GroupItem { Name = request.Name.Trim() };
-        var created = await _groups.CreateAsync(group, ct);
-        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        var group = GroupMapper.ToDomain(resource);
+        var created = await _domainFacade.CreateGroup(group);
+        var response = GroupMapper.ToResource(created);
+        return CreatedAtAction(nameof(GetById), new { id = response.Id }, response);
     }
 
     [HttpPut("{id:guid}")]
-    [ProducesResponseType(typeof(GroupItem), 200)]
+    [ProducesResponseType(typeof(GroupResource), 200)]
     [ProducesResponseType(404)]
-    public async Task<ActionResult<GroupItem>> Update(Guid id, [FromBody] UpdateGroupRequest request, CancellationToken ct = default)
+    public async Task<ActionResult<GroupResource>> Update(Guid id, [FromBody] UpdateGroupResource resource)
     {
-        var existing = await _groups.GetByIdAsync(id, ct);
-        if (existing == null) return NotFound();
-        if (!string.IsNullOrWhiteSpace(request.Name)) existing.Name = request.Name.Trim();
-        var updated = await _groups.UpdateAsync(existing, ct);
-        if (updated == null) return NotFound();
-        return Ok(updated);
+        var updates = GroupMapper.ToDomain(resource);
+        var updated = await _domainFacade.UpdateGroup(id, updates);
+        return Ok(GroupMapper.ToResource(updated));
     }
 
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(204)]
     [ProducesResponseType(404)]
-    public async Task<ActionResult> Delete(Guid id, CancellationToken ct = default)
+    public async Task<ActionResult> Delete(Guid id)
     {
-        var deleted = await _groups.DeleteAsync(id, ct);
-        if (!deleted) return NotFound();
+        await _domainFacade.DeleteGroup(id);
         return NoContent();
     }
-}
-
-public class CreateGroupRequest
-{
-    public string Name { get; set; } = string.Empty;
-}
-
-public class UpdateGroupRequest
-{
-    public string? Name { get; set; }
 }

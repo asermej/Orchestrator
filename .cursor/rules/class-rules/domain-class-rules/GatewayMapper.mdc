@@ -1,6 +1,6 @@
 ---
 description: "ACTIVE: GatewayMapper rules - External API model mapping"
-globs: apps/api/Orchestrator.Domain/Gateways/Mappers/*.cs
+globs: apps/orchestrator/Orchestrator.Domain/Gateways/Mappers/*.cs
 alwaysApply: false
 ---
 

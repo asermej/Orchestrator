@@ -43,7 +43,7 @@ jobs:
       with:
         node-version: '18'
         cache: 'npm'
-        cache-dependency-path: apps/web/Platform.Web/package-lock.json
+        cache-dependency-path: apps/orchestrator/Orchestrator.Web/package-lock.json
 
     - name: Install just
       uses: extractions/setup-just@v2
@@ -81,17 +81,33 @@ jobs:
         rm -rf /tmp/liquibase-install
 
     - name: Install web dependencies
-      run: cd apps/web/Platform.Web && npm ci
+      run: cd apps/orchestrator/Orchestrator.Web && npm ci
 
-    - name: Build
+    - name: Build Orchestrator
       run: just build
 
-    - name: Run Database Migrations
+    - name: Build Hireology Test ATS
+      run: just build-test-ats
+
+    - name: Create Test ATS Database
+      run: PGPASSWORD=${{ env.POSTGRES_PASSWORD }} psql -h localhost -U ${{ env.POSTGRES_USER }} -d ${{ env.POSTGRES_DB }} -c "CREATE DATABASE test_ats;" || true
+
+    - name: Run Orchestrator Database Migrations
       run: just db-update
       env:
         PGPASSWORD: ${{ env.POSTGRES_PASSWORD }}
 
-    - name: Test
+    - name: Run Test ATS Database Migrations
+      run: just db-test-ats-update
+      env:
+        PGPASSWORD: ${{ env.POSTGRES_PASSWORD }}
+
+    - name: Test Orchestrator
       run: just test
       env:
-        ConnectionStrings__DbConnectionString: "Host=localhost;Port=5432;Database=${{ env.POSTGRES_DB }};Username=${{ env.POSTGRES_USER }};Password=${{ env.POSTGRES_PASSWORD }}" 
+        ConnectionStrings__DbConnectionString: "Host=localhost;Port=5432;Database=${{ env.POSTGRES_DB }};Username=${{ env.POSTGRES_USER }};Password=${{ env.POSTGRES_PASSWORD }}"
+
+    - name: Test Hireology Test ATS
+      run: just test-test-ats
+      env:
+        ConnectionStrings__HireologyTestAts: "Host=localhost;Port=5432;Database=test_ats;Username=${{ env.POSTGRES_USER }};Password=${{ env.POSTGRES_PASSWORD }}" 

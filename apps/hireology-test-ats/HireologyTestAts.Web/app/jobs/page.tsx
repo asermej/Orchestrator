@@ -35,7 +35,7 @@ export default function JobsPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await testAtsApi.get<JobListResponse>("/api/jobs?pageNumber=1&pageSize=100");
+      const data = await testAtsApi.get<JobListResponse>("/api/v1/jobs?pageNumber=1&pageSize=100");
       setJobs(data.items);
       setTotalCount(data.totalCount);
     } catch (e) {

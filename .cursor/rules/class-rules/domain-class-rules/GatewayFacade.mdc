@@ -1,6 +1,6 @@
 ---
 description: "ACTIVE: GatewayFacade rules - External API integration entry point"
-globs: apps/api/Orchestrator.Domain/Gateways/GatewayFacade*.cs
+globs: apps/orchestrator/Orchestrator.Domain/Gateways/GatewayFacade*.cs
 alwaysApply: false
 ---
 

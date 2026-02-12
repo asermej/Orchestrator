@@ -177,5 +177,5 @@ dev-debug.log
 #end of taskmaster
 
 # Training data (persona and topic training files)
-apps/api/training-data/**/*.txt
-!apps/api/training-data/README.md
+apps/orchestrator/training-data/**/*.txt
+!apps/orchestrator/training-data/README.md

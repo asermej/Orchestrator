@@ -1,101 +1,68 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using HireologyTestAts.Api.Models;
-using HireologyTestAts.Api.Services;
+using HireologyTestAts.Api.Mappers;
+using HireologyTestAts.Api.ResourceModels;
+using HireologyTestAts.Domain;
 
 namespace HireologyTestAts.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/v1/[controller]")]
 [Produces("application/json")]
 [Authorize]
 public class OrganizationsController : ControllerBase
 {
-    private readonly OrganizationsRepository _organizations;
+    private readonly DomainFacade _domainFacade;
 
-    public OrganizationsController(OrganizationsRepository organizations)
+    public OrganizationsController(DomainFacade domainFacade)
     {
-        _organizations = organizations;
+        _domainFacade = domainFacade;
     }
 
     [HttpGet]
-    [ProducesResponseType(typeof(IReadOnlyList<OrganizationItem>), 200)]
-    public async Task<ActionResult<IReadOnlyList<OrganizationItem>>> List([FromQuery] Guid? groupId, CancellationToken ct = default)
+    [ProducesResponseType(typeof(IReadOnlyList<OrganizationResource>), 200)]
+    public async Task<ActionResult<IReadOnlyList<OrganizationResource>>> List([FromQuery] Guid? groupId)
     {
-        var items = await _organizations.ListAsync(groupId, ct);
-        return Ok(items);
+        var orgs = await _domainFacade.GetOrganizations(groupId);
+        return Ok(OrganizationMapper.ToResource(orgs));
     }
 
     [HttpGet("{id:guid}")]
-    [ProducesResponseType(typeof(OrganizationItem), 200)]
+    [ProducesResponseType(typeof(OrganizationResource), 200)]
     [ProducesResponseType(404)]
-    public async Task<ActionResult<OrganizationItem>> GetById(Guid id, CancellationToken ct = default)
+    public async Task<ActionResult<OrganizationResource>> GetById(Guid id)
     {
-        var item = await _organizations.GetByIdAsync(id, ct);
-        if (item == null) return NotFound();
-        return Ok(item);
+        var org = await _domainFacade.GetOrganizationById(id);
+        return Ok(OrganizationMapper.ToResource(org));
     }
 
     [HttpPost]
-    [ProducesResponseType(typeof(OrganizationItem), 201)]
+    [ProducesResponseType(typeof(OrganizationResource), 201)]
     [ProducesResponseType(400)]
-    public async Task<ActionResult<OrganizationItem>> Create([FromBody] CreateOrganizationRequest request, CancellationToken ct = default)
+    public async Task<ActionResult<OrganizationResource>> Create([FromBody] CreateOrganizationResource resource)
     {
-        if (string.IsNullOrWhiteSpace(request.Name))
-            return BadRequest("Name is required");
-        if (request.GroupId == Guid.Empty)
-            return BadRequest("GroupId is required");
-
-        var org = new OrganizationItem
-        {
-            GroupId = request.GroupId,
-            Name = request.Name.Trim(),
-            City = request.City?.Trim(),
-            State = request.State?.Trim()
-        };
-        var created = await _organizations.CreateAsync(org, ct);
-        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        var org = OrganizationMapper.ToDomain(resource);
+        var created = await _domainFacade.CreateOrganization(org);
+        var response = OrganizationMapper.ToResource(created);
+        return CreatedAtAction(nameof(GetById), new { id = response.Id }, response);
     }
 
     [HttpPut("{id:guid}")]
-    [ProducesResponseType(typeof(OrganizationItem), 200)]
+    [ProducesResponseType(typeof(OrganizationResource), 200)]
     [ProducesResponseType(404)]
-    public async Task<ActionResult<OrganizationItem>> Update(Guid id, [FromBody] UpdateOrganizationRequest request, CancellationToken ct = default)
+    public async Task<ActionResult<OrganizationResource>> Update(Guid id, [FromBody] UpdateOrganizationResource resource)
     {
-        var existing = await _organizations.GetByIdAsync(id, ct);
-        if (existing == null) return NotFound();
-        if (request.GroupId.HasValue && request.GroupId.Value != Guid.Empty) existing.GroupId = request.GroupId.Value;
-        if (!string.IsNullOrWhiteSpace(request.Name)) existing.Name = request.Name.Trim();
-        if (request.City != null) existing.City = request.City.Trim();
-        if (request.State != null) existing.State = request.State.Trim();
-        var updated = await _organizations.UpdateAsync(existing, ct);
-        if (updated == null) return NotFound();
-        return Ok(updated);
+        var updates = OrganizationMapper.ToDomain(resource);
+        var updated = await _domainFacade.UpdateOrganization(id, updates);
+        return Ok(OrganizationMapper.ToResource(updated));
     }
 
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(204)]
     [ProducesResponseType(404)]
-    public async Task<ActionResult> Delete(Guid id, CancellationToken ct = default)
+    public async Task<ActionResult> Delete(Guid id)
     {
-        var deleted = await _organizations.DeleteAsync(id, ct);
-        if (!deleted) return NotFound();
+        await _domainFacade.DeleteOrganization(id);
         return NoContent();
     }
-}
-
-public class CreateOrganizationRequest
-{
-    public Guid GroupId { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string? City { get; set; }
-    public string? State { get; set; }
-}
-
-public class UpdateOrganizationRequest
-{
-    public Guid? GroupId { get; set; }
-    public string? Name { get; set; }
-    public string? City { get; set; }
-    public string? State { get; set; }
 }

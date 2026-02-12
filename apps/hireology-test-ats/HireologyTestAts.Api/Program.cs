@@ -1,3 +1,5 @@
+using HireologyTestAts.Domain;
+using HireologyTestAts.Api.Middleware;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -11,56 +13,34 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
     serverOptions.ListenLocalhost(5001);
 });
 
-var auth0Authority = builder.Configuration["Auth0:Authority"];
-var auth0Audience = builder.Configuration["Auth0:Audience"];
-
-builder.Services.AddHttpContextAccessor();
-builder.Services.AddControllers();
-builder.Services.AddScoped<HireologyTestAts.Api.Services.JobsRepository>();
-builder.Services.AddScoped<HireologyTestAts.Api.Services.GroupsRepository>();
-builder.Services.AddScoped<HireologyTestAts.Api.Services.OrganizationsRepository>();
-builder.Services.AddScoped<HireologyTestAts.Api.Services.UsersRepository>();
-builder.Services.AddScoped<HireologyTestAts.Api.Services.ICurrentUserService, HireologyTestAts.Api.Services.CurrentUserService>();
-builder.Services.AddScoped<HireologyTestAts.Api.Services.UserSessionsRepository>();
-builder.Services.AddScoped<HireologyTestAts.Api.Services.UserAccessService>();
-builder.Services.AddScoped<HireologyTestAts.Api.Services.UserAccessRepository>();
-builder.Services.AddHttpClient<HireologyTestAts.Api.Services.OrchestratorSyncService>();
-builder.Services.AddHttpClient<HireologyTestAts.Api.Services.OrchestratorUserProvisioningService>();
-
-bool auth0Configured = !string.IsNullOrEmpty(auth0Authority) && !string.IsNullOrEmpty(auth0Audience);
-
-if (auth0Configured)
-{
-    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-        .AddJwtBearer(options =>
-        {
-            options.Authority = auth0Authority!.TrimEnd('/') + "/";
-            options.Audience = auth0Audience;
-            options.TokenValidationParameters = new TokenValidationParameters
-            {
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateLifetime = true,
-                ValidAlgorithms = new[] { "RS256" }
-            };
-        });
-    builder.Services.AddAuthorization();
-}
-else
-{
-    // No Auth0 config: let all requests through so the app runs until you set Auth0:Authority and Auth0:Audience
-    builder.Services.AddAuthentication(DevSkipAuthHandler.SchemeName)
-        .AddScheme<AuthenticationSchemeOptions, DevSkipAuthHandler>(DevSkipAuthHandler.SchemeName, _ => { });
-    builder.Services.AddAuthorization();
-}
-
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
+// Add services
+builder.Services.AddControllers()
+    .ConfigureApiBehaviorOptions(options =>
     {
-        policy.WithOrigins("http://localhost:3001").AllowAnyMethod().AllowAnyHeader();
+        // Customize model validation error responses to match our ErrorResponse format
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var errors = context.ModelState
+                .Where(e => e.Value?.Errors.Count > 0)
+                .Select(e => $"{e.Key}: {string.Join(", ", e.Value!.Errors.Select(x => x.ErrorMessage))}")
+                .ToList();
+
+            var errorResponse = new HireologyTestAts.Api.Common.ErrorResponse
+            {
+                StatusCode = 400,
+                Message = errors.Count > 0 ? string.Join("; ", errors) : "Validation failed",
+                ExceptionType = "ValidationException",
+                IsBusinessException = true,
+                IsTechnicalException = false,
+                Timestamp = DateTime.UtcNow
+            };
+
+            return new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(errorResponse)
+            {
+                StatusCode = 400
+            };
+        };
     });
-});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -70,13 +50,101 @@ builder.Services.AddSwaggerGen(c =>
         Version = "v1",
         Description = "Test applicant tracking system for Orchestrator integration testing"
     });
+
+    // Add JWT authentication to Swagger
+    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token.",
+        Name = "Authorization",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
+    });
+
+    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
 });
+
+// Auth0 JWT Authentication
+var auth0Authority = builder.Configuration["Auth0:Authority"];
+var auth0Audience = builder.Configuration["Auth0:Audience"];
+bool auth0Configured = !string.IsNullOrEmpty(auth0Authority)
+    && !string.IsNullOrEmpty(auth0Audience)
+    && !auth0Authority.Contains("your-tenant");
+
+if (auth0Configured)
+{
+    var domain = auth0Authority!.TrimEnd('/') + "/";
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            options.Authority = domain;
+            options.Audience = auth0Audience;
+
+            options.MetadataAddress = $"{domain}.well-known/openid-configuration";
+
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                NameClaimType = "sub",
+                ValidateIssuer = true,
+                ValidIssuer = domain,
+                ValidateAudience = true,
+                ValidAudience = auth0Audience,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ClockSkew = TimeSpan.FromMinutes(5),
+                RequireSignedTokens = true
+            };
+
+            options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+            {
+                OnAuthenticationFailed = context =>
+                {
+                    return Task.CompletedTask;
+                }
+            };
+        });
+    builder.Services.AddAuthorization();
+}
+else
+{
+    // No Auth0 config: let all requests through so the app runs until Auth0 is configured
+    builder.Services.AddAuthentication(DevSkipAuthHandler.SchemeName)
+        .AddScheme<AuthenticationSchemeOptions, DevSkipAuthHandler>(DevSkipAuthHandler.SchemeName, _ => { });
+    builder.Services.AddAuthorization();
+}
+
+// Add CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowTestAtsWeb", policy =>
+    {
+        policy.WithOrigins("http://localhost:3001")
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
+    });
+});
+
+builder.Services.AddScoped<DomainFacade>();
+
+builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 
-app.UseCors();
-app.UseAuthentication();
-app.UseAuthorization();
+// Middleware pipeline (aligned with Orchestrator)
 
 if (app.Environment.IsDevelopment())
 {
@@ -84,6 +152,43 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UsePlatformExceptionHandling();
+
+// Add clean request logging middleware (development only) - AFTER exception handling
+if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName.Equals("dev", StringComparison.OrdinalIgnoreCase))
+{
+    app.Use(async (context, next) =>
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var method = context.Request.Method;
+        var path = context.Request.Path + context.Request.QueryString;
+
+        await next();
+        stopwatch.Stop();
+
+        var statusCode = context.Response.StatusCode;
+        var emoji = statusCode switch
+        {
+            >= 200 and < 300 => "✓",
+            >= 400 and < 500 => "⚠",
+            >= 500 => "✗",
+            _ => "•"
+        };
+
+        Console.WriteLine($"{emoji} [{method}] {path} → {statusCode} ({stopwatch.ElapsedMilliseconds}ms)");
+    });
+}
+
+// Only use HTTPS redirection in production
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
+app.UseCors("AllowTestAtsWeb");
+
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
 
 // Health endpoint (no auth)

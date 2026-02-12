@@ -20,7 +20,7 @@ export default function GroupsPage() {
     setLoading(true);
     setError(null);
     try {
-      const list = await testAtsApi.get<Group[]>("/api/groups");
+      const list = await testAtsApi.get<Group[]>("/api/v1/groups");
       setGroups(list);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load groups");
@@ -38,7 +38,7 @@ export default function GroupsPage() {
     if (!newName.trim()) return;
     setError(null);
     try {
-      await testAtsApi.post("/api/groups", { name: newName.trim() });
+      await testAtsApi.post("/api/v1/groups", { name: newName.trim() });
       setNewName("");
       await load();
     } catch (e) {
@@ -50,7 +50,7 @@ export default function GroupsPage() {
     if (!editName.trim()) return;
     setError(null);
     try {
-      await testAtsApi.put(`/api/groups/${id}`, { name: editName.trim() });
+      await testAtsApi.put(`/api/v1/groups/${id}`, { name: editName.trim() });
       setEditingId(null);
       setEditName("");
       await load();
@@ -63,7 +63,7 @@ export default function GroupsPage() {
     if (!confirm("Delete this group?")) return;
     setError(null);
     try {
-      await testAtsApi.delete(`/api/groups/${id}`);
+      await testAtsApi.delete(`/api/v1/groups/${id}`);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete");

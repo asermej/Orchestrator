@@ -1,6 +1,6 @@
 ---
 description: Standard procedures for creating and updating database tables using Liquibase
-globs: apps/api/Orchestrator.Database/**/*
+globs: apps/orchestrator/Orchestrator.Database/**/*
 alwaysApply: false
 ---
 

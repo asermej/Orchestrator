@@ -1,6 +1,6 @@
 ---
 description: "ACTIVE: Manager rules - Core business logic implementation"
-globs: apps/api/Orchestrator.Domain/Managers/*Manager.cs
+globs: apps/orchestrator/Orchestrator.Domain/Managers/*Manager.cs
 alwaysApply: false
 ---
 

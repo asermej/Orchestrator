@@ -9,9 +9,9 @@ This document provides context for understanding the database schema and domain 
 | Resource | Location | Purpose |
 |----------|----------|---------|
 | Schema Summary | [`database-schema-summary.md`](database-schema-summary.md) | Current database tables and columns |
-| Entity Base Class | [`Entity.cs`](../../../apps/api/Orchestrator.Domain/Managers/Models/Entity.cs) | Base class all entities inherit from |
-| Domain Models | `apps/api/Orchestrator.Domain/Managers/Models/` | C# entity definitions with column mappings |
-| Liquibase Changelog | `apps/api/Orchestrator.Database/changelog/changes/` | Schema migration history |
+| Entity Base Class | [`Entity.cs`](../../../apps/orchestrator/Orchestrator.Domain/Managers/Models/Entity.cs) | Base class all entities inherit from |
+| Domain Models | `apps/orchestrator/Orchestrator.Domain/Managers/Models/` | C# entity definitions with column mappings |
+| Liquibase Changelog | `apps/orchestrator/Orchestrator.Database/changelog/changes/` | Schema migration history |
 
 ---
 
@@ -30,7 +30,7 @@ just update-db-context
 
 ## B. Entity Base Class
 
-**File**: [`Entity.cs`](../../../apps/api/Orchestrator.Domain/Managers/Models/Entity.cs)
+**File**: [`Entity.cs`](../../../apps/orchestrator/Orchestrator.Domain/Managers/Models/Entity.cs)
 
 All domain entities **must inherit from `Entity`**. This base class provides standard audit and soft-delete fields:
 
@@ -51,7 +51,7 @@ Your Liquibase migration **must include these columns** in the table definition.
 
 ## C. Domain Model Patterns
 
-**Location**: `apps/api/Orchestrator.Domain/Managers/Models/`
+**Location**: `apps/orchestrator/Orchestrator.Domain/Managers/Models/`
 
 Examine existing models to understand naming conventions and patterns.
 
@@ -69,8 +69,8 @@ Examine existing models to understand naming conventions and patterns.
 
 | File | Location |
 |------|----------|
-| Master Changelog | `apps/api/Orchestrator.Database/changelog/db.changelog-master.xml` |
-| Change Files | `apps/api/Orchestrator.Database/changelog/changes/` |
+| Master Changelog | `apps/orchestrator/Orchestrator.Database/changelog/db.changelog-master.xml` |
+| Change Files | `apps/orchestrator/Orchestrator.Database/changelog/changes/` |
 
 Files are named with timestamps: `YYYYMMDDHHMMSS-description.xml`
 

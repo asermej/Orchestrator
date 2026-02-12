@@ -28,25 +28,25 @@ Before proceeding with any request, validate:
   - `acceptance-tests-class-rules/` - Test classes (DomainFacadeTests)
 
 ### 2. 🔧 API Layer Rules (Backend Development)
-- **Location**: `apps/api/.cursor/`
+- **Location**: `apps/orchestrator/.cursor/`
 - **[Core Principles](docs/technical/reference/core/principles.md)** - Validation, exceptions, facades, domain patterns
 - **[Endpoint Workflow](.cursor/commands/new-endpoint.md)** - 8-phase interactive feature creation process (use `/new-endpoint` command)
 - **[Security & Performance](docs/technical/reference/core/security-performance.md)** - Security standards and performance requirements
 - **Templates**: `docs/technical/templates/domain-templates/`, `docs/technical/templates/api-templates/` - Code generation templates for backend components
 
 ### 3. 🗄️ Database Layer Rules (Schema & Migrations)
-- **Location**: `.cursor/rules/database-rules/` (glob-targeted to `apps/api/Orchestrator.Database/**/*`)
+- **Location**: `.cursor/rules/database-rules/` (glob-targeted to `apps/orchestrator/Orchestrator.Database/**/*`)
 - **[Database Workflow](mdc:.cursor/rules/database-rules/database-workflow.mdc)** - Table creation and migration process
 - **[Liquibase Best Practices](mdc:.cursor/rules/database-rules/liquibase-best-practices.mdc)** - Migration standards and naming
 - **Templates**: `docs/technical/templates/database-templates/` - Liquibase migration templates
 
 ### 4. 🧪 Testing Layer Rules (Acceptance Tests)
-- **Location**: `.cursor/rules/acceptance-test-rules/` (glob-targeted to `apps/api/Orchestrator.AcceptanceTests/**/*`)
+- **Location**: `.cursor/rules/acceptance-test-rules/` (glob-targeted to `apps/orchestrator/Orchestrator.AcceptanceTests/**/*`)
 - **[Testing Standards](mdc:.cursor/rules/acceptance-test-rules/testing-standards.mdc)** - Custom test doubles, DomainFacade-only testing
 - **CRITICAL**: Only test through DomainFacade interface
 
 ### 5. 🌐 Web Layer Rules (Frontend Development)
-- **Location**: `apps/web/Orchestrator.Web/.cursor/` (when applicable)
+- **Location**: `apps/orchestrator/Orchestrator.Web/.cursor/` (when applicable)
 - Frontend-specific patterns and components
 
 ## 🎯 Quick Task Reference
@@ -111,7 +111,7 @@ Before starting work, ask yourself:
 User: "I want to create a Customer management feature"
 
 AI: "I see you want to create a Customer feature. Let me validate my approach:
-1. ✅ Found .cursor folders at: root, apps/api
+1. ✅ Found .cursor folders at: root, apps/orchestrator
 2. ✅ This is API feature work, so I should use: /new-endpoint command
 3. ✅ I should use templates from: docs/technical/templates/domain-templates/ and docs/technical/templates/api-templates/
 4. ✅ I need to follow the 8-phase interactive process

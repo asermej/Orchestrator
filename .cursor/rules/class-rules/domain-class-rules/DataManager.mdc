@@ -1,6 +1,6 @@
 ---
 description: "ACTIVE: DataManager rules - SQL data access implementation"
-globs: apps/api/Orchestrator.Domain/Managers/DataLayer/DataManagers/*DataManager.cs
+globs: apps/orchestrator/Orchestrator.Domain/Managers/DataLayer/DataManagers/*DataManager.cs
 alwaysApply: false
 ---
 

@@ -33,16 +33,21 @@ Orchestrator/
 ├── README.md                          # This file
 ├── justfile                           # Build automation
 ├── apps/
-│   ├── Orchestrator.sln                   # .NET Solution
-│   ├── api/                          # Backend Services
-│   │   ├── README.md                 # → API Documentation
+│   ├── orchestrator/                     # Orchestrator Platform
+│   │   ├── Orchestrator.sln              # .NET Solution
+│   │   ├── README.md                     # → API Documentation
 │   │   ├── Orchestrator.Api/             # HTTP API Layer
-│   │   ├── Orchestrator.Domain/     # Business Logic
+│   │   ├── Orchestrator.Domain/          # Business Logic
 │   │   ├── Orchestrator.AcceptanceTests/ # Integration Tests
-│   │   └── Orchestrator.Database/        # Database Migrations
-│   └── web/                          # Frontend Application
-│       ├── README.md                 # → Web Documentation
-│       └── Orchestrator.Web/             # Next.js Application
+│   │   ├── Orchestrator.Database/        # Database Migrations
+│   │   └── Orchestrator.Web/             # Next.js Application
+│   └── hireology-test-ats/               # Hireology Test ATS
+│       ├── HireologyTestAts.sln          # .NET Solution
+│       ├── HireologyTestAts.Api/         # HTTP API Layer
+│       ├── HireologyTestAts.Domain/      # Business Logic
+│       ├── HireologyTestAts.AcceptanceTests/ # Integration Tests
+│       ├── HireologyTestAts.Database/    # Database Migrations
+│       └── HireologyTestAts.Web/         # Next.js Application
 ├── .github/
 │   └── workflows/
 │       └── build.yml                 # CI/CD Pipeline
@@ -86,18 +91,18 @@ brew install liquibase
 4. **Configure secrets (first time setup):**
    ```bash
    # Initialize user secrets
-   dotnet user-secrets init --project ./apps/api/Orchestrator.Api/Orchestrator.Api.csproj
+   dotnet user-secrets init --project ./apps/orchestrator/Orchestrator.Api/Orchestrator.Api.csproj
 
    # Set database connection string
    dotnet user-secrets set "ConnectionStrings:DbConnectionString" \
      "Host=localhost;Port=5432;Database=surrova;Username=postgres;Password=postgres" \
-     --project ./apps/api/Orchestrator.Api/Orchestrator.Api.csproj
+     --project ./apps/orchestrator/Orchestrator.Api/Orchestrator.Api.csproj
 
    # Set Azure Blob Storage connection string (required for image uploads)
    dotnet user-secrets set "Storage:BlobConnectionString" "<YOUR_AZURE_BLOB_CONNECTION_STRING>" \
-     --project ./apps/api/Orchestrator.Api/Orchestrator.Api.csproj
+     --project ./apps/orchestrator/Orchestrator.Api/Orchestrator.Api.csproj
 
-   # Set other required secrets (see apps/api/README.md for full list)
+   # Set other required secrets (see apps/orchestrator/README.md for full list)
    ```
 
 5. **Run database migrations:**
@@ -140,7 +145,7 @@ Persona voice selection and custom voice cloning use **ElevenLabs**. You can:
 
 **Local development:**
 
-- **Real ElevenLabs:** Set the ElevenLabs API key (see [API Documentation](apps/api/README.md#voice-features-elevenlabs)) and run `just dev` or `just start`. Voice list, preview, and cloning will use the live API.
+- **Real ElevenLabs:** Set the ElevenLabs API key (see [API Documentation](apps/orchestrator/README.md#voice-features-elevenlabs)) and run `just dev` or `just start`. Voice list, preview, and cloning will use the live API.
 - **Fake mode (no API key):** Run `just dev-fake`, `just start-fake`, or `just dev-api-fake`. The API returns deterministic fake voices and skips real ElevenLabs calls. Use this when you don’t have an API key or for quick UI testing.
 
 **Acceptance tests** run with fake voice enabled so they don’t call ElevenLabs.
@@ -148,8 +153,8 @@ Persona voice selection and custom voice cloning use **ElevenLabs**. You can:
 ## 📚 Documentation
 
 ### Application-Specific Documentation
-- **[API Documentation](apps/api/README.md)** - .NET API, Domain Layer, and Database
-- **[Web Documentation](apps/web/Orchestrator.Web/README.md)** - Next.js Frontend Application
+- **[API Documentation](apps/orchestrator/README.md)** - .NET API, Domain Layer, and Database
+- **[Web Documentation](apps/orchestrator/Orchestrator.Web/README.md)** - Next.js Frontend Application
 
 ### Architecture Documentation
 - **Clean Architecture**: Domain-driven design with clear separation of concerns
@@ -228,9 +233,9 @@ The project uses distributed Cursor rules and templates across different compone
 
 #### 🔧 Component-Specific Rules & Templates
 
-- **[API Rules & Templates](apps/api/README.md#cursor-rules--templates)** - .NET API development patterns
-- **[Database Rules & Templates](apps/api/README.md#database-rules--templates)** - Liquibase and database patterns
-- **[Web Rules](apps/web/Orchestrator.Web/README.md#cursor-rules)** - Next.js and React development patterns
+- **[API Rules & Templates](apps/orchestrator/README.md#cursor-rules--templates)** - .NET API development patterns
+- **[Database Rules & Templates](apps/orchestrator/README.md#database-rules--templates)** - Liquibase and database patterns
+- **[Web Rules](apps/orchestrator/Orchestrator.Web/README.md#cursor-rules)** - Next.js and React development patterns
 
 Each component maintains its own specific rules and code generation templates for consistent development patterns.
 
@@ -347,6 +352,6 @@ MCP servers are configured in `.cursor/mcp.json`:
 ---
 
 **Quick Navigation:**
-- [API Documentation →](apps/api/README.md)
-- [Web Documentation →](apps/web/Orchestrator.Web/README.md)
+- [API Documentation →](apps/orchestrator/README.md)
+- [Web Documentation →](apps/orchestrator/Orchestrator.Web/README.md)
 - [GitHub Actions →](.github/workflows/build.yml) 

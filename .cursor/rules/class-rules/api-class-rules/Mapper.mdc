@@ -1,6 +1,6 @@
 ---
 description: "ACTIVE: Mapper rules - API to Domain model mapping"
-globs: apps/api/Orchestrator.Api/Mappers/*Mapper.cs
+globs: apps/orchestrator/Orchestrator.Api/Mappers/*Mapper.cs
 alwaysApply: false
 ---
 

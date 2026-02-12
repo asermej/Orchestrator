@@ -1,6 +1,6 @@
 ---
 description: "ACTIVE: Controller rules - HTTP API endpoints"
-globs: apps/api/Orchestrator.Api/Controllers/*Controller.cs
+globs: apps/orchestrator/Orchestrator.Api/Controllers/*Controller.cs
 alwaysApply: false
 ---
 

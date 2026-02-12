@@ -1,6 +1,6 @@
 ---
 description: "ACTIVE: ServiceLocator rules - Dependency resolution"
-globs: apps/api/Orchestrator.Domain/Managers/ServiceLocators/ServiceLocator*.cs
+globs: apps/orchestrator/Orchestrator.Domain/Managers/ServiceLocators/ServiceLocator*.cs
 alwaysApply: false
 ---
 

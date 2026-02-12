@@ -1,6 +1,6 @@
 ---
 description: "ACTIVE: Exception rules - Custom domain exceptions"
-globs: apps/api/Orchestrator.Domain/Managers/Exceptions/*Exception.cs
+globs: apps/orchestrator/Orchestrator.Domain/Managers/Exceptions/*Exception.cs
 alwaysApply: false
 ---
 

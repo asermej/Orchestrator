@@ -47,15 +47,15 @@ export default function UsersPage() {
       totalCount: number;
       pageNumber: number;
       pageSize: number;
-    }>(`/api/users?pageNumber=${page}&pageSize=${pageSize}`);
+    }>(`/api/v1/users?pageNumber=${page}&pageSize=${pageSize}`);
     setUsers(res.items);
     setTotalCount(res.totalCount);
   };
 
   const loadGroupsAndOrgs = async () => {
     const [gList, oList] = await Promise.all([
-      testAtsApi.get<Group[]>("/api/groups"),
-      testAtsApi.get<Organization[]>("/api/organizations"),
+      testAtsApi.get<Group[]>("/api/v1/groups"),
+      testAtsApi.get<Organization[]>("/api/v1/organizations"),
     ]);
     setGroups(gList);
     setOrganizations(oList);
@@ -80,7 +80,7 @@ export default function UsersPage() {
 
   const openEdit = async (id: string) => {
     try {
-      const data = await testAtsApi.get<UserWithAccess>(`/api/users/${id}`);
+      const data = await testAtsApi.get<UserWithAccess>(`/api/v1/users/${id}`);
       setEditingId(id);
       setEditGroupIds(data.groupIds);
       setEditOrganizationIds(data.organizationIds);
@@ -93,7 +93,7 @@ export default function UsersPage() {
     if (!editingId) return;
     setError(null);
     try {
-      await testAtsApi.put(`/api/users/${editingId}/access`, {
+      await testAtsApi.put(`/api/v1/users/${editingId}/access`, {
         groupIds: editGroupIds,
         organizationIds: editOrganizationIds,
       });

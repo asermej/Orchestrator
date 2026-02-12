@@ -17,7 +17,7 @@ export function JobsList({ jobs, onDeleted }: JobsListProps) {
     if (!confirm("Delete this job? It will also be removed from Orchestrator.")) return;
     setDeletingId(id);
     try {
-      await testAtsApi.delete(`/api/jobs/${id}`);
+      await testAtsApi.delete(`/api/v1/jobs/${id}`);
       onDeleted();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Delete failed");

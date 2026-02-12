@@ -1,6 +1,6 @@
 ---
 description: "ACTIVE: DomainModel rules - Domain entity definitions"
-globs: apps/api/Orchestrator.Domain/Managers/Models/*.cs
+globs: apps/orchestrator/Orchestrator.Domain/Managers/Models/*.cs
 alwaysApply: false
 ---
 

@@ -16,7 +16,7 @@ Ask:
 
 ### If Existing Entity
 
-1. Scan `apps/api/Orchestrator.Domain/Managers/Models/*.cs`
+1. Scan `apps/orchestrator/Orchestrator.Domain/Managers/Models/*.cs`
 2. Filter out files containing "Request", "Result", or "Response" in the name
 3. Present the list:
 
@@ -28,7 +28,7 @@ Ask:
 
 **Wait for selection.**
 
-Then scan `apps/api/Orchestrator.Api/Controllers/{EntityName}Controller.cs` for existing endpoints:
+Then scan `apps/orchestrator/Orchestrator.Api/Controllers/{EntityName}Controller.cs` for existing endpoints:
 
 - **Create**: `[HttpPost]` without route param
 - **GetById**: `[HttpGet("{id}")]`

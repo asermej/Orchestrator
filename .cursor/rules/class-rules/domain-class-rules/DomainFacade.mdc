@@ -1,6 +1,6 @@
 ---
 description: "ACTIVE: DomainFacade rules - Public entry point to Orchestrator.Domain"
-globs: apps/api/Orchestrator.Domain/DomainFacade*.cs
+globs: apps/orchestrator/Orchestrator.Domain/DomainFacade*.cs
 alwaysApply: false
 ---
 

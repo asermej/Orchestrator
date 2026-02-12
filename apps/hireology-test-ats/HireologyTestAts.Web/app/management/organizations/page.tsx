@@ -33,15 +33,15 @@ export default function OrganizationsPage() {
   const [editState, setEditState] = useState("");
 
   const loadGroups = async () => {
-    const list = await testAtsApi.get<Group[]>("/api/groups");
+    const list = await testAtsApi.get<Group[]>("/api/v1/groups");
     setGroups(list);
     if (list.length && !formGroupId) setFormGroupId(list[0].id);
   };
 
   const loadOrgs = async () => {
     const url = groupIdFilter
-      ? `/api/organizations?groupId=${groupIdFilter}`
-      : "/api/organizations";
+      ? `/api/v1/organizations?groupId=${groupIdFilter}`
+      : "/api/v1/organizations";
     const list = await testAtsApi.get<Organization[]>(url);
     setOrganizations(list);
   };
@@ -69,7 +69,7 @@ export default function OrganizationsPage() {
     if (!formName.trim() || !groupId) return;
     setError(null);
     try {
-      await testAtsApi.post("/api/organizations", {
+      await testAtsApi.post("/api/v1/organizations", {
         groupId: groupId,
         name: formName.trim(),
         city: formCity.trim() || undefined,
@@ -88,7 +88,7 @@ export default function OrganizationsPage() {
     if (!editName.trim()) return;
     setError(null);
     try {
-      await testAtsApi.put(`/api/organizations/${id}`, {
+      await testAtsApi.put(`/api/v1/organizations/${id}`, {
         groupId: editGroupId,
         name: editName.trim(),
         city: editCity || undefined,
@@ -105,7 +105,7 @@ export default function OrganizationsPage() {
     if (!confirm("Delete this location?")) return;
     setError(null);
     try {
-      await testAtsApi.delete(`/api/organizations/${id}`);
+      await testAtsApi.delete(`/api/v1/organizations/${id}`);
       await loadOrgs();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete");
