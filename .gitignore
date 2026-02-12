@@ -146,6 +146,7 @@ project.lock.json
 .settings/
 *.sublime-workspace
 node_modules/
+.next/
 dist/
 tmp/
 temp/
