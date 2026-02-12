@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <!-- Drop agent_categories if it exists (safety for envs that may have had it created outside changelog) -->
+    <changeSet id="20260211120000-drop-agent-categories-if-exists" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="agent_categories"/>
+        </preConditions>
+        <dropTable tableName="agent_categories"/>
+    </changeSet>
+</databaseChangeLog>

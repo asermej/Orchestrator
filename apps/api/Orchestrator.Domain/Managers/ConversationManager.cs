@@ -16,18 +16,10 @@ namespace Orchestrator.Domain;
 internal sealed class ConversationManager : IDisposable
 {
     private readonly ServiceLocatorBase _serviceLocator;
-    private DataFacade? _dataFacade;
-    private DataFacade DataFacade => _dataFacade ??= new DataFacade(_serviceLocator.CreateConfigurationProvider().GetDbConnectionString());
     private GatewayFacade? _gatewayFacade;
     private GatewayFacade GatewayFacade => _gatewayFacade ??= new GatewayFacade(_serviceLocator);
     private AgentManager? _agentManager;
     private AgentManager AgentManager => _agentManager ??= new AgentManager(_serviceLocator);
-    private MessageManager? _messageManager;
-    private MessageManager MessageManager => _messageManager ??= new MessageManager(_serviceLocator);
-    private ChatManager? _chatManager;
-    private ChatManager ChatManager => _chatManager ??= new ChatManager(_serviceLocator);
-    private TrainingStorageManager? _storageManager;
-    private TrainingStorageManager StorageManager => _storageManager ??= new TrainingStorageManager();
 
     // Abbreviations to skip when detecting sentence boundaries
     private static readonly HashSet<string> Abbreviations = new(StringComparer.OrdinalIgnoreCase)
@@ -42,16 +34,14 @@ internal sealed class ConversationManager : IDisposable
     }
 
     /// <summary>
-    /// Streams audio response for a voice conversation.
-    /// Saves user message, generates AI response, and streams TTS audio.
+    /// Streams audio response for a voice conversation (stateless; no persistence).
+    /// Generates AI response and streams TTS audio.
     /// </summary>
-    /// <param name="chatId">The chat ID</param>
     /// <param name="agentId">The agent ID for voice settings</param>
     /// <param name="userMessage">The user's text message (transcribed from speech)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Async enumerable of audio chunks (MP3 bytes)</returns>
     public async IAsyncEnumerable<byte[]> StreamAudioResponseAsync(
-        Guid chatId,
         Guid agentId,
         string userMessage,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -64,16 +54,6 @@ internal sealed class ConversationManager : IDisposable
             throw new ElevenLabsDisabledException("ElevenLabs TTS is disabled in configuration");
         }
 
-        // Save user message
-        var message = new Message
-        {
-            ChatId = chatId,
-            Role = "user",
-            Content = userMessage
-        };
-        MessageValidator.Validate(message);
-        await DataFacade.AddMessage(message).ConfigureAwait(false);
-
         // Get agent for voice settings
         var agent = await AgentManager.GetAgentById(agentId).ConfigureAwait(false);
         if (agent == null)
@@ -81,29 +61,14 @@ internal sealed class ConversationManager : IDisposable
             throw new AgentNotFoundException($"Agent with ID {agentId} not found");
         }
 
-        // Get chat history
-        var chatHistory = await DataFacade.SearchMessages(chatId, null, null, 1, 50).ConfigureAwait(false);
+        // Build minimal in-request history (single user turn) for AI context
+        var chatHistory = new List<ConversationTurn>
+        {
+            new ConversationTurn { Role = "user", Content = userMessage }
+        };
 
         // Generate AI response text
-        var aiResponseText = await GenerateAIResponse(agentId, chatId, chatHistory.Items).ConfigureAwait(false);
-
-        // Save AI response
-        var aiMessage = new Message
-        {
-            ChatId = chatId,
-            Role = "assistant",
-            Content = aiResponseText
-        };
-        MessageValidator.Validate(aiMessage);
-        await DataFacade.AddMessage(aiMessage).ConfigureAwait(false);
-
-        // Update chat's LastMessageAt
-        var chat = await DataFacade.GetChatById(chatId).ConfigureAwait(false);
-        if (chat != null)
-        {
-            chat.LastMessageAt = DateTime.UtcNow;
-            await DataFacade.UpdateChat(chat).ConfigureAwait(false);
-        }
+        var aiResponseText = await GenerateAIResponse(agentId, chatHistory).ConfigureAwait(false);
 
         // Stream TTS for each sentence
         var voiceId = agent.ElevenlabsVoiceId ?? config.DefaultVoiceId;
@@ -282,7 +247,7 @@ internal sealed class ConversationManager : IDisposable
     /// <summary>
     /// Generates AI response using OpenAI.
     /// </summary>
-    private async Task<string> GenerateAIResponse(Guid agentId, Guid chatId, IEnumerable<Message> chatHistory)
+    private async Task<string> GenerateAIResponse(Guid agentId, IEnumerable<ConversationTurn> chatHistory)
     {
         var agent = await AgentManager.GetAgentById(agentId).ConfigureAwait(false);
         if (agent == null)
@@ -337,7 +302,5 @@ internal sealed class ConversationManager : IDisposable
     {
         _gatewayFacade?.Dispose();
         _agentManager?.Dispose();
-        _messageManager?.Dispose();
-        _chatManager?.Dispose();
     }
 }

@@ -31,7 +31,7 @@ public sealed partial class DomainFacade
 {
     // BAD: These expose internal implementation details
     public async Task<PersonaTopic> AddTopicToPersona(Guid personaId, Guid topicId, ...);
-    public async Task<PersonaCategory> AddCategoryToPersona(PersonaCategory personaCategory);
+    public async Task<EntityJoin> AddJoinRecord(EntityJoin joinRecord);
 }
 ```
 
@@ -51,15 +51,15 @@ public sealed partial class DomainFacade
 {
     // Good: These are business operations, not implementation details
     public async Task<PersonaTopic> AddTopicToPersona(Guid personaId, Guid topicId, ...);
-    public async Task<IEnumerable<Category>> GetPersonaCategories(Guid personaId);
-    public async Task<bool> RemoveCategoryFromPersona(Guid personaId, Guid categoryId);
+    public async Task<IEnumerable<Tag>> GetPersonaTags(Guid personaId);
+    public async Task<bool> RemoveTagFromPersona(Guid personaId, Guid tagId);
 }
 
 // Implementation: PersonaManager handles the join table internally
 internal sealed class PersonaManager
 {
     private PersonaTopicManager PersonaTopicManager { get; }
-    private PersonaCategoryManager PersonaCategoryManager { get; }
+    private PersonaTagManager PersonaTagManager { get; }
     
     public async Task<PersonaTopic> AddTopicToPersona(Guid personaId, Guid topicId, ...)
     {

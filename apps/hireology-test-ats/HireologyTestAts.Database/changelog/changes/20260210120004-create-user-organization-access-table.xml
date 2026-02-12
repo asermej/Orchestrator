@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260210120004-create-user-organization-access-table" author="system">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="user_organization_access"/>
+            </not>
+        </preConditions>
+        <createTable tableName="user_organization_access">
+            <column name="user_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_user_organization_access_user" references="users(id)"/>
+            </column>
+            <column name="organization_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_user_organization_access_organization" references="organizations(id)"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint tableName="user_organization_access" columnNames="user_id, organization_id" constraintName="uq_user_organization_access_user_org"/>
+        <createIndex tableName="user_organization_access" indexName="idx_user_organization_access_user_id">
+            <column name="user_id"/>
+        </createIndex>
+        <createIndex tableName="user_organization_access" indexName="idx_user_organization_access_organization_id">
+            <column name="organization_id"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

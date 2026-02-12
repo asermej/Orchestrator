@@ -1,53 +1,38 @@
 using Orchestrator.Domain;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orchestrator.AcceptanceTests.Domain;
+using Orchestrator.AcceptanceTests.TestUtilities;
 
 namespace Orchestrator.AcceptanceTests.Domain;
 
 /// <summary>
-/// Tests for User operations using real DomainFacade
-/// 
-/// TEST APPROACH:
-/// - Uses real DomainFacade instances for acceptance tests
-/// - Tests the actual integration between layers
-/// - No external mocking frameworks used
-/// - Tests clean up ONLY the data they create (tracked by ID)
+/// Tests for User operations using real DomainFacade.
+/// Cleanup: centralized SQL cleanup in TestInitialize/TestCleanup via TestDataCleanup.
+/// Users are identified by email pattern @example.com (no organization FK).
 /// </summary>
 [TestClass]
 public class DomainFacadeTestsUser
 {
     private DomainFacade _domainFacade = null!;
-    
-    // Track entities created during test for targeted cleanup
-    private readonly List<Guid> _createdUserIds = new();
 
     [TestInitialize]
     public void TestInitialize()
     {
+        TestDataCleanup.CleanupAllTestData();
         var serviceLocator = new ServiceLocatorForAcceptanceTesting();
         _domainFacade = new DomainFacade(serviceLocator);
-        
-        // Clear tracking list
-        _createdUserIds.Clear();
     }
 
     [TestCleanup]
-    public async Task TestCleanup()
+    public void TestCleanup()
     {
         try
         {
-            // Delete ONLY the users created during this test
-            foreach (var userId in _createdUserIds)
-            {
-                try
-                {
-                    await _domainFacade.DeleteUser(userId);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Warning: Could not delete user {userId}: {ex.Message}");
-                }
-            }
+            TestDataCleanup.CleanupAllTestData();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning: Error during test cleanup: {ex.Message}");
         }
         finally
         {
@@ -56,7 +41,7 @@ public class DomainFacadeTestsUser
     }
 
     /// <summary>
-    /// Helper method to create test User and track it for cleanup
+    /// Helper method to create test User
     /// </summary>
     private async Task<User> CreateTestUserAsync(string suffix = "")
     {
@@ -72,10 +57,6 @@ public class DomainFacadeTestsUser
 
         var result = await _domainFacade.CreateUser(user);
         Assert.IsNotNull(result, "Failed to create test User");
-        
-        // Track for cleanup
-        _createdUserIds.Add(result.Id);
-        
         return result;
     }
 
@@ -94,7 +75,6 @@ public class DomainFacadeTestsUser
 
         // Act
         var result = await _domainFacade.CreateUser(user);
-        _createdUserIds.Add(result.Id); // Track for cleanup
 
         // Assert
         Assert.IsNotNull(result, "Create should return a User");
@@ -191,7 +171,6 @@ public class DomainFacadeTestsUser
             Phone = "+15551111111"
         };
         var created1 = await _domainFacade.CreateUser(user1);
-        _createdUserIds.Add(created1.Id);
         
         var user2 = new User
         {
@@ -201,7 +180,6 @@ public class DomainFacadeTestsUser
             Phone = "+15552222222"
         };
         var created2 = await _domainFacade.CreateUser(user2);
-        _createdUserIds.Add(created2.Id);
 
         // Act - Search by lastName pattern (SearchUsers searches by phone, email, lastName)
         var result = await _domainFacade.SearchUsers(null, null, uniqueLastName, 1, 10);
@@ -290,9 +268,6 @@ public class DomainFacadeTestsUser
         // Arrange - Create a test User
         var user = await CreateTestUserAsync();
         var userId = user.Id;
-        
-        // Remove from tracking since we're testing delete
-        _createdUserIds.Remove(userId);
 
         // Act
         var result = await _domainFacade.DeleteUser(userId);
@@ -332,7 +307,6 @@ public class DomainFacadeTestsUser
         var created = await _domainFacade.CreateUser(user);
         Assert.IsNotNull(created, "User should be created");
         var createdId = created.Id;
-        // Don't add to tracking - we'll delete it as part of the test
         
         // Get
         var retrievedUser = await _domainFacade.GetUserById(createdId);

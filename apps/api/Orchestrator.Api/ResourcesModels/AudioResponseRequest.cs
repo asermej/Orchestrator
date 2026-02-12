@@ -6,15 +6,10 @@ namespace Orchestrator.Api.ResourcesModels;
 /// <summary>
 /// Request model for streaming audio response endpoint.
 /// The message is TEXT (already transcribed by browser via Web Speech API).
+/// Stateless: no chat or message persistence.
 /// </summary>
 public class AudioResponseRequest
 {
-    /// <summary>
-    /// The chat ID to associate the message with
-    /// </summary>
-    [Required]
-    public Guid ChatId { get; set; }
-
     /// <summary>
     /// The agent ID to get voice settings from
     /// </summary>

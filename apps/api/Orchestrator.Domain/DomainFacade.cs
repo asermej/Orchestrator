@@ -16,12 +16,6 @@ public sealed partial class DomainFacade : IDisposable
     private ImageManager ImageManager => _imageManager ??= new ImageManager(_serviceLocator);
     private GatewayFacade? _gatewayFacade;
     private GatewayFacade GatewayFacade => _gatewayFacade ??= new GatewayFacade(_serviceLocator);
-    private CategoryManager? _categoryManager;
-    private CategoryManager CategoryManager => _categoryManager ??= new CategoryManager(_serviceLocator);
-    private ChatManager? _chatManager;
-    private ChatManager ChatManager => _chatManager ??= new ChatManager(_serviceLocator);
-    private MessageManager? _messageManager;
-    private MessageManager MessageManager => _messageManager ??= new MessageManager(_serviceLocator);
     private AudioCacheManager? _audioCacheManager;
     private AudioCacheManager AudioCacheManager => _audioCacheManager ??= new AudioCacheManager(_serviceLocator);
     
@@ -66,9 +60,6 @@ public sealed partial class DomainFacade : IDisposable
             _agentManager?.Dispose();
             _imageManager?.Dispose();
             _gatewayFacade?.Dispose();
-            _categoryManager?.Dispose();
-            _chatManager?.Dispose();
-            _messageManager?.Dispose();
             _audioCacheManager?.Dispose();
             _organizationManager?.Dispose();
             _applicantManager?.Dispose();

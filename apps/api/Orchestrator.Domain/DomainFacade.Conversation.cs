@@ -14,21 +14,19 @@ public sealed partial class DomainFacade
     private ConversationManager ConversationManager => _conversationManager ??= new ConversationManager(_serviceLocator);
 
     /// <summary>
-    /// Streams audio response for a voice conversation.
-    /// Saves user message, generates AI response, and streams TTS audio.
+    /// Streams audio response for a voice conversation (stateless; no persistence).
+    /// Generates AI response and streams TTS audio.
     /// </summary>
-    /// <param name="chatId">The chat ID</param>
     /// <param name="agentId">The agent ID for voice settings</param>
     /// <param name="userMessage">The user's text message (transcribed from speech)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Async enumerable of audio chunks (MP3 bytes)</returns>
     public async IAsyncEnumerable<byte[]> StreamAudioResponseAsync(
-        Guid chatId,
         Guid agentId,
         string userMessage,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        await foreach (var chunk in ConversationManager.StreamAudioResponseAsync(chatId, agentId, userMessage, cancellationToken).ConfigureAwait(false))
+        await foreach (var chunk in ConversationManager.StreamAudioResponseAsync(agentId, userMessage, cancellationToken).ConfigureAwait(false))
         {
             yield return chunk;
         }

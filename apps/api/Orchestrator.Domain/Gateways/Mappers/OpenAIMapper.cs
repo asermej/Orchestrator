@@ -19,7 +19,7 @@ internal static class OpenAIMapper
     /// <returns>OpenAI API request object</returns>
     public static OpenAIChatCompletionRequest ToChatCompletionRequest(
         string systemPrompt,
-        IEnumerable<Message> chatHistory,
+        IEnumerable<ConversationTurn> chatHistory,
         string model,
         double temperature,
         int maxTokens)
@@ -40,12 +40,12 @@ internal static class OpenAIMapper
         });
 
         // Add chat history
-        foreach (var message in chatHistory)
+        foreach (var turn in chatHistory)
         {
             request.Messages.Add(new OpenAIChatMessage
             {
-                Role = message.Role,
-                Content = message.Content
+                Role = turn.Role,
+                Content = turn.Content
             });
         }
 

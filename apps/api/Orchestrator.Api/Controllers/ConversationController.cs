@@ -27,7 +27,7 @@ public class ConversationController : ControllerBase
     /// Sends a text message and receives a streaming audio response from the agent.
     /// The user's speech is transcribed in the browser before calling this endpoint.
     /// </summary>
-    /// <param name="request">Text message and context (chatId, agentId, message)</param>
+    /// <param name="request">Text message and context (agentId, message)</param>
     /// <returns>Streaming audio/mpeg of agent's spoken response</returns>
     /// <response code="200">Returns streaming audio response</response>
     /// <response code="400">If the request is invalid</response>
@@ -40,8 +40,7 @@ public class ConversationController : ControllerBase
     [ProducesResponseType(503)]
     public async Task GetAudioResponse([FromBody] AudioResponseRequest request)
     {
-        _logger.LogInformation("Streaming audio response for chat {ChatId}, agent {AgentId}", 
-            request.ChatId, request.AgentId);
+        _logger.LogInformation("Streaming audio response for agent {AgentId}", request.AgentId);
 
         Response.ContentType = "audio/mpeg";
         Response.Headers.Append("Cache-Control", "no-cache");
@@ -53,7 +52,6 @@ public class ConversationController : ControllerBase
         try
         {
             await foreach (var audioChunk in _domainFacade.StreamAudioResponseAsync(
-                request.ChatId, 
                 request.AgentId, 
                 request.Message, 
                 HttpContext.RequestAborted))

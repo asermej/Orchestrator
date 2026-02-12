@@ -111,6 +111,19 @@ export default async function HomePage() {
               Run voice interviews and view session results.
             </p>
           </Link>
+
+          <Link
+            href="/jobs"
+            className="bg-white rounded-xl p-6 border border-slate-200 hover:border-indigo-300 hover:shadow-lg transition-all group"
+          >
+            <div className="text-4xl mb-4">📋</div>
+            <h2 className="text-xl font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">
+              Jobs
+            </h2>
+            <p className="text-slate-600 mt-2">
+              View jobs synced from your ATS for use in interviews.
+            </p>
+          </Link>
         </div>
       </main>
     </div>

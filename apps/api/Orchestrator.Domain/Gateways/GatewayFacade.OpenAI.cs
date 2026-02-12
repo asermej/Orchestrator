@@ -17,7 +17,7 @@ internal sealed partial class GatewayFacade
     /// <param name="systemPrompt">The system prompt that defines the persona behavior</param>
     /// <param name="chatHistory">Previous messages in the conversation</param>
     /// <returns>The AI-generated response content</returns>
-    public async Task<string> GenerateChatCompletion(string systemPrompt, IEnumerable<Message> chatHistory)
+    public async Task<string> GenerateChatCompletion(string systemPrompt, IEnumerable<ConversationTurn> chatHistory)
     {
         return await OpenAIManager.GenerateChatCompletion(systemPrompt, chatHistory).ConfigureAwait(false);
     }

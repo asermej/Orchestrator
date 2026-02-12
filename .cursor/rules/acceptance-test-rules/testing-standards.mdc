@@ -61,9 +61,9 @@ Orchestrator.AcceptanceTests/
 
 ## Database Cleanup
 
-- Clean up **before AND after** each test
-- Use direct SQL with pattern-based identification
-- Test data patterns: `@example.com`, `@test.com`, `Test*` prefixes
+- **Centralized SQL cleanup**: Call `TestDataCleanup.CleanupAllTestData()` in **both** `TestInitialize` (clean orphans from previous runs) and `TestCleanup` (courtesy cleanup). No ID-tracking lists needed.
+- **Organization naming convention**: All test organization names MUST start with `TestOrg_`. All test user emails MUST use `@example.com`.
+- **Adding new entities**: When adding a new entity type, add a DELETE statement to `TestDataCleanup.CleanupAllTestData()` in the correct FK position and a check in `ManualCleanup.VerifyDatabase_NoTestDataRemains`.
 
 **Guide**: See [Test Cleanup Guide](mdc:docs/technical/reference/guides/acceptance-test-guides/test-cleanup.md) for comprehensive cleanup patterns and examples.
 

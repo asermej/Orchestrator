@@ -136,7 +136,7 @@ export default function GeneralTraining() {
       <div className="border-b bg-gradient-to-r from-green-50 via-emerald-50 to-green-50 dark:from-green-950/20 dark:via-emerald-950/20 dark:to-green-950/20">
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center gap-6">
-            <Link href="/my-personas">
+            <Link href="/my-agents">
               <Button variant="ghost" size="icon" className="rounded-full">
                 <ArrowLeft className="h-5 w-5" />
               </Button>

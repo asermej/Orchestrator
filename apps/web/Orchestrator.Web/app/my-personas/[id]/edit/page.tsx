@@ -256,7 +256,7 @@ export default function EditAgent() {
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
-              <Link href="/my-personas">
+              <Link href="/my-agents">
                 <Button variant="ghost" size="icon" className="rounded-full">
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
@@ -410,7 +410,7 @@ export default function EditAgent() {
           <Card className="bg-muted/50">
             <CardContent className="p-6">
               <h3 className="font-semibold mb-4">Quick Links</h3>
-              <Link href={`/my-personas/${agentId}/general-training`}>
+              <Link href={`/my-agents/${agentId}/general-training`}>
                 <Button variant="outline" className="w-full justify-start">
                   <BookOpen className="mr-2 h-4 w-4" />
                   General Training

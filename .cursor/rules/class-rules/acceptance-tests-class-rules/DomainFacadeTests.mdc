@@ -20,8 +20,8 @@ Acceptance tests verify business logic **exclusively through DomainFacade**. Nev
 
 - **Test ONLY through DomainFacade**: Black-box testing of domain logic
 - **Real database**: Use `ServiceLocatorForAcceptanceTesting` with real test database
-- **Cleanup before AND after**: Database-level cleanup for test isolation
-- **Pattern-based cleanup**: Identify test data by patterns (e.g., `@example.com`, `Test*`)
+- **Centralized SQL cleanup**: Call `TestDataCleanup.CleanupAllTestData()` in **both** TestInitialize and TestCleanup. No ID-tracking lists needed.
+- **Organization naming convention**: All test organization names MUST start with `TestOrg_`. All test user emails MUST use `@example.com`.
 - **No external mocking frameworks**: Use custom test doubles only
 
 ## Pattern
@@ -30,29 +30,36 @@ Acceptance tests verify business logic **exclusively through DomainFacade**. Nev
 [TestClass]
 public class DomainFacadeTestsFeature
 {
-    private DomainFacade _domainFacade;
-    private string _connectionString;
+    private DomainFacade _domainFacade = null!;
 
     [TestInitialize]
     public void TestInitialize()
     {
-        var serviceLocator = new ServiceLocatorForAcceptanceTesting();
-        _domainFacade = new DomainFacade(serviceLocator);
-        _connectionString = serviceLocator.CreateConfigurationProvider().GetDbConnectionString();
-        CleanupAllTestData();
+        TestDataCleanup.CleanupAllTestData();
+        _domainFacade = new DomainFacade(new ServiceLocatorForAcceptanceTesting());
     }
 
     [TestCleanup]
     public void TestCleanup()
     {
-        CleanupAllTestData();
-        _domainFacade?.Dispose();
+        try { TestDataCleanup.CleanupAllTestData(); }
+        catch (Exception ex) { Console.WriteLine($"Warning: {ex.Message}"); }
+        finally { _domainFacade?.Dispose(); }
     }
 }
 ```
+
+## Adding a New Entity Type
+
+When adding a new entity type that acceptance tests write to:
+1. Add a DELETE statement in `TestDataCleanup.CleanupAllTestData()` at the correct FK position.
+2. Add a verification check in `ManualCleanup.VerifyDatabase_NoTestDataRemains`.
+3. Ensure test data uses `TestOrg_` organizations.
 
 ## Do NOT
 
 - Test managers, validators, or data managers directly
 - Use external mocking frameworks (Moq, NSubstitute, etc.)
+- Use ID-tracking lists for cleanup (use centralized SQL cleanup instead)
+- Use organization names that don't start with `TestOrg_`
 - Leave test data in the database

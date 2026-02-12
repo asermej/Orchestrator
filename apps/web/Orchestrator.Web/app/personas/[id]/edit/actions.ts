@@ -1,7 +1,7 @@
 "use server";
 
 import { apiGet, apiPut } from "@/lib/api-client-server";
-import { AgentItem } from "../../actions";
+import { AgentItem } from "@/app/my-personas/actions";
 
 export async function fetchAgentById(id: string): Promise<AgentItem> {
   const data = await apiGet<AgentItem>(`/Agent/${id}`);

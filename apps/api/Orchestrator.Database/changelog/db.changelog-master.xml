@@ -91,4 +91,7 @@
     
     <!-- Remove Tags, JobTypes, and Topics -->
     <include file="changes/20260203145454-remove-tags-jobtypes-topics.xml" relativeToChangelogFile="true"/>
+
+    <!-- Remove Category concept: drop agent_categories if present -->
+    <include file="changes/20260211120000-drop-agent-categories-if-exists.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog> 

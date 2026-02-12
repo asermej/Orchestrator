@@ -62,9 +62,9 @@ Return format (strict JSON array):
 
         var userPrompt = $"Main question: {questionText}\n\nGenerate 6-10 follow-up questions as a JSON array.";
 
-        var chatHistory = new List<Message>
+        var chatHistory = new List<ConversationTurn>
         {
-            new Message { Role = "user", Content = userPrompt }
+            new ConversationTurn { Role = "user", Content = userPrompt }
         };
 
         var response = await GatewayFacade.GenerateChatCompletion(systemPrompt, chatHistory).ConfigureAwait(false);
@@ -299,9 +299,9 @@ Available follow-up questions:
 
 Select the most appropriate follow-up question, or return null if none are needed.";
 
-        var chatHistory = new List<Message>
+        var chatHistory = new List<ConversationTurn>
         {
-            new Message { Role = "user", Content = userPrompt }
+            new ConversationTurn { Role = "user", Content = userPrompt }
         };
 
         var response = await GatewayFacade.GenerateChatCompletion(systemPrompt, chatHistory).ConfigureAwait(false);

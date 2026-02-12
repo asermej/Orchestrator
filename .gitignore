@@ -16,8 +16,10 @@
 !.cursor/mcp.json.template
 !.cursor/templates/
 !.cursor/rules/
+!.cursor/commands/
 !.cursor/**/*.mdc
 !.cursor/**/*.hbs
+!.cursor/**/*.md
 *.user
 *.userosscache
 *.suo

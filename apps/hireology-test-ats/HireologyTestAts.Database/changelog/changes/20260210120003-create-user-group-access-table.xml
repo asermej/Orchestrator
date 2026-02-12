@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260210120003-create-user-group-access-table" author="system">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="user_group_access"/>
+            </not>
+        </preConditions>
+        <createTable tableName="user_group_access">
+            <column name="user_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_user_group_access_user" references="users(id)"/>
+            </column>
+            <column name="group_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_user_group_access_group" references="groups(id)"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint tableName="user_group_access" columnNames="user_id, group_id" constraintName="uq_user_group_access_user_group"/>
+        <createIndex tableName="user_group_access" indexName="idx_user_group_access_user_id">
+            <column name="user_id"/>
+        </createIndex>
+        <createIndex tableName="user_group_access" indexName="idx_user_group_access_group_id">
+            <column name="group_id"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

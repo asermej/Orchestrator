@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260210120006-add-organization-id-to-jobs" author="system">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="jobs" columnName="organization_id"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="jobs">
+            <column name="organization_id" type="uuid">
+                <constraints nullable="true" foreignKeyName="fk_jobs_organization" references="organizations(id)"/>
+            </column>
+        </addColumn>
+        <createIndex tableName="jobs" indexName="idx_jobs_organization_id">
+            <column name="organization_id"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

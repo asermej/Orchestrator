@@ -13,7 +13,7 @@ import { ImageUpload } from "@/components/image-upload";
 import { ArrowLeft, Loader2, BookOpen, Save, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { fetchAgentById, updateAgent } from "./actions";
-import { AgentItem } from "../../actions";
+import { AgentItem } from "@/app/my-personas/actions";
 import { uploadImage } from "@/lib/upload-image";
 import { 
   fetchAgentTraining, 
@@ -47,7 +47,7 @@ export default function EditAgent() {
     },
     {
       successMessage: "Agent profile updated successfully!",
-      onSuccess: () => router.push("/personas"),
+      onSuccess: () => router.push("/my-agents"),
     }
   );
 
@@ -156,7 +156,7 @@ export default function EditAgent() {
       <div className="border-b bg-muted/20">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
-            <Link href="/personas">
+            <Link href="/my-agents">
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
@@ -323,7 +323,7 @@ export default function EditAgent() {
 
                 {/* Save Button */}
                 <div className="flex justify-end gap-4">
-                  <Link href="/personas">
+                  <Link href="/my-agents">
                     <Button type="button" variant="outline" disabled={isSubmitting}>
                       Cancel
                     </Button>

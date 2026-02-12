@@ -14,11 +14,11 @@ const AUDIO_URL = `${API_BASE}/api/v1/conversation/respond/audio`;
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { chatId, agentId, message } = body;
+    const { agentId, message } = body;
 
-    if (!chatId || !agentId || !message) {
+    if (!agentId || !message) {
       return NextResponse.json(
-        { error: "chatId, agentId, and message are required" },
+        { error: "agentId and message are required" },
         { status: 400 }
       );
     }
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({ chatId, agentId, message }),
+      body: JSON.stringify({ agentId, message }),
       // @ts-expect-error Node 18+ ReadableStream from fetch is valid
       duplex: "half",
     });

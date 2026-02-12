@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LogOut, Settings, LayoutGrid } from "lucide-react";
+import { LogOut, Settings, LayoutGrid, Briefcase } from "lucide-react";
 import Link from "next/link";
 import { UserProfile } from '@auth0/nextjs-auth0/client';
 
@@ -65,6 +65,12 @@ export function Header({ user }: HeaderProps) {
                     <Link href="/my-agents">
                       <LayoutGrid className="mr-2 h-4 w-4" />
                       <span>Manage Agents</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/jobs">
+                      <Briefcase className="mr-2 h-4 w-4" />
+                      <span>Jobs</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />

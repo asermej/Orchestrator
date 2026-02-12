@@ -5,6 +5,8 @@
 **CRITICAL TESTING BOUNDARY**: Tests MUST ONLY interact with the `DomainFacade` interface.  
 Do **NOT** create tests for individual managers, data managers, or validators.
 
+**Cleanup**: Generated tests MUST follow the ID-tracked cleanup pattern from [DomainFacadeTests.mdc](mdc:.cursor/rules/class-rules/acceptance-tests-class-rules/DomainFacadeTests.mdc) and [Test Cleanup](mdc:docs/technical/reference/guides/acceptance-test-guides/test-cleanup.md): track created entity IDs in lists; in TestCleanup, delete only those entities via DomainFacade in reverse dependency order. No pattern-based or SQL cleanup in TestInitialize/TestCleanup.
+
 When this workflow is active, follow these steps **in order**, waiting for user responses where indicated.
 
 ---
@@ -20,6 +22,7 @@ When this workflow is active, follow these steps **in order**, waiting for user 
 > * **Template**: `docs/technical/templates/acceptance-test-templates/DomainFacadeTests.Base.hbs`
 > * **Best Practices**: See [DomainFacadeTests.mdc](mdc:.cursor/rules/class-rules/acceptance-tests-class-rules/DomainFacadeTests.mdc)
 > * **Related Guides**: [Test Cleanup](mdc:docs/technical/reference/guides/acceptance-test-guides/test-cleanup.md)
+> * **Cleanup**: Use ID-tracked cleanup only; no pattern-based/SQL cleanup in test lifecycle. Delete in reverse dependency order in TestCleanup.
 >
 > Ready to generate the **acceptance test file**?"
 

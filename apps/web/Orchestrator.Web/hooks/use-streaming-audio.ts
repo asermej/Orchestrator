@@ -13,9 +13,8 @@ interface UseStreamingAudioReturn {
   isStreaming: boolean;
   isPlaying: boolean;
   error: string | null;
-  streamResponse: (chatId: string, agentId: string, message: string) => Promise<void>;
+  streamResponse: (agentId: string, message: string) => Promise<void>;
   stopPlayback: () => void;
-  playMessageAudio: (messageId: string) => Promise<void>;
 }
 
 /**
@@ -73,7 +72,7 @@ export function useStreamingAudio({
    * Input is text (already transcribed), output is streaming audio.
    */
   const streamResponse = useCallback(
-    async (chatId: string, agentId: string, message: string) => {
+    async (agentId: string, message: string) => {
       setError(null);
       setIsStreaming(true);
 
@@ -85,7 +84,7 @@ export function useStreamingAudio({
         const response = await fetch(voiceAudioUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chatId, agentId, message }),
+          body: JSON.stringify({ agentId, message }),
           signal: abortControllerRef.current.signal,
         });
 
@@ -188,41 +187,6 @@ export function useStreamingAudio({
     [voiceAudioUrl, onPlayStart, onError]
   );
 
-  /**
-   * Play cached audio for an existing message (replay).
-   */
-  const playMessageAudio = useCallback(
-    async (messageId: string) => {
-      setError(null);
-
-      try {
-        const response = await fetch(`/api/voice/message/${messageId}/audio`, {
-          method: "GET",
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `Request failed: ${response.status}`);
-        }
-
-        const audioBlob = await response.blob();
-        const audioUrl = URL.createObjectURL(audioBlob);
-
-        if (audioRef.current) {
-          audioRef.current.src = audioUrl;
-          await audioRef.current.play();
-          setIsPlaying(true);
-          onPlayStart?.();
-        }
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to play audio";
-        setError(errorMessage);
-        onError?.(errorMessage);
-      }
-    },
-    [onPlayStart, onError]
-  );
-
   // Handle audio ended event
   useEffect(() => {
     const audio = audioRef.current;
@@ -244,6 +208,5 @@ export function useStreamingAudio({
     error,
     streamResponse,
     stopPlayback,
-    playMessageAudio,
   };
 }

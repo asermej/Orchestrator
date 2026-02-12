@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260210120005-create-user-sessions-table" author="system">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="user_sessions"/>
+            </not>
+        </preConditions>
+        <createTable tableName="user_sessions">
+            <column name="user_id" type="uuid">
+                <constraints primaryKey="true" nullable="false" foreignKeyName="fk_user_sessions_user" references="users(id)"/>
+            </column>
+            <column name="selected_organization_id" type="uuid">
+                <constraints nullable="true" foreignKeyName="fk_user_sessions_organization" references="organizations(id)"/>
+            </column>
+            <column name="updated_at" type="timestamp with time zone" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="user_sessions" indexName="idx_user_sessions_selected_organization_id">
+            <column name="selected_organization_id"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

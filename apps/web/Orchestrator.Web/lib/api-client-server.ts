@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from 'next/navigation';
 import { getAccessToken } from '@/lib/auth0';
 import { ApiError, ApiClientError } from '@/lib/api-types';
 
@@ -30,7 +31,12 @@ async function apiFetch(url: string, options: RequestInit = {}): Promise<Respons
     cache: 'no-store',
   });
   
-  // Handle error responses with structured error format
+  // Session timeout or missing token: redirect to login instead of throwing 500
+  if (response.status === 401) {
+    redirect('/api/auth/login');
+  }
+
+  // Handle other error responses with structured error format
   if (!response.ok) {
     try {
       const error: ApiError = await response.json();
@@ -120,6 +126,10 @@ export async function apiPostFormData<T>(url: string, formData: FormData): Promi
     cache: 'no-store',
   });
   
+  if (response.status === 401) {
+    redirect('/api/auth/login');
+  }
+
   if (!response.ok) {
     try {
       const error: ApiError = await response.json();
@@ -138,7 +148,7 @@ export async function apiPostFormData<T>(url: string, formData: FormData): Promi
       });
     }
   }
-  
+
   // Handle 204 No Content responses
   if (response.status === 204) {
     return;

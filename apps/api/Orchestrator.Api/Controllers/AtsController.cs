@@ -108,6 +108,25 @@ public class AtsController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Deletes a job by external ID (soft delete in Orchestrator)
+    /// </summary>
+    [HttpDelete("jobs/{externalJobId}")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(401)]
+    public async Task<ActionResult> DeleteJob(string externalJobId)
+    {
+        var organizationId = GetOrganizationId();
+        var job = await _domainFacade.GetJobByExternalId(organizationId, externalJobId);
+        if (job == null)
+        {
+            return NotFound($"Job with external ID {externalJobId} not found");
+        }
+        await _domainFacade.DeleteJob(job.Id);
+        return NoContent();
+    }
+
     // Applicant Endpoints
 
     /// <summary>

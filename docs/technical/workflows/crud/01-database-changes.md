@@ -99,7 +99,7 @@ Check existing tables AND Step 1 fields to suggest:
 
 ### Step 3c – Many-to-many Relationships
 
-**CRITICAL**: Analyze existing tables to suggest only relevant many-to-many relationships. For example, if "Tag" table exists, suggest it; if "Category" table exists, suggest it; otherwise don't suggest them. Only include options that make logical sense.
+**CRITICAL**: Analyze existing tables to suggest only relevant many-to-many relationships. For example, if "Tag" table exists, suggest it; otherwise don't suggest them. Only include options that make logical sense.
 
 Check existing tables to suggest relevant many-to-many relationships:
 

@@ -1,109 +1,37 @@
-using Orchestrator.DomainLayer;
+using Orchestrator.Domain;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Orchestrator.AcceptanceTests.DomainLayer;
-using Npgsql;
-using Dapper;
+using Orchestrator.AcceptanceTests.Domain;
+using Orchestrator.AcceptanceTests.TestUtilities;
 
-namespace Orchestrator.AcceptanceTests.DomainLayer;
+namespace Orchestrator.AcceptanceTests.Domain;
 
 /// <summary>
-/// Tests for {{featureName}} operations using real DomainFacade and real DataFacade with data cleanup
-/// 
-/// TEST APPROACH:
-/// - Uses real DomainFacade and DataFacade instances for acceptance tests
-/// - Tests the actual integration between layers
-/// - No external mocking frameworks used
-/// - ServiceLocatorForAcceptanceTesting provides real implementations
-/// - Tests clean up their own data to ensure complete independence
-/// 
-/// ENHANCED CLEANUP APPROACH:
-/// - Database-level cleanup before AND after each test for complete isolation
-/// - Identifies test data by patterns (email domains, specific names)
-/// - Robust error handling that doesn't break tests
-/// - Ensures 100% test reliability and independence
+/// Tests for {{featureName}} operations using real DomainFacade.
+/// Cleanup: centralized SQL cleanup in TestInitialize/TestCleanup via TestDataCleanup.
+/// All test organization names MUST start with "TestOrg_".
 /// </summary>
 [TestClass]
 public class DomainFacadeTests{{featureName}}
 {
-    private DomainFacade _domainFacade;
-    private string _connectionString;
-
-    public DomainFacadeTests{{featureName}}()
-    {
-        _domainFacade = null!;
-        _connectionString = null!;
-    }
+    private DomainFacade _domainFacade = null!;
 
     [TestInitialize]
     public void TestInitialize()
     {
-        var serviceLocator = new ServiceLocatorForAcceptanceTesting();
-        _domainFacade = new DomainFacade(serviceLocator);
-        _connectionString = serviceLocator.CreateConfigurationProvider().GetDbConnectionString();
-        
-        // Clean up ALL test data before each test to ensure complete isolation
-        CleanupAllTestData();
+        TestDataCleanup.CleanupAllTestData();
+        _domainFacade = new DomainFacade(new ServiceLocatorForAcceptanceTesting());
     }
 
     [TestCleanup]
     public void TestCleanup()
     {
-        try
-        {
-            // Clean up any remaining test data after the test
-            CleanupAllTestData();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Warning: Error during test cleanup: {ex.Message}");
-        }
-        finally
-        {
-            _domainFacade?.Dispose();
-        }
+        try { TestDataCleanup.CleanupAllTestData(); }
+        catch (Exception ex) { Console.WriteLine($"Warning: {ex.Message}"); }
+        finally { _domainFacade?.Dispose(); }
     }
 
     /// <summary>
-    /// Cleans up all test data to ensure complete test isolation
-    /// Uses database-level cleanup for better performance and reliability
-    /// </summary>
-    private void CleanupAllTestData()
-    {
-        try
-        {
-            using var connection = new NpgsqlConnection(_connectionString);
-            connection.Open();
-
-            // Delete all {{featureName}}s that might have been created by tests
-            // We identify test data by looking for specific patterns in data
-            var deleteSql = @"
-                DELETE FROM {{tableName}} 
-                WHERE {{#each properties}}{{#if_eq type "string"}}{{#if_eq name "Email"}}{{snakeCase name}} LIKE '%@example.com' 
-                   OR {{snakeCase name}} LIKE '%@test.com'{{else}}{{#if @first}}{{snakeCase name}} IN ('Test{{../featureName}}', 'Search{{../featureName}}', 'Update{{../featureName}}', 'Delete{{../featureName}}', 'John', 'Jane', 'Bob', 'Alice')
-                   OR {{snakeCase name}} LIKE 'Test%'
-                   OR {{snakeCase name}} LIKE 'Search%'
-                   OR {{snakeCase name}} LIKE 'Update%'
-                   OR {{snakeCase name}} LIKE 'Delete%'
-                   OR {{snakeCase name}} LIKE 'test%'{{else}}
-                   OR {{snakeCase name}} LIKE 'Test%'
-                   OR {{snakeCase name}} LIKE 'test%'{{/if}}{{/if}}{{/if_eq}}{{/each}}";
-
-            var rowsAffected = connection.Execute(deleteSql);
-            
-            if (rowsAffected > 0)
-            {
-                Console.WriteLine($"Cleaned up {rowsAffected} test {{featureName}}s from previous test runs");
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Warning: Error during test data cleanup: {ex.Message}");
-            // Don't fail the test due to cleanup issues
-        }
-    }
-
-    /// <summary>
-    /// Helper method to create test {{featureName}} with unique data and track it for cleanup
+    /// Helper method to create test {{featureName}} with unique data
     /// </summary>
     private async Task<{{featureName}}> CreateTest{{featureName}}Async(string suffix = "")
     {
@@ -127,7 +55,7 @@ public class DomainFacadeTests{{featureName}}
             {{else if_eq type "Guid"}}
             {{name}} = Guid.NewGuid(),
             {{else}}
-            {{name}} = default({{type}}), // Default value for {{type}}
+            {{name}} = default({{type}}),
             {{/if_eq}}
             {{/each}}
         };
@@ -162,7 +90,7 @@ public class DomainFacadeTests{{featureName}}
             {{else if_eq type "Guid"}}
             {{name}} = Guid.NewGuid(),
             {{else}}
-            {{name}} = default({{type}}), // Default value for {{type}}
+            {{name}} = default({{type}}),
             {{/if_eq}}
             {{/each}}
         };
@@ -196,7 +124,7 @@ public class DomainFacadeTests{{featureName}}
             {{else if_eq type "Guid"}}
             {{name}} = Guid.NewGuid(),
             {{else}}
-            {{name}} = default({{type}}), // Default value for {{type}}
+            {{name}} = default({{type}}),
             {{/if_eq}}
             {{/each}}
         };
@@ -212,8 +140,6 @@ public class DomainFacadeTests{{featureName}}
         Assert.AreEqual({{camelCase ../featureName}}.{{name}}, result.{{name}});
         {{/if_eq}}
         {{/each}}
-        
-        Console.WriteLine($"{{featureName}} created with ID: {result.Id}");
     }
 
     [TestMethod]
@@ -224,23 +150,23 @@ public class DomainFacadeTests{{featureName}}
         {
             {{#each properties}}
             {{#if_eq type "string"}}
-            {{name}} = "", // Required field empty or invalid
+            {{name}} = "",
             {{else if_eq type "int"}}
-            {{name}} = -1, // Invalid value
+            {{name}} = -1,
             {{else if_eq type "bool"}}
-            {{name}} = false, // Invalid value  
+            {{name}} = false,
             {{else if_eq type "DateTime"}}
-            {{name}} = DateTime.MinValue, // Invalid value
+            {{name}} = DateTime.MinValue,
             {{else if_eq type "Guid"}}
-            {{name}} = Guid.Empty, // Invalid value
+            {{name}} = Guid.Empty,
             {{else}}
-            {{name}} = default({{type}}), // Default invalid value for {{type}}
+            {{name}} = default({{type}}),
             {{/if_eq}}
             {{/each}}
         };
 
         // Act & Assert
-        await Assert.ThrowsExceptionAsync<{{featureName}}ValidationException>(() => 
+        await Assert.ThrowsExceptionAsync<{{featureName}}ValidationException>(() =>
             _domainFacade.Create{{featureName}}({{camelCase featureName}}), "Should throw validation exception for invalid data");
     }
     {{/if}}
@@ -249,7 +175,7 @@ public class DomainFacadeTests{{featureName}}
     [TestMethod]
     public async Task Get{{featureName}}ById_ExistingId_Returns{{featureName}}()
     {
-        // Arrange - Create a test {{featureName}}
+        // Arrange
         var created{{featureName}} = await CreateTest{{featureName}}Async();
 
         // Act
@@ -272,8 +198,8 @@ public class DomainFacadeTests{{featureName}}
         var nonExistingId = Guid.NewGuid();
 
         // Act & Assert
-        await Assert.ThrowsExceptionAsync<{{featureName}}NotFoundException>(() => 
-            _domainFacade.Get{{featureName}}ById(nonExistingId), 
+        await Assert.ThrowsExceptionAsync<{{featureName}}NotFoundException>(() =>
+            _domainFacade.Get{{featureName}}ById(nonExistingId),
             "Should throw exception for non-existing ID");
     }
     {{/if}}
@@ -282,19 +208,17 @@ public class DomainFacadeTests{{featureName}}
     [TestMethod]
     public async Task Search{{featureName}}s_WithResults_ReturnsPaginatedList()
     {
-        // Arrange - Create some test {{featureName}}s
+        // Arrange
         var {{camelCase featureName}}1 = await CreateTest{{featureName}}Async("Test1");
         var {{camelCase featureName}}2 = await CreateTest{{featureName}}Async("Test2");
 
-        // Act - Search by first field only since AND logic requires all fields to match
+        // Act
         var result = await _domainFacade.Search{{featureName}}s({{#each searchableFields}}{{#if @first}}"Test"{{else}}null{{/if}}{{#unless @last}}, {{/unless}}{{/each}}, 1, 10);
 
         // Assert
         Assert.IsNotNull(result, "Search should return results");
         Assert.IsTrue(result.TotalCount >= 2, $"Should find at least 2 {{featureName}}s, found {result.TotalCount}");
         Assert.IsTrue(result.Items.Count() >= 2, $"Should return at least 2 items, returned {result.Items.Count()}");
-        
-        Console.WriteLine($"Search returned {result.TotalCount} total {{featureName}}s");
     }
 
     [TestMethod]
@@ -314,10 +238,8 @@ public class DomainFacadeTests{{featureName}}
     [TestMethod]
     public async Task Update{{featureName}}_ValidData_UpdatesSuccessfully()
     {
-        // Arrange - Create a test {{featureName}}
+        // Arrange
         var {{camelCase featureName}} = await CreateTest{{featureName}}Async();
-        
-        // Modify the {{featureName}}
         {{#each properties}}
         {{#if_eq type "string"}}
         {{#if_eq name "Email"}}
@@ -338,26 +260,22 @@ public class DomainFacadeTests{{featureName}}
         Assert.AreEqual({{camelCase ../featureName}}.{{name}}, result.{{name}});
         {{/if_eq}}
         {{/each}}
-        
-        Console.WriteLine($"{{featureName}} updated successfully");
     }
 
     [TestMethod]
     public async Task Update{{featureName}}_InvalidData_ThrowsValidationException()
     {
-        // Arrange - Create a test {{featureName}}
+        // Arrange
         var {{camelCase featureName}} = await CreateTest{{featureName}}Async();
-        
-        // Set invalid data
         {{#each properties}}
         {{#if_eq type "string"}}
-        {{camelCase ../featureName}}.{{name}} = ""; // Invalid empty value
+        {{camelCase ../featureName}}.{{name}} = "";
         {{/if_eq}}
         {{/each}}
 
         // Act & Assert
-        await Assert.ThrowsExceptionAsync<{{featureName}}ValidationException>(() => 
-            _domainFacade.Update{{featureName}}({{camelCase featureName}}), 
+        await Assert.ThrowsExceptionAsync<{{featureName}}ValidationException>(() =>
+            _domainFacade.Update{{featureName}}({{camelCase featureName}}),
             "Should throw validation exception for invalid data");
     }
     {{/if}}
@@ -366,19 +284,18 @@ public class DomainFacadeTests{{featureName}}
     [TestMethod]
     public async Task Delete{{featureName}}_ExistingId_DeletesSuccessfully()
     {
-        // Arrange - Create a test {{featureName}}
+        // Arrange
         var {{camelCase featureName}} = await CreateTest{{featureName}}Async();
+        var id = {{camelCase featureName}}.Id;
 
         // Act
-        var result = await _domainFacade.Delete{{featureName}}({{camelCase featureName}}.Id);
+        var result = await _domainFacade.Delete{{featureName}}(id);
 
         // Assert
         Assert.IsTrue(result, "Should return true when deleting existing {{featureName}}");
-        await Assert.ThrowsExceptionAsync<{{featureName}}NotFoundException>(() => 
-            _domainFacade.Get{{featureName}}ById({{camelCase featureName}}.Id), 
+        await Assert.ThrowsExceptionAsync<{{featureName}}NotFoundException>(() =>
+            _domainFacade.Get{{featureName}}ById(id),
             "Should not find deleted {{featureName}}");
-        
-        Console.WriteLine($"{{featureName}} deleted successfully");
     }
 
     [TestMethod]
@@ -402,12 +319,12 @@ public class DomainFacadeTests{{featureName}}
         var {{camelCase featureName}} = await CreateTest{{featureName}}Async("Lifecycle");
         Assert.IsNotNull({{camelCase featureName}}, "{{featureName}} should be created");
         var createdId = {{camelCase featureName}}.Id;
-        
+
         // Get
         var retrieved{{featureName}} = await _domainFacade.Get{{featureName}}ById(createdId);
         Assert.IsNotNull(retrieved{{featureName}}, "Should retrieve created {{featureName}}");
         Assert.AreEqual(createdId, retrieved{{featureName}}.Id);
-        
+
         // Update
         {{#each properties}}
         {{#if_eq type "string"}}
@@ -418,79 +335,19 @@ public class DomainFacadeTests{{featureName}}
         {{/if_eq}}
         {{/if_eq}}
         {{/each}}
-        
         var updated{{featureName}} = await _domainFacade.Update{{featureName}}(retrieved{{featureName}});
         Assert.IsNotNull(updated{{featureName}}, "Should update {{featureName}}");
-        
-        // Search - Search by first field only since AND logic requires all fields to match
+
+        // Search
         var searchResult = await _domainFacade.Search{{featureName}}s({{#each searchableFields}}{{#if @first}}"Updated"{{else}}null{{/if}}{{#unless @last}}, {{/unless}}{{/each}}, 1, 10);
         Assert.IsNotNull(searchResult, "Search should return results");
         Assert.IsTrue(searchResult.TotalCount > 0, "Should find updated {{featureName}}");
-        
+
         // Delete
         var deleteResult = await _domainFacade.Delete{{featureName}}(createdId);
         Assert.IsTrue(deleteResult, "Should successfully delete {{featureName}}");
-        
-        // Verify deletion
-        await Assert.ThrowsExceptionAsync<{{featureName}}NotFoundException>(() => 
-            _domainFacade.Get{{featureName}}ById(createdId), 
+        await Assert.ThrowsExceptionAsync<{{featureName}}NotFoundException>(() =>
+            _domainFacade.Get{{featureName}}ById(createdId),
             "Should not find deleted {{featureName}}");
-        
-        Console.WriteLine("{{featureName}} lifecycle test completed successfully");
-    }
-
-    /// <summary>
-    /// Optional: Call this method to completely reset the database after all tests
-    /// This can be useful for integration test scenarios or when you want a completely clean slate
-    /// </summary>
-    [TestMethod]
-    [TestCategory("DatabaseReset")]
-    public void ResetDatabase_RemoveAllTestData()
-    {
-        try
-        {
-            using var connection = new NpgsqlConnection(_connectionString);
-            connection.Open();
-
-            // More aggressive cleanup that removes ALL potential test data
-            var resetSql = @"
-                DELETE FROM {{tableName}} 
-                WHERE {{#each properties}}{{#if_eq type "string"}}{{#if_eq name "Email"}}{{snakeCase name}} LIKE '%@example.com' 
-                   OR {{snakeCase name}} LIKE '%@test.com'
-                   OR {{snakeCase name}} LIKE '%test%'{{else}}{{#if @first}}{{snakeCase name}} LIKE '%Test%'
-                   OR {{snakeCase name}} LIKE '%test%'
-                   OR {{snakeCase name}} LIKE '%Search%'
-                   OR {{snakeCase name}} LIKE '%Update%'
-                   OR {{snakeCase name}} LIKE '%Delete%'
-                   OR {{snakeCase name}} LIKE '%Lifecycle%'{{else}}
-                   OR {{snakeCase name}} LIKE '%Test%'
-                   OR {{snakeCase name}} LIKE '%test%'{{/if}}{{/if}}{{/if_eq}}{{/each}};";
-
-            var rowsAffected = connection.Execute(resetSql);
-            
-            Console.WriteLine($"Database reset: Removed {rowsAffected} test {{featureName}} records");
-            Assert.IsTrue(true, $"Successfully reset database - removed {rowsAffected} records");
-        }
-        catch (Exception ex)
-        {
-            Assert.Fail($"Failed to reset database: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Optional: Call this to verify the database is clean after reset
-    /// </summary>
-    [TestMethod]
-    [TestCategory("DatabaseReset")]
-    public async Task VerifyDatabaseClean_NoTestDataRemains()
-    {
-        // Search for any remaining test data
-        var result = await _domainFacade.Search{{featureName}}s({{#each searchableFields}}{{#if @first}}"Test"{{else}}null{{/if}}{{#unless @last}}, {{/unless}}{{/each}}, 1, 100);
-        
-        Assert.IsNotNull(result, "Search should return results object");
-        Assert.AreEqual(0, result.TotalCount, $"Database should be clean but found {result.TotalCount} test records");
-        Assert.IsFalse(result.Items.Any(), "No test items should remain in database");
-        
-        Console.WriteLine("✅ Database verification passed - no test data found");
     }
 }

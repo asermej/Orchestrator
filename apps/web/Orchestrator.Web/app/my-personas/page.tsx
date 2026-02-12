@@ -117,7 +117,7 @@ export default function MyAgents() {
               </form>
               
               {/* Create New Button */}
-              <Link href="/create-persona">
+              <Link href="/create-agent">
                 <Button>
                   <Plus className="mr-2 h-4 w-4" />
                   Create New
@@ -150,7 +150,7 @@ export default function MyAgents() {
                 : "Create your first AI agent to get started!"}
             </p>
             {!searchTerm && (
-              <Link href="/create-persona">
+              <Link href="/create-agent">
                 <Button>
                   <Plus className="mr-2 h-4 w-4" />
                   Create Your First Agent
@@ -165,7 +165,7 @@ export default function MyAgents() {
               {agents.map((agent) => (
                 <Card key={agent.id} className="overflow-hidden hover:shadow-lg transition-shadow relative">
                   {/* Edit button in top right corner */}
-                  <Link href={`/my-personas/${agent.id}/edit`} className="absolute top-2 right-2 z-10">
+                  <Link href={`/my-agents/${agent.id}/edit`} className="absolute top-2 right-2 z-10">
                     <Button variant="outline" size="icon" className="h-8 w-8 rounded-md bg-background shadow-sm">
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -187,7 +187,7 @@ export default function MyAgents() {
                     </div>
                   </CardHeader>
                   <CardContent className="p-4 pt-0 space-y-2">
-                    <Link href={`/my-personas/${agent.id}/general-training`}>
+                    <Link href={`/my-agents/${agent.id}/general-training`}>
                       <Button className="w-full" variant="secondary">
                         Train
                         <ArrowRight className="ml-2 h-4 w-4" />

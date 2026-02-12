@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <include file="changes/20260209120000-initial-schema.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260209130000-jobs-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260210120000-create-groups-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260210120001-create-organizations-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260210120002-create-users-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260210120003-create-user-group-access-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260210120004-create-user-organization-access-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260210120005-create-user-sessions-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260210120006-add-organization-id-to-jobs.xml" relativeToChangelogFile="true"/>
+</databaseChangeLog>

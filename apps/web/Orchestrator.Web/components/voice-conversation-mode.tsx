@@ -14,7 +14,6 @@ type ConversationState = "idle" | "listening" | "processing" | "speaking";
 interface VoiceConversationModeProps {
   isOpen: boolean;
   onClose: () => void;
-  chatId: string;
   agentId: string;
   agentName: string;
   agentImageUrl?: string | null;
@@ -29,7 +28,6 @@ interface VoiceConversationModeProps {
 export function VoiceConversationMode({
   isOpen,
   onClose,
-  chatId,
   agentId,
   agentName,
   agentImageUrl,
@@ -101,13 +99,13 @@ export function VoiceConversationMode({
     transcriptRef.current = "";
 
     try {
-      await streamResponse(chatId, agentId, message);
+      await streamResponse(agentId, message);
       // Note: state will be set to "speaking" by onPlayStart callback
     } catch (err) {
       setState("idle");
       setError(err instanceof Error ? err.message : "Failed to get response");
     }
-  }, [chatId, agentId, streamResponse]);
+  }, [agentId, streamResponse]);
 
   // Start listening
   const startListening = useCallback(() => {

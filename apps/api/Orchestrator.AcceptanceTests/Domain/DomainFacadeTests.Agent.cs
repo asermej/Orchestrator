@@ -1,77 +1,45 @@
 using Orchestrator.Domain;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orchestrator.AcceptanceTests.Domain;
+using Orchestrator.AcceptanceTests.TestUtilities;
 
 namespace Orchestrator.AcceptanceTests.Domain;
 
 /// <summary>
-/// Tests for Agent operations using real DomainFacade
-/// 
-/// TEST APPROACH:
-/// - Uses real DomainFacade instances for acceptance tests
-/// - Tests the actual integration between layers
-/// - No external mocking frameworks used
-/// - Tests clean up ONLY the data they create (tracked by ID)
+/// Tests for Agent operations using real DomainFacade.
+/// Cleanup: centralized SQL cleanup in TestInitialize/TestCleanup via TestDataCleanup.
 /// </summary>
 [TestClass]
 public class DomainFacadeTestsAgent
 {
     private DomainFacade _domainFacade = null!;
     private Guid _testOrganizationId;
-    
-    // Track entities created during test for targeted cleanup
-    private readonly List<Guid> _createdAgentIds = new();
-    private readonly List<Guid> _createdOrganizationIds = new();
 
     [TestInitialize]
     public async Task TestInitialize()
     {
+        TestDataCleanup.CleanupAllTestData();
         var serviceLocator = new ServiceLocatorForAcceptanceTesting();
         _domainFacade = new DomainFacade(serviceLocator);
-        
-        // Clear tracking lists
-        _createdAgentIds.Clear();
-        _createdOrganizationIds.Clear();
-        
+
         // Create a test organization for agent tests
         var testOrg = await _domainFacade.CreateOrganization(new Organization
         {
             Name = $"TestOrg_{Guid.NewGuid():N}"
         });
         _testOrganizationId = testOrg.Id;
-        _createdOrganizationIds.Add(testOrg.Id);
     }
 
     [TestCleanup]
-    public async Task TestCleanup()
+    public void TestCleanup()
     {
         try
         {
-            // Delete ONLY the agents created during this test
-            foreach (var agentId in _createdAgentIds)
-            {
-                try
-                {
-                    await _domainFacade.DeleteAgent(agentId);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Warning: Could not delete agent {agentId}: {ex.Message}");
-                }
-            }
-            
-            // Delete ONLY the organizations created during this test
-            foreach (var orgId in _createdOrganizationIds)
-            {
-                try
-                {
-                    await _domainFacade.DeleteOrganization(orgId);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Warning: Could not delete organization {orgId}: {ex.Message}");
-                }
-            }
+            TestDataCleanup.CleanupAllTestData();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning: Error during test cleanup: {ex.Message}");
         }
         finally
         {
@@ -80,7 +48,7 @@ public class DomainFacadeTestsAgent
     }
 
     /// <summary>
-    /// Helper method to create test Agent and track it for cleanup
+    /// Helper method to create test Agent
     /// </summary>
     private async Task<Agent> CreateTestAgentAsync(string suffix = "")
     {
@@ -93,10 +61,6 @@ public class DomainFacadeTestsAgent
 
         var result = await _domainFacade.CreateAgent(agent);
         Assert.IsNotNull(result, "Failed to create test Agent");
-        
-        // Track for cleanup
-        _createdAgentIds.Add(result.Id);
-        
         return result;
     }
 
@@ -113,7 +77,6 @@ public class DomainFacadeTestsAgent
 
         // Act
         var result = await _domainFacade.CreateAgent(agent);
-        _createdAgentIds.Add(result.Id); // Track for cleanup
 
         // Assert
         Assert.IsNotNull(result, "Create should return an Agent");
@@ -135,7 +98,6 @@ public class DomainFacadeTestsAgent
 
         // Act
         var result = await _domainFacade.CreateAgent(agent);
-        _createdAgentIds.Add(result.Id); // Track for cleanup
 
         // Assert
         Assert.IsNotNull(result, "Create should return an Agent");
@@ -237,7 +199,6 @@ public class DomainFacadeTestsAgent
             DisplayName = $"{uniquePrefix}_1"
         };
         var created1 = await _domainFacade.CreateAgent(agent1);
-        _createdAgentIds.Add(created1.Id);
         
         var agent2 = new Agent
         {
@@ -245,7 +206,6 @@ public class DomainFacadeTestsAgent
             DisplayName = $"{uniquePrefix}_2"
         };
         var created2 = await _domainFacade.CreateAgent(agent2);
-        _createdAgentIds.Add(created2.Id);
 
         // Act - Search by displayName pattern
         var result = await _domainFacade.SearchAgents(null, uniquePrefix, null, null, 1, 10);
@@ -327,9 +287,6 @@ public class DomainFacadeTestsAgent
         // Arrange - Create a test Agent
         var agent = await CreateTestAgentAsync();
         var agentId = agent.Id;
-        
-        // Remove from tracking since we're testing delete
-        _createdAgentIds.Remove(agentId);
 
         // Act
         var result = await _domainFacade.DeleteAgent(agentId);
@@ -366,7 +323,6 @@ public class DomainFacadeTestsAgent
         var created = await _domainFacade.CreateAgent(agent);
         Assert.IsNotNull(created, "Agent should be created");
         var createdId = created.Id;
-        // Don't add to tracking - we'll delete it as part of the test
         
         // Get
         var retrievedAgent = await _domainFacade.GetAgentById(createdId);

@@ -9,7 +9,7 @@ public sealed partial class DomainFacade
 {
     // In-memory session storage for widget conversations
     // In production, this should use Redis or similar distributed cache
-    private static readonly ConcurrentDictionary<string, List<Message>> _widgetSessions = new();
+    private static readonly ConcurrentDictionary<string, List<ConversationTurn>> _widgetSessions = new();
 
     /// <summary>
     /// Generates a chat response for the widget chatbot
@@ -29,12 +29,12 @@ public sealed partial class DomainFacade
 
         // Get or create session history
         var sessionKey = $"{agentId}:{sessionId}";
-        var history = _widgetSessions.GetOrAdd(sessionKey, _ => new List<Message>());
+        var history = _widgetSessions.GetOrAdd(sessionKey, _ => new List<ConversationTurn>());
 
         // Add user message to history
         lock (history)
         {
-            history.Add(new Message
+            history.Add(new ConversationTurn
             {
                 Role = "user",
                 Content = userMessage
@@ -45,7 +45,7 @@ public sealed partial class DomainFacade
         var systemPrompt = BuildWidgetSystemPrompt(agent);
 
         // Generate AI response
-        IEnumerable<Message> historySnapshot;
+        IEnumerable<ConversationTurn> historySnapshot;
         lock (history)
         {
             // Take last 20 messages to keep context manageable
@@ -57,7 +57,7 @@ public sealed partial class DomainFacade
         // Add AI response to history
         lock (history)
         {
-            history.Add(new Message
+            history.Add(new ConversationTurn
             {
                 Role = "assistant",
                 Content = response

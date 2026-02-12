@@ -15,7 +15,7 @@ import { AgentAvatar } from "@/components/agent-avatar";
 import { 
   fetchAgentTraining, 
   updateAgentTraining 
-} from "../../../personas/[id]/train/actions";
+} from "../../../agents/[id]/train/actions";
 import { useVoiceInput } from "@/hooks/use-voice-input";
 import { VoiceInputToggle } from "@/components/voice-input-toggle";
 import { useServerAction } from "@/lib/use-server-action";
@@ -130,7 +130,7 @@ export default function AgentTrainPage() {
       <div className="border-b bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5">
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center gap-6">
-            <Link href={`/my-personas/${agentId}/edit`}>
+            <Link href={`/my-agents/${agentId}/edit`}>
               <Button variant="ghost" size="icon" className="rounded-full">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
