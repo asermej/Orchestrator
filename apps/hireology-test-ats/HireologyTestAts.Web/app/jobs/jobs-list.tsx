@@ -50,7 +50,11 @@ export function JobsList({ jobs, onDeleted }: JobsListProps) {
           {jobs.map((job) => (
             <tr key={job.id}>
               <td className="px-4 py-3 text-sm text-slate-900">{job.externalJobId}</td>
-              <td className="px-4 py-3 text-sm text-slate-900">{job.title}</td>
+              <td className="px-4 py-3 text-sm">
+                <a href={`/jobs/${job.id}`} className="text-indigo-600 hover:text-indigo-800 font-medium">
+                  {job.title}
+                </a>
+              </td>
               <td className="px-4 py-3 text-sm text-slate-600">{job.location ?? "—"}</td>
               <td className="px-4 py-3 text-sm text-slate-600">{job.status}</td>
               <td className="px-4 py-3 text-right">

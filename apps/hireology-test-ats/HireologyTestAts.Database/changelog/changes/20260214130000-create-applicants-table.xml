@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260214130000-create-applicants-table" author="system">
+        <createTable tableName="applicants">
+            <column name="id" type="uuid">
+                <constraints primaryKey="true" nullable="false" />
+            </column>
+            <column name="job_id" type="uuid">
+                <constraints nullable="false" references="jobs(id)" foreignKeyName="fk_applicants_job" />
+            </column>
+            <column name="organization_id" type="uuid">
+                <constraints nullable="true" references="organizations(id)" foreignKeyName="fk_applicants_organization" />
+            </column>
+            <column name="first_name" type="varchar(200)">
+                <constraints nullable="false" />
+            </column>
+            <column name="last_name" type="varchar(200)">
+                <constraints nullable="false" />
+            </column>
+            <column name="email" type="varchar(500)">
+                <constraints nullable="false" />
+            </column>
+            <column name="phone" type="varchar(50)">
+                <constraints nullable="true" />
+            </column>
+            <column name="created_at" type="timestamptz" defaultValueComputed="NOW()">
+                <constraints nullable="false" />
+            </column>
+            <column name="updated_at" type="timestamptz" defaultValueComputed="NOW()">
+                <constraints nullable="false" />
+            </column>
+        </createTable>
+
+        <createIndex tableName="applicants" indexName="idx_applicants_job_id">
+            <column name="job_id" />
+        </createIndex>
+        <createIndex tableName="applicants" indexName="idx_applicants_organization_id">
+            <column name="organization_id" />
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>
