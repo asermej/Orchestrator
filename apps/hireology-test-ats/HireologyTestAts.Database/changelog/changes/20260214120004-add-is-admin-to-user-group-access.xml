@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260214120004-add-is-admin-to-user-group-access" author="system">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="user_group_access" columnName="is_admin"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="user_group_access">
+            <column name="is_admin" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="user_group_access" columnName="is_admin"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

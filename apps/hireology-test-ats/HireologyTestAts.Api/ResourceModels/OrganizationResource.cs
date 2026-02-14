@@ -4,6 +4,7 @@ public class OrganizationResource
 {
     public Guid Id { get; set; }
     public Guid GroupId { get; set; }
+    public Guid? ParentOrganizationId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? City { get; set; }
     public string? State { get; set; }
@@ -14,6 +15,7 @@ public class OrganizationResource
 public class CreateOrganizationResource
 {
     public Guid GroupId { get; set; }
+    public Guid? ParentOrganizationId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? City { get; set; }
     public string? State { get; set; }
@@ -22,6 +24,7 @@ public class CreateOrganizationResource
 public class UpdateOrganizationResource
 {
     public Guid? GroupId { get; set; }
+    public Guid? ParentOrganizationId { get; set; }
     public string? Name { get; set; }
     public string? City { get; set; }
     public string? State { get; set; }

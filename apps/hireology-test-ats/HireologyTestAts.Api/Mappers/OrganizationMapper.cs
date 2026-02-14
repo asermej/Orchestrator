@@ -11,6 +11,7 @@ public static class OrganizationMapper
         {
             Id = org.Id,
             GroupId = org.GroupId,
+            ParentOrganizationId = org.ParentOrganizationId,
             Name = org.Name,
             City = org.City,
             State = org.State,
@@ -29,6 +30,7 @@ public static class OrganizationMapper
         return new Organization
         {
             GroupId = resource.GroupId,
+            ParentOrganizationId = resource.ParentOrganizationId,
             Name = resource.Name,
             City = resource.City,
             State = resource.State
@@ -40,6 +42,7 @@ public static class OrganizationMapper
         return new Organization
         {
             GroupId = resource.GroupId ?? Guid.Empty,
+            ParentOrganizationId = resource.ParentOrganizationId,
             Name = resource.Name ?? string.Empty,
             City = resource.City,
             State = resource.State

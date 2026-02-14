@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Make auth0_sub nullable on the users table to support pre-provisioned users
+        who are invited by email before they log in via Auth0.
+        Replace the full unique constraint with a partial unique index
+        so that multiple pre-provisioned users can have NULL auth0_sub.
+    -->
+    <changeSet id="20260214120006-make-auth0sub-nullable" author="system">
+        <dropNotNullConstraint tableName="users" columnName="auth0_sub" columnDataType="varchar(255)"/>
+
+        <!-- Drop the existing unique constraint on auth0_sub (auto-generated name from inline unique="true") -->
+        <sql splitStatements="false">
+            DO $$
+            DECLARE
+                constraint_name_var text;
+            BEGIN
+                SELECT conname INTO constraint_name_var
+                FROM pg_constraint
+                WHERE conrelid = 'users'::regclass
+                  AND contype = 'u'
+                  AND array_length(conkey, 1) = 1
+                  AND conkey[1] = (SELECT attnum FROM pg_attribute WHERE attrelid = 'users'::regclass AND attname = 'auth0_sub');
+                IF constraint_name_var IS NOT NULL THEN
+                    EXECUTE format('ALTER TABLE users DROP CONSTRAINT %I', constraint_name_var);
+                END IF;
+            END $$;
+        </sql>
+
+        <!-- Drop the existing non-unique index on auth0_sub (we'll replace with partial unique) -->
+        <sql>DROP INDEX IF EXISTS idx_users_auth0_sub;</sql>
+
+        <!-- Create a partial unique index: only enforce uniqueness where auth0_sub IS NOT NULL -->
+        <sql>
+            CREATE UNIQUE INDEX idx_users_auth0_sub_unique
+            ON users (auth0_sub)
+            WHERE auth0_sub IS NOT NULL;
+        </sql>
+
+        <rollback>
+            <sql>DROP INDEX IF EXISTS idx_users_auth0_sub_unique;</sql>
+            <createIndex tableName="users" indexName="idx_users_auth0_sub">
+                <column name="auth0_sub"/>
+            </createIndex>
+            <addUniqueConstraint tableName="users" columnNames="auth0_sub" constraintName="users_auth0_sub_key"/>
+            <addNotNullConstraint tableName="users" columnName="auth0_sub" columnDataType="varchar(255)"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

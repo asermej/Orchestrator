@@ -76,6 +76,10 @@ public static class ExceptionToHttpTranslator
         {
             return 404;
         }
+        if (exception is SuperadminRequiredException or AccessDeniedException)
+        {
+            return 403;
+        }
         if (exception is BusinessBaseException)
         {
             return 400;

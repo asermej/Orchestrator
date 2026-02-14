@@ -31,20 +31,38 @@ public class JobsController : ControllerBase
             var user = await _domainFacade.GetUserByAuth0Sub(auth0Sub);
             if (user != null)
             {
-                var allowedOrgIds = await _domainFacade.GetAllowedOrganizationIds(user.Id);
+                var isSuperadmin = user.IsSuperadmin;
+
                 if (organizationId.HasValue)
                 {
-                    if (!allowedOrgIds.Contains(organizationId.Value))
-                        return Forbid();
+                    // Explicit org filter: superadmins can access any; others need permission
+                    if (!isSuperadmin)
+                    {
+                        var canAccess = await _domainFacade.CanAccessOrganization(user.Id, organizationId.Value);
+                        if (!canAccess) return Forbid();
+                    }
                     orgFilter = new[] { organizationId.Value };
                 }
                 else
                 {
+                    // No explicit org — use the selected location to scope jobs
                     var selectedId = await _domainFacade.GetSelectedOrganizationId(user.Id);
-                    if (selectedId.HasValue && allowedOrgIds.Contains(selectedId.Value))
-                        orgFilter = new[] { selectedId.Value };
-                    else if (allowedOrgIds.Count > 0)
-                        orgFilter = allowedOrgIds;
+                    if (selectedId.HasValue)
+                    {
+                        if (isSuperadmin || await _domainFacade.CanAccessOrganization(user.Id, selectedId.Value))
+                        {
+                            orgFilter = new[] { selectedId.Value };
+                        }
+                    }
+
+                    // If no selected location and not superadmin, fall back to all allowed orgs
+                    if (orgFilter == null && !isSuperadmin)
+                    {
+                        var allowedOrgIds = await _domainFacade.GetAllowedOrganizationIds(user.Id);
+                        if (allowedOrgIds.Count > 0)
+                            orgFilter = allowedOrgIds;
+                    }
+                    // Superadmin with no selected location: orgFilter stays null → show all jobs
                 }
             }
         }

@@ -10,6 +10,7 @@ public static class GroupMapper
         return new GroupResource
         {
             Id = group.Id,
+            RootOrganizationId = group.RootOrganizationId,
             Name = group.Name,
             CreatedAt = group.CreatedAt,
             UpdatedAt = group.UpdatedAt

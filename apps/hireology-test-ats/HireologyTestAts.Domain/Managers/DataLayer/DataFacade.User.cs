@@ -34,4 +34,29 @@ internal sealed partial class DataFacade
     {
         return await UserDataManager.CountAsync().ConfigureAwait(false);
     }
+
+    public async Task<bool> SetSuperadmin(Guid userId, bool isSuperadmin)
+    {
+        return await UserDataManager.SetSuperadminAsync(userId, isSuperadmin).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<User>> GetSuperadmins()
+    {
+        return await UserDataManager.GetSuperadminsAsync().ConfigureAwait(false);
+    }
+
+    public async Task<User?> GetUserByEmail(string email)
+    {
+        return await UserDataManager.GetByEmailAsync(email).ConfigureAwait(false);
+    }
+
+    public async Task<User?> UpdateAuth0Sub(Guid userId, string auth0Sub, string? name)
+    {
+        return await UserDataManager.UpdateAuth0SubAsync(userId, auth0Sub, name).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<User>> GetUsersByGroup(Guid groupId)
+    {
+        return await UserDataManager.GetUsersByGroupAsync(groupId).ConfigureAwait(false);
+    }
 }

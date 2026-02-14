@@ -23,7 +23,7 @@ internal sealed class JobDataManager
             SELECT id AS Id, external_job_id AS ExternalJobId, title AS Title, description AS Description,
                    location AS Location, status AS Status, organization_id AS OrganizationId, created_at AS CreatedAt, updated_at AS UpdatedAt
             FROM jobs
-            WHERE organization_id = ANY(@OrganizationIds)
+            WHERE organization_id = ANY(@OrganizationIds) OR organization_id IS NULL
             ORDER BY created_at DESC
             LIMIT @PageSize OFFSET @Offset";
             args = new { OrganizationIds = allowedOrganizationIds.ToArray(), PageSize = pageSize, Offset = offset };
@@ -49,7 +49,7 @@ internal sealed class JobDataManager
         object? args;
         if (allowedOrganizationIds != null && allowedOrganizationIds.Count > 0)
         {
-            sql = "SELECT COUNT(*) FROM jobs WHERE organization_id = ANY(@OrganizationIds)";
+            sql = "SELECT COUNT(*) FROM jobs WHERE organization_id = ANY(@OrganizationIds) OR organization_id IS NULL";
             args = new { OrganizationIds = allowedOrganizationIds.ToArray() };
         }
         else

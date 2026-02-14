@@ -29,4 +29,14 @@ internal sealed partial class DataFacade
     {
         return await OrganizationDataManager.DeleteAsync(id).ConfigureAwait(false);
     }
+
+    public async Task<IReadOnlyList<Organization>> GetChildOrganizations(Guid parentOrganizationId)
+    {
+        return await OrganizationDataManager.GetChildrenAsync(parentOrganizationId).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<Organization>> GetOrganizationTree(Guid groupId)
+    {
+        return await OrganizationDataManager.GetOrganizationTreeAsync(groupId).ConfigureAwait(false);
+    }
 }

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260214120005-add-include-children-to-user-org-access" author="system">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="user_organization_access" columnName="include_children"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="user_organization_access">
+            <column name="include_children" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="user_organization_access" columnName="include_children"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Seed the first superadmin by email.
+        Set the property 'superadmin.email' when running Liquibase:
+            liquibase -Dsuperadmin.email=admin@example.com update
+        If the property is not set, the changeset is skipped via precondition.
+    -->
+    <changeSet id="20260214120003-seed-superadmin" author="system" context="seed">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                SELECT COUNT(*) FROM users WHERE email = '${superadmin.email}'
+            </sqlCheck>
+        </preConditions>
+        <sql>
+            UPDATE users SET is_superadmin = true, updated_at = CURRENT_TIMESTAMP
+            WHERE email = '${superadmin.email}';
+        </sql>
+        <rollback>
+            <sql>
+                UPDATE users SET is_superadmin = false, updated_at = CURRENT_TIMESTAMP
+                WHERE email = '${superadmin.email}';
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

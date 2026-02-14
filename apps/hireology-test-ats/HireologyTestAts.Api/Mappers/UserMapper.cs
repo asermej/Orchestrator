@@ -13,6 +13,7 @@ public static class UserMapper
             Auth0Sub = user.Auth0Sub,
             Email = user.Email,
             Name = user.Name,
+            IsSuperadmin = user.IsSuperadmin,
             CreatedAt = user.CreatedAt,
             UpdatedAt = user.UpdatedAt
         };

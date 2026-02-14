@@ -14,4 +14,11 @@
     <include file="changes/20260210120004-create-user-organization-access-table.xml" relativeToChangelogFile="true"/>
     <include file="changes/20260210120005-create-user-sessions-table.xml" relativeToChangelogFile="true"/>
     <include file="changes/20260210120006-add-organization-id-to-jobs.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260214120000-add-superadmin-to-users.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260214120001-add-parent-org-to-organizations.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260214120002-add-root-org-to-groups.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260214120003-seed-superadmin.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260214120004-add-is-admin-to-user-group-access.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260214120005-add-include-children-to-user-org-access.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260214120006-make-auth0sub-nullable.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

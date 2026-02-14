@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using HireologyTestAts.Api.Auth;
 using HireologyTestAts.Api.Mappers;
 using HireologyTestAts.Api.ResourceModels;
 using HireologyTestAts.Domain;
@@ -36,9 +37,26 @@ public class OrganizationsController : ControllerBase
         return Ok(OrganizationMapper.ToResource(org));
     }
 
+    /// <summary>
+    /// Returns all organizations in a group as a flat list for client-side tree building.
+    /// </summary>
+    [HttpGet("tree")]
+    [ProducesResponseType(typeof(IReadOnlyList<OrganizationResource>), 200)]
+    [ProducesResponseType(400)]
+    public async Task<ActionResult<IReadOnlyList<OrganizationResource>>> GetTree([FromQuery] Guid groupId)
+    {
+        if (groupId == Guid.Empty)
+            return BadRequest(new { Message = "groupId is required" });
+
+        var orgs = await _domainFacade.GetOrganizationTree(groupId);
+        return Ok(OrganizationMapper.ToResource(orgs));
+    }
+
     [HttpPost]
+    [SuperadminRequired]
     [ProducesResponseType(typeof(OrganizationResource), 201)]
     [ProducesResponseType(400)]
+    [ProducesResponseType(403)]
     public async Task<ActionResult<OrganizationResource>> Create([FromBody] CreateOrganizationResource resource)
     {
         var org = OrganizationMapper.ToDomain(resource);
@@ -48,8 +66,10 @@ public class OrganizationsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [SuperadminRequired]
     [ProducesResponseType(typeof(OrganizationResource), 200)]
     [ProducesResponseType(404)]
+    [ProducesResponseType(403)]
     public async Task<ActionResult<OrganizationResource>> Update(Guid id, [FromBody] UpdateOrganizationResource resource)
     {
         var updates = OrganizationMapper.ToDomain(resource);
@@ -57,9 +77,23 @@ public class OrganizationsController : ControllerBase
         return Ok(OrganizationMapper.ToResource(updated));
     }
 
+    [HttpPost("{id:guid}/move")]
+    [SuperadminRequired]
+    [ProducesResponseType(typeof(OrganizationResource), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(403)]
+    public async Task<ActionResult<OrganizationResource>> Move(Guid id, [FromBody] MoveOrganizationResource resource)
+    {
+        var updated = await _domainFacade.MoveOrganization(id, resource.NewParentOrganizationId);
+        return Ok(OrganizationMapper.ToResource(updated));
+    }
+
     [HttpDelete("{id:guid}")]
+    [SuperadminRequired]
     [ProducesResponseType(204)]
     [ProducesResponseType(404)]
+    [ProducesResponseType(403)]
     public async Task<ActionResult> Delete(Guid id)
     {
         await _domainFacade.DeleteOrganization(id);

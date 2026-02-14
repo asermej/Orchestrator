@@ -12,9 +12,9 @@ public sealed partial class DomainFacade
         return await GroupManager.GetGroupById(id).ConfigureAwait(false);
     }
 
-    public async Task<Group> CreateGroup(Group group)
+    public async Task<Group> CreateGroup(Group group, string? adminEmail = null)
     {
-        return await GroupManager.CreateGroup(group).ConfigureAwait(false);
+        return await GroupManager.CreateGroup(group, adminEmail).ConfigureAwait(false);
     }
 
     public async Task<Group> UpdateGroup(Guid id, Group updates)

@@ -15,7 +15,8 @@ internal sealed class GroupDataManager
     public async Task<IReadOnlyList<Group>> ListAsync()
     {
         const string sql = @"
-            SELECT id AS Id, name AS Name, created_at AS CreatedAt, updated_at AS UpdatedAt
+            SELECT id AS Id, root_organization_id AS RootOrganizationId, name AS Name,
+                   created_at AS CreatedAt, updated_at AS UpdatedAt
             FROM groups
             ORDER BY name";
         await using var conn = new NpgsqlConnection(_connectionString);
@@ -26,7 +27,8 @@ internal sealed class GroupDataManager
     public async Task<Group?> GetByIdAsync(Guid id)
     {
         const string sql = @"
-            SELECT id AS Id, name AS Name, created_at AS CreatedAt, updated_at AS UpdatedAt
+            SELECT id AS Id, root_organization_id AS RootOrganizationId, name AS Name,
+                   created_at AS CreatedAt, updated_at AS UpdatedAt
             FROM groups WHERE id = @Id";
         await using var conn = new NpgsqlConnection(_connectionString);
         return await conn.QueryFirstOrDefaultAsync<Group>(new CommandDefinition(sql, new { Id = id }));
@@ -38,9 +40,10 @@ internal sealed class GroupDataManager
         group.CreatedAt = DateTime.UtcNow;
         group.UpdatedAt = DateTime.UtcNow;
         const string sql = @"
-            INSERT INTO groups (id, name, created_at, updated_at)
-            VALUES (@Id, @Name, @CreatedAt, @UpdatedAt)
-            RETURNING id AS Id, name AS Name, created_at AS CreatedAt, updated_at AS UpdatedAt";
+            INSERT INTO groups (id, root_organization_id, name, created_at, updated_at)
+            VALUES (@Id, @RootOrganizationId, @Name, @CreatedAt, @UpdatedAt)
+            RETURNING id AS Id, root_organization_id AS RootOrganizationId, name AS Name,
+                      created_at AS CreatedAt, updated_at AS UpdatedAt";
         await using var conn = new NpgsqlConnection(_connectionString);
         return (await conn.QuerySingleAsync<Group>(new CommandDefinition(sql, group)))!;
     }
@@ -49,9 +52,10 @@ internal sealed class GroupDataManager
     {
         group.UpdatedAt = DateTime.UtcNow;
         const string sql = @"
-            UPDATE groups SET name = @Name, updated_at = @UpdatedAt
+            UPDATE groups SET root_organization_id = @RootOrganizationId, name = @Name, updated_at = @UpdatedAt
             WHERE id = @Id
-            RETURNING id AS Id, name AS Name, created_at AS CreatedAt, updated_at AS UpdatedAt";
+            RETURNING id AS Id, root_organization_id AS RootOrganizationId, name AS Name,
+                      created_at AS CreatedAt, updated_at AS UpdatedAt";
         await using var conn = new NpgsqlConnection(_connectionString);
         return await conn.QueryFirstOrDefaultAsync<Group>(new CommandDefinition(sql, group));
     }

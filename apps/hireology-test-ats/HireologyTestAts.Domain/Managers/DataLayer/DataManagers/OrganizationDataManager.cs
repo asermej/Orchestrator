@@ -15,7 +15,8 @@ internal sealed class OrganizationDataManager
     public async Task<IReadOnlyList<Organization>> ListAsync(Guid? groupId)
     {
         const string sqlBase = @"
-            SELECT id AS Id, group_id AS GroupId, name AS Name, city AS City, state AS State,
+            SELECT id AS Id, group_id AS GroupId, parent_organization_id AS ParentOrganizationId,
+                   name AS Name, city AS City, state AS State,
                    created_at AS CreatedAt, updated_at AS UpdatedAt
             FROM organizations";
         var sql = groupId.HasValue
@@ -30,7 +31,8 @@ internal sealed class OrganizationDataManager
     public async Task<Organization?> GetByIdAsync(Guid id)
     {
         const string sql = @"
-            SELECT id AS Id, group_id AS GroupId, name AS Name, city AS City, state AS State,
+            SELECT id AS Id, group_id AS GroupId, parent_organization_id AS ParentOrganizationId,
+                   name AS Name, city AS City, state AS State,
                    created_at AS CreatedAt, updated_at AS UpdatedAt
             FROM organizations WHERE id = @Id";
         await using var conn = new NpgsqlConnection(_connectionString);
@@ -43,9 +45,10 @@ internal sealed class OrganizationDataManager
         org.CreatedAt = DateTime.UtcNow;
         org.UpdatedAt = DateTime.UtcNow;
         const string sql = @"
-            INSERT INTO organizations (id, group_id, name, city, state, created_at, updated_at)
-            VALUES (@Id, @GroupId, @Name, @City, @State, @CreatedAt, @UpdatedAt)
-            RETURNING id AS Id, group_id AS GroupId, name AS Name, city AS City, state AS State,
+            INSERT INTO organizations (id, group_id, parent_organization_id, name, city, state, created_at, updated_at)
+            VALUES (@Id, @GroupId, @ParentOrganizationId, @Name, @City, @State, @CreatedAt, @UpdatedAt)
+            RETURNING id AS Id, group_id AS GroupId, parent_organization_id AS ParentOrganizationId,
+                      name AS Name, city AS City, state AS State,
                       created_at AS CreatedAt, updated_at AS UpdatedAt";
         await using var conn = new NpgsqlConnection(_connectionString);
         return (await conn.QuerySingleAsync<Organization>(new CommandDefinition(sql, org)))!;
@@ -55,9 +58,11 @@ internal sealed class OrganizationDataManager
     {
         org.UpdatedAt = DateTime.UtcNow;
         const string sql = @"
-            UPDATE organizations SET group_id = @GroupId, name = @Name, city = @City, state = @State, updated_at = @UpdatedAt
+            UPDATE organizations SET group_id = @GroupId, parent_organization_id = @ParentOrganizationId,
+                   name = @Name, city = @City, state = @State, updated_at = @UpdatedAt
             WHERE id = @Id
-            RETURNING id AS Id, group_id AS GroupId, name AS Name, city AS City, state AS State,
+            RETURNING id AS Id, group_id AS GroupId, parent_organization_id AS ParentOrganizationId,
+                      name AS Name, city AS City, state AS State,
                       created_at AS CreatedAt, updated_at AS UpdatedAt";
         await using var conn = new NpgsqlConnection(_connectionString);
         return await conn.QueryFirstOrDefaultAsync<Organization>(new CommandDefinition(sql, org));
@@ -69,5 +74,31 @@ internal sealed class OrganizationDataManager
         await using var conn = new NpgsqlConnection(_connectionString);
         var rows = await conn.ExecuteAsync(new CommandDefinition(sql, new { Id = id }));
         return rows > 0;
+    }
+
+    public async Task<IReadOnlyList<Organization>> GetChildrenAsync(Guid parentOrganizationId)
+    {
+        const string sql = @"
+            SELECT id AS Id, group_id AS GroupId, parent_organization_id AS ParentOrganizationId,
+                   name AS Name, city AS City, state AS State,
+                   created_at AS CreatedAt, updated_at AS UpdatedAt
+            FROM organizations WHERE parent_organization_id = @ParentOrganizationId ORDER BY name";
+        await using var conn = new NpgsqlConnection(_connectionString);
+        var items = await conn.QueryAsync<Organization>(
+            new CommandDefinition(sql, new { ParentOrganizationId = parentOrganizationId }));
+        return items.ToList();
+    }
+
+    public async Task<IReadOnlyList<Organization>> GetOrganizationTreeAsync(Guid groupId)
+    {
+        const string sql = @"
+            SELECT id AS Id, group_id AS GroupId, parent_organization_id AS ParentOrganizationId,
+                   name AS Name, city AS City, state AS State,
+                   created_at AS CreatedAt, updated_at AS UpdatedAt
+            FROM organizations WHERE group_id = @GroupId ORDER BY name";
+        await using var conn = new NpgsqlConnection(_connectionString);
+        var items = await conn.QueryAsync<Organization>(
+            new CommandDefinition(sql, new { GroupId = groupId }));
+        return items.ToList();
     }
 }

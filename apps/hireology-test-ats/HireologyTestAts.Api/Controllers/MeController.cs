@@ -31,18 +31,33 @@ public class MeController : ControllerBase
         var auth0Sub = GetAuth0Sub();
         if (string.IsNullOrEmpty(auth0Sub)) return Unauthorized();
 
-        var email = User?.FindFirstValue(ClaimTypes.Email) ?? User?.FindFirstValue("email");
-        var name = User?.FindFirstValue(ClaimTypes.Name) ?? User?.FindFirstValue("name");
+        var (email, name) = GetEmailAndName();
 
         var user = await _domainFacade.GetOrCreateUser(auth0Sub, email, name);
 
-        var groups = await _domainFacade.GetAccessibleGroups(user.Id);
-        var organizations = await _domainFacade.GetAccessibleOrganizations(user.Id);
+        // Superadmins see all groups and organizations; regular users only see what they have access to
+        IReadOnlyList<Group> groups;
+        IReadOnlyList<Organization> organizations;
+        if (user.IsSuperadmin)
+        {
+            groups = await _domainFacade.GetGroups();
+            organizations = await _domainFacade.GetOrganizations();
+        }
+        else
+        {
+            groups = await _domainFacade.GetAccessibleGroups(user.Id);
+            organizations = await _domainFacade.GetAccessibleOrganizations(user.Id);
+        }
+
         var selectedOrganizationId = await _domainFacade.GetSelectedOrganizationId(user.Id);
+        var adminGroupIds = await _domainFacade.GetGroupAdminGroupIds(user.Id);
 
         return Ok(new MeResponse
         {
             User = UserMapper.ToResource(user),
+            IsSuperadmin = user.IsSuperadmin,
+            IsGroupAdmin = adminGroupIds.Count > 0 || user.IsSuperadmin,
+            AdminGroupIds = adminGroupIds,
             AccessibleGroups = GroupMapper.ToResource(groups),
             AccessibleOrganizations = OrganizationMapper.ToResource(organizations),
             CurrentContext = new MeContextResponse { SelectedOrganizationId = selectedOrganizationId }
@@ -60,8 +75,7 @@ public class MeController : ControllerBase
         var auth0Sub = GetAuth0Sub();
         if (string.IsNullOrEmpty(auth0Sub)) return Unauthorized();
 
-        var email = User?.FindFirstValue(ClaimTypes.Email) ?? User?.FindFirstValue("email");
-        var name = User?.FindFirstValue(ClaimTypes.Name) ?? User?.FindFirstValue("name");
+        var (email, name) = GetEmailAndName();
 
         var user = await _domainFacade.GetOrCreateUser(auth0Sub, email, name);
 
@@ -81,8 +95,7 @@ public class MeController : ControllerBase
         var auth0Sub = GetAuth0Sub();
         if (string.IsNullOrEmpty(auth0Sub)) return Unauthorized();
 
-        var email = User?.FindFirstValue(ClaimTypes.Email) ?? User?.FindFirstValue("email");
-        var name = User?.FindFirstValue(ClaimTypes.Name) ?? User?.FindFirstValue("name");
+        var (email, name) = GetEmailAndName();
 
         var user = await _domainFacade.GetOrCreateUser(auth0Sub, email, name);
 
@@ -94,5 +107,30 @@ public class MeController : ControllerBase
     {
         return User?.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? User?.FindFirstValue("sub");
+    }
+
+    /// <summary>
+    /// Get email and name from JWT claims first, then fall back to X-User-Email / X-User-Name
+    /// headers (sent by the frontend from the Auth0 session/ID token, since Auth0 access tokens
+    /// for custom APIs don't include email/name claims by default).
+    /// </summary>
+    private (string? email, string? name) GetEmailAndName()
+    {
+        var email = User?.FindFirstValue(ClaimTypes.Email)
+            ?? User?.FindFirstValue("email");
+        var name = User?.FindFirstValue(ClaimTypes.Name)
+            ?? User?.FindFirstValue("name");
+
+        // Fallback: frontend sends these from the Auth0 session when claims are missing
+        if (string.IsNullOrEmpty(email))
+        {
+            email = Request.Headers["X-User-Email"].FirstOrDefault();
+        }
+        if (string.IsNullOrEmpty(name))
+        {
+            name = Request.Headers["X-User-Name"].FirstOrDefault();
+        }
+
+        return (email, name);
     }
 }

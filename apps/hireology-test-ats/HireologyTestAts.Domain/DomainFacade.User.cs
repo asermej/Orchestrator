@@ -34,6 +34,40 @@ public sealed partial class DomainFacade
         return await UserManager.UpdateUser(id, updates).ConfigureAwait(false);
     }
 
+    // Superadmin operations
+
+    public async Task<bool> IsSuperadmin(Guid userId)
+    {
+        return await UserManager.IsSuperadmin(userId).ConfigureAwait(false);
+    }
+
+    public async Task<bool> IsSuperadminByAuth0Sub(string auth0Sub)
+    {
+        return await UserManager.IsSuperadminByAuth0Sub(auth0Sub).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<User>> GetSuperadmins()
+    {
+        return await UserManager.GetSuperadmins().ConfigureAwait(false);
+    }
+
+    public async Task<User> SetSuperadmin(Guid requestingUserId, Guid targetUserId, bool isSuperadmin)
+    {
+        return await UserManager.SetSuperadmin(requestingUserId, targetUserId, isSuperadmin).ConfigureAwait(false);
+    }
+
+    // User invitation / pre-provisioning
+
+    public async Task<User> InviteUser(string email, Guid groupId, bool isAdmin)
+    {
+        return await UserManager.InviteUser(email, groupId, isAdmin).ConfigureAwait(false);
+    }
+
+    public async Task<User> InviteUserWithOrgAccess(string email, Guid groupId, bool isAdmin, IReadOnlyList<OrganizationAccessEntry>? orgAccessEntries)
+    {
+        return await UserManager.InviteUserWithOrgAccess(email, groupId, isAdmin, orgAccessEntries).ConfigureAwait(false);
+    }
+
     // User access
 
     public async Task<IReadOnlyList<Guid>> GetUserGroupIds(Guid userId)
@@ -49,6 +83,16 @@ public sealed partial class DomainFacade
     public async Task SetUserAccess(Guid userId, IReadOnlyList<Guid>? groupIds, IReadOnlyList<Guid>? organizationIds)
     {
         await UserManager.SetUserAccess(userId, groupIds, organizationIds).ConfigureAwait(false);
+    }
+
+    public async Task SetUserOrganizationAccessWithFlags(Guid userId, IReadOnlyList<OrganizationAccessEntry> entries)
+    {
+        await UserManager.SetUserOrganizationAccessWithFlags(userId, entries).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<OrganizationAccessEntry>> GetOrganizationAccessEntries(Guid userId)
+    {
+        return await UserManager.GetOrganizationAccessEntries(userId).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<Guid>> GetAllowedOrganizationIds(Guid userId)
@@ -69,6 +113,28 @@ public sealed partial class DomainFacade
     public async Task<IReadOnlyList<Organization>> GetAccessibleOrganizations(Guid userId)
     {
         return await UserManager.GetAccessibleOrganizations(userId).ConfigureAwait(false);
+    }
+
+    // Group admin operations
+
+    public async Task<bool> IsGroupAdmin(Guid userId, Guid groupId)
+    {
+        return await UserManager.IsGroupAdmin(userId, groupId).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<Guid>> GetGroupAdminGroupIds(Guid userId)
+    {
+        return await UserManager.GetGroupAdminGroupIds(userId).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<User>> GetUsersByGroup(Guid groupId)
+    {
+        return await UserManager.GetUsersByGroup(groupId).ConfigureAwait(false);
+    }
+
+    public async Task RemoveUserFromGroup(Guid userId, Guid groupId)
+    {
+        await UserManager.RemoveUserFromGroup(userId, groupId).ConfigureAwait(false);
     }
 
     // User sessions

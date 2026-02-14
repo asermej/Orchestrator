@@ -3,21 +3,33 @@ const API_BASE =
     ? process.env.NEXT_PUBLIC_TEST_ATS_API_URL || "http://localhost:5001"
     : process.env.NEXT_PUBLIC_TEST_ATS_API_URL || "http://localhost:5001";
 
-async function getToken(): Promise<string | null> {
-  if (typeof window === "undefined") return null;
+interface TokenInfo {
+  accessToken: string | null;
+  email?: string;
+  name?: string;
+}
+
+async function getTokenInfo(): Promise<TokenInfo> {
+  if (typeof window === "undefined") return { accessToken: null };
   const res = await fetch("/api/auth/token");
-  if (!res.ok) return null;
+  if (!res.ok) return { accessToken: null };
   const data = await res.json();
-  return data.accessToken ?? null;
+  return {
+    accessToken: data.accessToken ?? null,
+    email: data.email ?? undefined,
+    name: data.name ?? undefined,
+  };
 }
 
 async function fetchWithAuth(
   path: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  const token = await getToken();
+  const info = await getTokenInfo();
   const headers = new Headers(options.headers);
-  if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (info.accessToken) headers.set("Authorization", `Bearer ${info.accessToken}`);
+  if (info.email) headers.set("X-User-Email", info.email);
+  if (info.name) headers.set("X-User-Name", info.name);
   return fetch(`${API_BASE}${path}`, { ...options, headers });
 }
 

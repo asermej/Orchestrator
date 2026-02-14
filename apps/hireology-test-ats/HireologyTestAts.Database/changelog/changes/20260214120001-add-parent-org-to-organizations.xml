@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260214120001-add-parent-org-to-organizations" author="system">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="organizations" columnName="parent_organization_id"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="organizations">
+            <column name="parent_organization_id" type="uuid">
+                <constraints nullable="true"
+                             foreignKeyName="fk_organizations_parent_org"
+                             references="organizations(id)"/>
+            </column>
+        </addColumn>
+        <createIndex tableName="organizations" indexName="idx_organizations_parent_org_id">
+            <column name="parent_organization_id"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

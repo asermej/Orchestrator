@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using HireologyTestAts.Api.Auth;
 using HireologyTestAts.Api.Mappers;
 using HireologyTestAts.Api.ResourceModels;
 using HireologyTestAts.Domain;
@@ -37,19 +38,23 @@ public class GroupsController : ControllerBase
     }
 
     [HttpPost]
+    [SuperadminRequired]
     [ProducesResponseType(typeof(GroupResource), 201)]
     [ProducesResponseType(400)]
+    [ProducesResponseType(403)]
     public async Task<ActionResult<GroupResource>> Create([FromBody] CreateGroupResource resource)
     {
         var group = GroupMapper.ToDomain(resource);
-        var created = await _domainFacade.CreateGroup(group);
+        var created = await _domainFacade.CreateGroup(group, resource.AdminEmail);
         var response = GroupMapper.ToResource(created);
         return CreatedAtAction(nameof(GetById), new { id = response.Id }, response);
     }
 
     [HttpPut("{id:guid}")]
+    [SuperadminRequired]
     [ProducesResponseType(typeof(GroupResource), 200)]
     [ProducesResponseType(404)]
+    [ProducesResponseType(403)]
     public async Task<ActionResult<GroupResource>> Update(Guid id, [FromBody] UpdateGroupResource resource)
     {
         var updates = GroupMapper.ToDomain(resource);
@@ -58,8 +63,10 @@ public class GroupsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [SuperadminRequired]
     [ProducesResponseType(204)]
     [ProducesResponseType(404)]
+    [ProducesResponseType(403)]
     public async Task<ActionResult> Delete(Guid id)
     {
         await _domainFacade.DeleteGroup(id);

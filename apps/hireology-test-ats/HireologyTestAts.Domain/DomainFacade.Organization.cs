@@ -22,8 +22,23 @@ public sealed partial class DomainFacade
         return await OrganizationManager.UpdateOrganization(id, updates).ConfigureAwait(false);
     }
 
+    public async Task<Organization> MoveOrganization(Guid id, Guid? newParentOrganizationId)
+    {
+        return await OrganizationManager.MoveOrganization(id, newParentOrganizationId).ConfigureAwait(false);
+    }
+
     public async Task<bool> DeleteOrganization(Guid id)
     {
         return await OrganizationManager.DeleteOrganization(id).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<Organization>> GetOrganizationTree(Guid groupId)
+    {
+        return await OrganizationManager.GetOrganizationTree(groupId).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<Organization>> GetChildOrganizations(Guid parentOrganizationId)
+    {
+        return await OrganizationManager.GetChildOrganizations(parentOrganizationId).ConfigureAwait(false);
     }
 }
