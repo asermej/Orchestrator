@@ -105,10 +105,11 @@ export function useVoiceInput({
         }
 
         // Only log unexpected errors to console (not "aborted", "no-speech", or "network" without transcript)
+        // Use console.warn instead of console.error to avoid Next.js error overlay intercepting it
         const shouldLogError = event.error !== "no-speech" && 
                                !(event.error === "network" && !hasTranscriptRef.current);
         if (shouldLogError) {
-          console.error("Speech recognition error:", event.error);
+          console.warn("Speech recognition error:", event.error);
         }
 
         setError(errorMessage);

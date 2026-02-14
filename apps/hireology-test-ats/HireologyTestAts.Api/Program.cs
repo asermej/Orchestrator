@@ -78,15 +78,15 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // Auth0 JWT Authentication
-var auth0Authority = builder.Configuration["Auth0:Authority"];
+var auth0Domain = builder.Configuration["Auth0:Domain"];
 var auth0Audience = builder.Configuration["Auth0:Audience"];
-bool auth0Configured = !string.IsNullOrEmpty(auth0Authority)
+bool auth0Configured = !string.IsNullOrEmpty(auth0Domain)
     && !string.IsNullOrEmpty(auth0Audience)
-    && !auth0Authority.Contains("your-tenant");
+    && !auth0Domain.Contains("your-tenant");
 
 if (auth0Configured)
 {
-    var domain = auth0Authority!.TrimEnd('/') + "/";
+    var domain = $"https://{auth0Domain}/";
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
