@@ -471,4 +471,24 @@ public class AtsController : ControllerBase
 
         return Ok(InterviewMapper.ToResultResource(result));
     }
+
+    /// <summary>
+    /// Gets the responses for an interview (questions, transcripts, audio URLs)
+    /// </summary>
+    [HttpGet("interviews/{id}/responses")]
+    [ProducesResponseType(typeof(IReadOnlyList<InterviewResponseResource>), 200)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(401)]
+    public async Task<ActionResult<IReadOnlyList<InterviewResponseResource>>> GetInterviewResponses(Guid id)
+    {
+        var interview = await _domainFacade.GetInterviewById(id);
+        if (interview == null)
+        {
+            return NotFound($"Interview with ID {id} not found");
+        }
+
+        var responses = await _domainFacade.GetInterviewResponsesByInterviewId(id);
+        return Ok(responses.Select(InterviewMapper.ToResponseResource).ToList());
+    }
+
 }

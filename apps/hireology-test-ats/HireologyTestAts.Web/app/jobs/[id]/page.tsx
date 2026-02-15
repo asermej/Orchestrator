@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { testAtsApi } from "@/lib/test-ats-api";
 import { SendInterviewModal } from "./send-interview-modal";
 import { InterviewResultsModal } from "./interview-results-modal";
+import { ApplicantSidePanel } from "./applicant-side-panel";
 
 interface JobDetail {
   id: string;
@@ -117,6 +118,9 @@ export default function JobDetailPage() {
   // Modal state
   const [sendModalApplicant, setSendModalApplicant] = useState<ApplicantItem | null>(null);
   const [resultsModalRequest, setResultsModalRequest] = useState<InterviewRequestItem | null>(null);
+
+  // Side panel state
+  const [selectedApplicantId, setSelectedApplicantId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -252,7 +256,11 @@ export default function JobDetailPage() {
                 {applicants.map((applicant) => {
                   const ir = getInterviewRequest(applicant.id);
                   return (
-                    <tr key={applicant.id}>
+                    <tr
+                      key={applicant.id}
+                      onClick={() => setSelectedApplicantId(applicant.id)}
+                      className="cursor-pointer hover:bg-slate-50 transition-colors"
+                    >
                       <td className="px-4 py-3 text-sm text-slate-900">
                         {applicant.firstName} {applicant.lastName}
                       </td>
@@ -278,7 +286,7 @@ export default function JobDetailPage() {
                           <span className="text-slate-400 text-xs">No interview</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm">
+                      <td className="px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
                           {!ir ? (
                             <button
@@ -349,6 +357,28 @@ export default function JobDetailPage() {
           onClose={() => setResultsModalRequest(null)}
         />
       )}
+
+      {/* Applicant Side Panel */}
+      {selectedApplicantId && (() => {
+        const selectedApplicant = applicants.find((a) => a.id === selectedApplicantId);
+        if (!selectedApplicant) return null;
+        const selectedIndex = applicants.findIndex((a) => a.id === selectedApplicantId);
+        const ir = getInterviewRequest(selectedApplicantId);
+        return (
+          <ApplicantSidePanel
+            applicant={selectedApplicant}
+            interviewRequest={ir}
+            applicants={applicants}
+            currentIndex={selectedIndex}
+            onNavigate={(id) => setSelectedApplicantId(id)}
+            onClose={() => setSelectedApplicantId(null)}
+            onSendInterview={(a) => {
+              setSendModalApplicant(a);
+            }}
+            onRefreshInvite={handleRefreshInvite}
+          />
+        );
+      })()}
     </div>
   );
 }

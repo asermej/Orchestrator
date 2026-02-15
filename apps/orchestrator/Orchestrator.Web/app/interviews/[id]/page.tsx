@@ -209,6 +209,114 @@ function AudioPlayer({ src }: { src: string }) {
   );
 }
 
+function CollapsibleResponseCard({
+  group,
+  groupIndex,
+  qScore,
+  scoreBadge,
+}: {
+  group: { main: InterviewResponse; followUps: InterviewResponse[] };
+  groupIndex: number;
+  qScore?: QuestionScore;
+  scoreBadge?: { text: string; bg: string } | null;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <Card className="overflow-hidden">
+      {/* Collapsible header — always visible */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-start gap-3 py-4 px-6 text-left hover:bg-muted/30 transition-colors"
+      >
+        <div className="flex-shrink-0 w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+          <span className="text-xs font-bold text-primary">{groupIndex + 1}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className={`font-medium text-sm pt-0.5 ${expanded ? "" : "line-clamp-2"}`}>
+            {group.main.questionText}
+          </p>
+        </div>
+        {qScore && scoreBadge && (
+          <div className={`flex-shrink-0 px-2.5 py-1 rounded-md border text-xs font-semibold ${scoreBadge.bg} ${scoreBadge.text}`}>
+            {Number(qScore.score).toFixed(1)}/{Number(qScore.maxScore).toFixed(0)}
+          </div>
+        )}
+        <div className="flex-shrink-0 mt-0.5">
+          {expanded ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
+        </div>
+      </button>
+
+      {/* Expanded content */}
+      {expanded && (
+        <div className="px-6 pb-5 border-t">
+          {/* Main response */}
+          <div className="ml-10 mt-4">
+            <div className="bg-muted/50 rounded-lg p-4 border border-border/50">
+              <p className="text-sm whitespace-pre-wrap">{group.main.transcript || "No transcript available"}</p>
+              {group.main.audioUrl && (
+                <AudioPlayer src={group.main.audioUrl} />
+              )}
+              {group.main.durationSeconds != null && (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  Duration: {Math.floor(group.main.durationSeconds / 60)}m {group.main.durationSeconds % 60}s
+                </div>
+              )}
+            </div>
+
+            {/* Per-question AI Analysis */}
+            {group.main.aiAnalysis && (
+              <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                <div className="text-xs font-medium text-blue-700 mb-1">AI Analysis</div>
+                <p className="text-sm text-blue-900">{group.main.aiAnalysis}</p>
+              </div>
+            )}
+
+            {/* Per-question Score Feedback */}
+            {qScore && qScore.feedback && !group.main.aiAnalysis && (
+              <div className="mt-3 p-3 bg-muted/50 rounded-lg border border-border/50">
+                <div className="text-xs font-medium text-muted-foreground mb-1">Score Feedback</div>
+                <p className="text-sm">{qScore.feedback}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Follow-up Questions */}
+          {group.followUps.map((followUp, fuIndex) => (
+            <div key={followUp.id} className="mt-4 ml-10">
+              <div className="flex items-start gap-2 mb-2">
+                <CornerDownRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                <div>
+                  <div className="text-xs text-muted-foreground mb-0.5">Follow-up {fuIndex + 1}</div>
+                  <p className="font-medium text-sm">{followUp.questionText}</p>
+                </div>
+              </div>
+              <div className="ml-6">
+                <div className="bg-muted/50 rounded-lg p-4 border border-border/50">
+                  <p className="text-sm whitespace-pre-wrap">{followUp.transcript || "No transcript available"}</p>
+                  {followUp.audioUrl && (
+                    <AudioPlayer src={followUp.audioUrl} />
+                  )}
+                </div>
+                {followUp.aiAnalysis && (
+                  <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                    <div className="text-xs font-medium text-blue-700 mb-1">AI Analysis</div>
+                    <p className="text-sm text-blue-900">{followUp.aiAnalysis}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 interface InterviewDetailPageProps {
   params: Promise<{ id: string }>;
 }
@@ -620,88 +728,19 @@ export default function InterviewDetailPage({ params }: InterviewDetailPageProps
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {responseGroups.map((group, groupIndex) => {
                 const qScore = questionScoresByIndex.get(group.main.responseOrder);
                 const scoreBadge = qScore ? getQuestionScoreBadge(qScore.score, qScore.maxScore) : null;
 
                 return (
-                <Card key={group.main.id}>
-                  <CardContent className="py-5 px-6">
-                    {/* Question + Score */}
-                    <div className="flex items-start gap-3 mb-3">
-                      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-xs font-bold text-primary">{groupIndex + 1}</span>
-                      </div>
-                      <div className="flex-1 flex items-start justify-between gap-2">
-                        <p className="font-medium text-sm pt-0.5">{group.main.questionText}</p>
-                        {qScore && scoreBadge && (
-                          <div className={`flex-shrink-0 px-2.5 py-1 rounded-md border text-xs font-semibold ${scoreBadge.bg} ${scoreBadge.text}`}>
-                            {Number(qScore.score).toFixed(1)}/{Number(qScore.maxScore).toFixed(0)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Candidate Response */}
-                    <div className="ml-10">
-                      <div className="bg-muted/50 rounded-lg p-4">
-                        <p className="text-sm whitespace-pre-wrap">{group.main.transcript || "No transcript available"}</p>
-                        {group.main.audioUrl && (
-                          <AudioPlayer src={group.main.audioUrl} />
-                        )}
-                        {group.main.durationSeconds != null && (
-                          <div className="mt-2 text-xs text-muted-foreground">
-                            Duration: {Math.floor(group.main.durationSeconds / 60)}m {group.main.durationSeconds % 60}s
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Per-question AI Analysis */}
-                      {group.main.aiAnalysis && (
-                        <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                          <div className="text-xs font-medium text-blue-700 mb-1">AI Analysis</div>
-                          <p className="text-sm text-blue-900">{group.main.aiAnalysis}</p>
-                        </div>
-                      )}
-
-                      {/* Per-question Score Feedback */}
-                      {qScore && qScore.feedback && !group.main.aiAnalysis && (
-                        <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                          <div className="text-xs font-medium text-slate-600 mb-1">Score Feedback</div>
-                          <p className="text-sm text-slate-700">{qScore.feedback}</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Follow-up Questions */}
-                    {group.followUps.map((followUp, fuIndex) => (
-                      <div key={followUp.id} className="mt-4 ml-10">
-                        <div className="flex items-start gap-2 mb-2">
-                          <CornerDownRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                          <div>
-                            <div className="text-xs text-muted-foreground mb-0.5">Follow-up {fuIndex + 1}</div>
-                            <p className="font-medium text-sm">{followUp.questionText}</p>
-                          </div>
-                        </div>
-                        <div className="ml-6">
-                          <div className="bg-muted/50 rounded-lg p-4">
-                            <p className="text-sm whitespace-pre-wrap">{followUp.transcript || "No transcript available"}</p>
-                            {followUp.audioUrl && (
-                              <AudioPlayer src={followUp.audioUrl} />
-                            )}
-                          </div>
-                          {followUp.aiAnalysis && (
-                            <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                              <div className="text-xs font-medium text-blue-700 mb-1">AI Analysis</div>
-                              <p className="text-sm text-blue-900">{followUp.aiAnalysis}</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
+                  <CollapsibleResponseCard
+                    key={group.main.id}
+                    group={group}
+                    groupIndex={groupIndex}
+                    qScore={qScore}
+                    scoreBadge={scoreBadge}
+                  />
                 );
               })}
             </div>
