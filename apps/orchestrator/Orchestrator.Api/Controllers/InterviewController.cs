@@ -140,7 +140,7 @@ public class InterviewController : ControllerBase
     }
 
     /// <summary>
-    /// Searches for interviews
+    /// Searches for interviews with related entity data
     /// </summary>
     [HttpGet]
     [Authorize]
@@ -155,9 +155,49 @@ public class InterviewController : ControllerBase
             request.PageNumber,
             request.PageSize);
 
+        // Collect unique related entity IDs for batch lookup
+        var jobIds = result.Items.Select(i => i.JobId).Distinct().ToList();
+        var applicantIds = result.Items.Select(i => i.ApplicantId).Distinct().ToList();
+        var agentIds = result.Items.Select(i => i.AgentId).Distinct().ToList();
+        var interviewIds = result.Items.Select(i => i.Id).ToList();
+
+        // Fetch related entities in parallel
+        var jobTasks = jobIds.Select(id => _domainFacade.GetJobById(id));
+        var applicantTasks = applicantIds.Select(id => _domainFacade.GetApplicantById(id));
+        var agentTasks = agentIds.Select(id => _domainFacade.GetAgentById(id));
+        var responseTasks = interviewIds.Select(id => _domainFacade.GetInterviewResponsesByInterviewId(id));
+        var resultTasks = interviewIds.Select(id => _domainFacade.GetInterviewResultByInterviewId(id));
+
+        var jobs = (await Task.WhenAll(jobTasks)).Where(j => j != null).ToDictionary(j => j!.Id);
+        var applicants = (await Task.WhenAll(applicantTasks)).Where(a => a != null).ToDictionary(a => a!.Id);
+        var agents = (await Task.WhenAll(agentTasks)).Where(a => a != null).ToDictionary(a => a!.Id);
+        var responsesByInterview = (await Task.WhenAll(responseTasks))
+            .Select((responses, index) => new { InterviewId = interviewIds[index], Responses = responses })
+            .ToDictionary(x => x.InterviewId, x => x.Responses);
+        var resultsByInterview = (await Task.WhenAll(resultTasks))
+            .Select((r, index) => new { InterviewId = interviewIds[index], Result = r })
+            .Where(x => x.Result != null)
+            .ToDictionary(x => x.InterviewId, x => x.Result!);
+
+        // Map interviews with hydrated related data
+        var items = result.Items.Select(interview =>
+        {
+            var resource = InterviewMapper.ToResource(interview);
+            resource.Job = jobs.TryGetValue(interview.JobId, out var job) && job != null ? JobMapper.ToResource(job) : null;
+            resource.Applicant = applicants.TryGetValue(interview.ApplicantId, out var applicant) && applicant != null ? ApplicantMapper.ToResource(applicant) : null;
+            resource.Agent = agents.TryGetValue(interview.AgentId, out var agent) && agent != null ? AgentMapper.ToResource(agent) : null;
+            resource.Responses = responsesByInterview.TryGetValue(interview.Id, out var responses)
+                ? responses.Select(InterviewMapper.ToResponseResource).ToList()
+                : new List<InterviewResponseResource>();
+            resource.Result = resultsByInterview.TryGetValue(interview.Id, out var interviewResult)
+                ? InterviewMapper.ToResultResource(interviewResult)
+                : null;
+            return resource;
+        });
+
         var response = new PaginatedResponse<InterviewResource>
         {
-            Items = InterviewMapper.ToResource(result.Items),
+            Items = items,
             TotalCount = result.TotalCount,
             PageNumber = result.PageNumber,
             PageSize = result.PageSize

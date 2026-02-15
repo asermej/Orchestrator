@@ -22,19 +22,21 @@ public class InterviewResource
     public int CurrentQuestionIndex { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
-}
 
-/// <summary>
-/// Detailed interview resource including related data
-/// </summary>
-public class InterviewDetailResource : InterviewResource
-{
+    // Related entities (populated on list/search and detail endpoints)
     public JobResource? Job { get; set; }
     public ApplicantResource? Applicant { get; set; }
     public AgentResource? Agent { get; set; }
-    public List<InterviewQuestionResource> Questions { get; set; } = new();
     public List<InterviewResponseResource> Responses { get; set; } = new();
     public InterviewResultResource? Result { get; set; }
+}
+
+/// <summary>
+/// Detailed interview resource including questions (extends base with all related data)
+/// </summary>
+public class InterviewDetailResource : InterviewResource
+{
+    public List<InterviewQuestionResource> Questions { get; set; } = new();
 }
 
 /// <summary>
