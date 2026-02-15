@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260214120000-create-interview-invites-table" author="system">
+        <createTable tableName="interview_invites">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="interview_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_interview_invites_interview" references="interviews(id)"/>
+            </column>
+            <column name="organization_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_interview_invites_organization" references="organizations(id)"/>
+            </column>
+            <column name="short_code" type="varchar(20)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uk_interview_invites_short_code"/>
+            </column>
+            <column name="status" type="varchar(20)" defaultValue="active">
+                <constraints nullable="false"/>
+            </column>
+            <column name="expires_at" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+            <column name="max_uses" type="integer" defaultValueNumeric="3">
+                <constraints nullable="false"/>
+            </column>
+            <column name="use_count" type="integer" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="revoked_at" type="timestamptz">
+                <constraints nullable="true"/>
+            </column>
+            <column name="revoked_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <!-- Audit fields -->
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamptz">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="updated_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_deleted" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamptz">
+                <constraints nullable="true"/>
+            </column>
+            <column name="deleted_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="interview_invites" indexName="idx_interview_invites_short_code">
+            <column name="short_code"/>
+        </createIndex>
+
+        <createIndex tableName="interview_invites" indexName="idx_interview_invites_interview_id">
+            <column name="interview_id"/>
+        </createIndex>
+
+        <createIndex tableName="interview_invites" indexName="idx_interview_invites_organization_id">
+            <column name="organization_id"/>
+        </createIndex>
+
+        <createIndex tableName="interview_invites" indexName="idx_interview_invites_status">
+            <column name="status"/>
+        </createIndex>
+
+        <createIndex tableName="interview_invites" indexName="idx_interview_invites_is_deleted">
+            <column name="is_deleted"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

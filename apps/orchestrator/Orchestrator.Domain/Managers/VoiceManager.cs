@@ -155,19 +155,17 @@ internal sealed class VoiceManager : IDisposable
         var config = GatewayFacade.GetElevenLabsConfig();
         var voiceId = agent.ElevenlabsVoiceId ?? config.DefaultVoiceId;
         
-        // Get the job to find the job type
-        var job = await DataFacade.GetJobById(interview.JobId).ConfigureAwait(false);
-        if (job == null)
+        // Load questions from interview configuration
+        if (!interview.InterviewConfigurationId.HasValue)
         {
-            return result; // No job, no questions to warm up
+            return result; // No configuration, no questions to warm up
         }
 
-        // Get interview questions from job type
-        var questionList = new List<InterviewQuestion>();
-        result.TotalQuestions = questionList.Count;
+        var configQuestions = await DataFacade.GetInterviewConfigurationQuestions(interview.InterviewConfigurationId.Value).ConfigureAwait(false);
+        result.TotalQuestions = configQuestions.Count;
 
         // Pre-generate audio for each question
-        foreach (var question in questionList)
+        foreach (var question in configQuestions)
         {
             if (cancellationToken.IsCancellationRequested) break;
             
@@ -175,7 +173,7 @@ internal sealed class VoiceManager : IDisposable
             {
                 // Generate audio (the cache manager handles checking/storing cache)
                 await GatewayFacade.GenerateSpeechAsync(
-                    question.QuestionText,
+                    question.Question,
                     voiceId,
                     0.5m,
                     0.75m,

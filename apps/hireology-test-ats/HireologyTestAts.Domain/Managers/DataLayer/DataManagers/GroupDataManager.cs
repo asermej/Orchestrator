@@ -12,13 +12,17 @@ internal sealed class GroupDataManager
         _connectionString = connectionString;
     }
 
-    public async Task<IReadOnlyList<Group>> ListAsync()
+    public async Task<IReadOnlyList<Group>> ListAsync(bool excludeTestData = false)
     {
-        const string sql = @"
+        var sql = @"
             SELECT id AS Id, root_organization_id AS RootOrganizationId, name AS Name,
                    created_at AS CreatedAt, updated_at AS UpdatedAt
-            FROM groups
-            ORDER BY name";
+            FROM groups";
+        if (excludeTestData)
+        {
+            sql += " WHERE name NOT LIKE 'TestGroup_%'";
+        }
+        sql += " ORDER BY name";
         await using var conn = new NpgsqlConnection(_connectionString);
         var items = await conn.QueryAsync<Group>(new CommandDefinition(sql));
         return items.ToList();

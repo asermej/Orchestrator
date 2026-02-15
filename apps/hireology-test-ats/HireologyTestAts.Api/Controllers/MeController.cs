@@ -40,8 +40,8 @@ public class MeController : ControllerBase
         IReadOnlyList<Organization> organizations;
         if (user.IsSuperadmin)
         {
-            groups = await _domainFacade.GetGroups();
-            organizations = await _domainFacade.GetOrganizations();
+            groups = await _domainFacade.GetGroups(excludeTestData: true);
+            organizations = await _domainFacade.GetOrganizations(excludeTestData: true);
         }
         else
         {

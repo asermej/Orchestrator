@@ -19,7 +19,7 @@ internal sealed class InterviewDataManager
     public async Task<Interview?> GetById(Guid id)
     {
         const string sql = @"
-            SELECT id, job_id, applicant_id, agent_id, token, status, interview_type, scheduled_at, started_at, completed_at, current_question_index, created_at, updated_at, is_deleted
+            SELECT id, job_id, applicant_id, agent_id, interview_configuration_id, token, status, interview_type, scheduled_at, started_at, completed_at, current_question_index, created_at, updated_at, is_deleted
             FROM interviews
             WHERE id = @id AND is_deleted = false";
         using var connection = new NpgsqlConnection(_dbConnectionString);
@@ -29,7 +29,7 @@ internal sealed class InterviewDataManager
     public async Task<Interview?> GetByToken(string token)
     {
         const string sql = @"
-            SELECT id, job_id, applicant_id, agent_id, token, status, interview_type, scheduled_at, started_at, completed_at, current_question_index, created_at, updated_at, is_deleted
+            SELECT id, job_id, applicant_id, agent_id, interview_configuration_id, token, status, interview_type, scheduled_at, started_at, completed_at, current_question_index, created_at, updated_at, is_deleted
             FROM interviews
             WHERE token = @Token AND is_deleted = false";
         using var connection = new NpgsqlConnection(_dbConnectionString);
@@ -44,9 +44,9 @@ internal sealed class InterviewDataManager
         }
 
         const string sql = @"
-            INSERT INTO interviews (id, job_id, applicant_id, agent_id, token, status, interview_type, scheduled_at, created_by)
-            VALUES (@Id, @JobId, @ApplicantId, @AgentId, @Token, @Status, @InterviewType, @ScheduledAt, @CreatedBy)
-            RETURNING id, job_id, applicant_id, agent_id, token, status, interview_type, scheduled_at, started_at, completed_at, current_question_index, created_at, updated_at, is_deleted";
+            INSERT INTO interviews (id, job_id, applicant_id, agent_id, interview_configuration_id, token, status, interview_type, scheduled_at, created_by)
+            VALUES (@Id, @JobId, @ApplicantId, @AgentId, @InterviewConfigurationId, @Token, @Status, @InterviewType, @ScheduledAt, @CreatedBy)
+            RETURNING id, job_id, applicant_id, agent_id, interview_configuration_id, token, status, interview_type, scheduled_at, started_at, completed_at, current_question_index, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var newItem = await connection.QueryFirstOrDefaultAsync<Interview>(sql, interview);
@@ -65,7 +65,7 @@ internal sealed class InterviewDataManager
                 updated_at = CURRENT_TIMESTAMP,
                 updated_by = @UpdatedBy
             WHERE id = @Id AND is_deleted = false
-            RETURNING id, job_id, applicant_id, agent_id, token, status, interview_type, scheduled_at, started_at, completed_at, current_question_index, created_at, updated_at, is_deleted";
+            RETURNING id, job_id, applicant_id, agent_id, interview_configuration_id, token, status, interview_type, scheduled_at, started_at, completed_at, current_question_index, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var updatedItem = await connection.QueryFirstOrDefaultAsync<Interview>(sql, interview);
@@ -127,7 +127,7 @@ internal sealed class InterviewDataManager
 
         var offset = (pageNumber - 1) * pageSize;
         var querySql = $@"
-            SELECT id, job_id, applicant_id, agent_id, token, status, interview_type, scheduled_at, started_at, completed_at, current_question_index, created_at, updated_at, is_deleted
+            SELECT id, job_id, applicant_id, agent_id, interview_configuration_id, token, status, interview_type, scheduled_at, started_at, completed_at, current_question_index, created_at, updated_at, is_deleted
             FROM interviews
             {whereSql}
             ORDER BY created_at DESC

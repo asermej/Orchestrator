@@ -43,12 +43,12 @@ public class DomainFacadeTestsJob
     {
         var group = await _domainFacade.CreateGroup(new Group
         {
-            Name = $"TestGroup_{Guid.NewGuid():N}"[..50]
+            Name = $"TestGroup_{Guid.NewGuid():N}"
         });
         var org = await _domainFacade.CreateOrganization(new Organization
         {
             GroupId = group.Id,
-            Name = $"TestOrg_{Guid.NewGuid():N}"[..50]
+            Name = $"TestOrg_{Guid.NewGuid():N}"
         });
         return (group, org);
     }

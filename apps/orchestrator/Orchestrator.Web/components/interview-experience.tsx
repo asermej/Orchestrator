@@ -38,7 +38,9 @@ export interface InterviewExperienceProps {
   agentName: string;
   agentImageUrl?: string;
   applicantName?: string;
-  onSaveResponse: (questionId: string, questionText: string, transcript: string, order: number, isFollowUp?: boolean, followUpTemplateId?: string) => Promise<FollowUpSelectionResponse | void>;
+  jobTitle?: string;
+  onSaveResponse: (questionId: string, questionText: string, transcript: string, order: number, isFollowUp?: boolean, followUpTemplateId?: string, audioUrl?: string, durationSeconds?: number) => Promise<FollowUpSelectionResponse | void>;
+  onUploadAudio?: (blob: Blob) => Promise<string | null>;
   onComplete: () => Promise<void>;
   onExit?: () => void;
   onBegin?: () => Promise<void>;
@@ -54,7 +56,9 @@ export function InterviewExperience({
   agentName,
   agentImageUrl,
   applicantName = "there",
+  jobTitle,
   onSaveResponse,
+  onUploadAudio,
   onComplete,
   onExit,
   onBegin,
@@ -83,6 +87,7 @@ export function InterviewExperience({
   const [accommodationRequested, setAccommodationRequested] = useState(false);
   
   const transcriptRef = useRef("");
+  const recordingStartTimeRef = useRef<number>(0);
   const audioRef = useRef<HTMLAudioElement>(null);
   const mediaSourceRef = useRef<MediaSource | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -139,6 +144,7 @@ export function InterviewExperience({
     error: voiceError,
     startRecording,
     stopRecording,
+    getAudioBlob,
   } = useVoiceInput({
     onTranscript: handleTranscript,
     onError: (err) => {
@@ -252,6 +258,7 @@ export function InterviewExperience({
   const startListening = useCallback(() => {
     setTranscript("");
     transcriptRef.current = "";
+    recordingStartTimeRef.current = Date.now();
     startRecording();
   }, [startRecording]);
 
@@ -274,6 +281,25 @@ export function InterviewExperience({
     const isFollowUp = currentQuestion.isFollowUp || false;
     const followUpTemplateId = currentQuestion.followUpTemplateId;
 
+    // Upload audio recording if available
+    let audioUrl: string | undefined;
+    let durationSeconds: number | undefined;
+    const audioBlob = getAudioBlob();
+    if (audioBlob && onUploadAudio) {
+      try {
+        setProcessingMessage("Uploading audio recording");
+        const url = await onUploadAudio(audioBlob);
+        if (url) {
+          audioUrl = url;
+          durationSeconds = Math.round((Date.now() - recordingStartTimeRef.current) / 1000);
+        }
+      } catch (err) {
+        console.warn("Failed to upload audio (continuing without it):", err);
+      }
+    }
+
+    setProcessingMessage("Saving your response");
+
     // Save the response and get next question info
     let followUpResponse: FollowUpSelectionResponse | void;
     try {
@@ -283,7 +309,9 @@ export function InterviewExperience({
         message,
         currentQuestionIndex,
         isFollowUp,
-        followUpTemplateId
+        followUpTemplateId,
+        audioUrl,
+        durationSeconds
       );
     } catch (err) {
       // Log but continue - the interview flow is more important than persisting each response
@@ -374,7 +402,7 @@ export function InterviewExperience({
         await speakText(nextQuestionText);
       }
     }
-  }, [currentQuestion, currentQuestionIndex, isLastQuestion, questions, onSaveResponse, stateMachine, followUpCounts]);
+  }, [currentQuestion, currentQuestionIndex, isLastQuestion, questions, onSaveResponse, onUploadAudio, getAudioBlob, stateMachine, followUpCounts]);
 
   const handleComplete = useCallback(async () => {
     stateMachine.completeProcessing(true);
@@ -584,22 +612,51 @@ export function InterviewExperience({
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
       
-      // Reset playing state
-      setIsPlaying(false);
-      setCurrentSpokenText(null);
-      
       // If silentFail is true (for practice), don't throw or show error
       if (silentFail) {
+        setIsPlaying(false);
+        setCurrentSpokenText(null);
         console.warn("Audio playback failed (silent):", err);
         return;
       }
       
-      console.error("Speech error:", err);
-      // Only show error if we're in an interview state (not practice)
+      console.warn("ElevenLabs TTS failed, falling back to browser speech synthesis:", err);
+      
+      // Fallback to browser-native TTS so the interview can continue
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        try {
+          await new Promise<void>((resolve, reject) => {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+            utterance.onend = () => resolve();
+            utterance.onerror = (e) => reject(e);
+            window.speechSynthesis.speak(utterance);
+          });
+          // Browser TTS succeeded — trigger state transition manually
+          // (the <audio> ended event won't fire since we used speechSynthesis)
+          setIsPlaying(false);
+          setCurrentSpokenText(null);
+          if (state === InterviewState.QUESTION_PLAYING) {
+            stateMachine.onTTSEnd();
+            setTimeout(() => startListening(), 300);
+          }
+          return;
+        } catch (ttsErr) {
+          console.warn("Browser TTS also failed:", ttsErr);
+        }
+      }
+      
+      // All TTS methods failed — reset state and report error
+      setIsPlaying(false);
+      setCurrentSpokenText(null);
+      
+      console.error("Speech error (all methods exhausted):", err);
       if (state === InterviewState.QUESTION_PLAYING || state === InterviewState.RECORDING) {
         stateMachine.handleError("audio_playback", "Failed to play audio. Please try again.");
       } else {
-        // For other states, just log and don't show error
         console.warn("Audio playback failed (non-blocking):", err);
       }
     }
@@ -837,7 +894,19 @@ export function InterviewExperience({
       onBegin().catch(err => console.error("onBegin callback failed:", err));
     }
     
-    await speakText(greeting);
+    try {
+      await speakText(greeting);
+    } catch (err) {
+      // All TTS methods exhausted — proceed with interview in text mode
+      console.error("All speech methods failed for greeting, switching to text mode:", err);
+      setIsPlaying(false);
+      setCurrentSpokenText(null);
+      setIsTextResponseMode(true);
+      isTextResponseModeRef.current = true;
+      if (state === InterviewState.QUESTION_PLAYING) {
+        stateMachine.onTTSEnd();
+      }
+    }
   };
 
   // Practice prompt handler - uses browser TTS (free, no API calls, no quota)
@@ -958,9 +1027,15 @@ export function InterviewExperience({
                 className="mb-6"
               />
               
-              <h2 className="text-2xl font-bold text-white mb-4">
-                Get Ready to Start
+              <h2 className="text-2xl font-bold text-white mb-2">
+                {applicantName !== "there" ? `Hi ${applicantName}, get ready to start` : "Get Ready to Start"}
               </h2>
+
+              {jobTitle && (
+                <p className="text-white/50 text-sm mb-4">
+                  Interview for <span className="text-white/80 font-medium">{jobTitle}</span>
+                </p>
+              )}
               
               {/* Expectations Line */}
               <p className="text-white/70 mb-6">
@@ -1106,7 +1181,7 @@ export function InterviewExperience({
                 <p className="text-sm text-white/60 mb-2">
                   {getQuestionIndicator()}
                 </p>
-                <Progress value={progressPercent} className="w-48 h-1.5 bg-white/10" />
+                <Progress value={progressPercent} className="w-48 h-1.5 bg-white/10" indicatorClassName="bg-emerald-500" />
               </div>
 
               <motion.div
@@ -1178,7 +1253,7 @@ export function InterviewExperience({
                 <p className="text-sm text-white/60 mb-2">
                   {getQuestionIndicator()}
                 </p>
-                <Progress value={progressPercent} className="w-48 h-1.5 bg-white/10" />
+                <Progress value={progressPercent} className="w-48 h-1.5 bg-white/10" indicatorClassName="bg-emerald-500" />
               </div>
 
               <motion.div
@@ -1308,7 +1383,7 @@ export function InterviewExperience({
                 <p className="text-sm text-white/60 mb-2">
                   {getQuestionIndicator()}
                 </p>
-                <Progress value={progressPercent} className="w-48 h-1.5 bg-white/10" />
+                <Progress value={progressPercent} className="w-48 h-1.5 bg-white/10" indicatorClassName="bg-emerald-500" />
               </div>
 
               <motion.div
@@ -1463,7 +1538,7 @@ export function InterviewExperience({
                 <p className="text-sm text-white/60 mb-2">
                   {getQuestionIndicator()}
                 </p>
-                <Progress value={progressPercent} className="w-48 h-1.5 bg-white/10" />
+                <Progress value={progressPercent} className="w-48 h-1.5 bg-white/10" indicatorClassName="bg-emerald-500" />
               </div>
 
               <h2 className="text-xl font-semibold text-white mb-2">
@@ -1519,7 +1594,7 @@ export function InterviewExperience({
                 <p className="text-sm text-white/60 mb-2">
                   {getQuestionIndicator()}
                 </p>
-                <Progress value={progressPercent} className="w-48 h-1.5 bg-white/10" />
+                <Progress value={progressPercent} className="w-48 h-1.5 bg-white/10" indicatorClassName="bg-emerald-500" />
               </div>
 
               <motion.div
@@ -1563,7 +1638,7 @@ export function InterviewExperience({
                 <p className="text-sm text-white/60 mb-2">
                   {totalQuestions} of {totalQuestions} questions completed
                 </p>
-                <Progress value={100} className="w-48 h-1.5 bg-white/10 mx-auto" />
+                <Progress value={100} className="w-48 h-1.5 bg-white/10 mx-auto" indicatorClassName="bg-emerald-500" />
               </div>
 
               {onExit && (

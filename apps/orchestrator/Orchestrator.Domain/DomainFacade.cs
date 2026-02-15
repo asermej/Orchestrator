@@ -30,6 +30,11 @@ public sealed partial class DomainFacade : IDisposable
     private InterviewManager InterviewManager => _interviewManager ??= new InterviewManager(_serviceLocator);
     private InterviewConfigurationManager? _interviewConfigurationManager;
     private InterviewConfigurationManager InterviewConfigurationManager => _interviewConfigurationManager ??= new InterviewConfigurationManager(_serviceLocator);
+    private InterviewInviteManager? _interviewInviteManager;
+    private InterviewInviteManager InterviewInviteManager => _interviewInviteManager ??= new InterviewInviteManager(_serviceLocator);
+    private CandidateSessionManager? _candidateSessionManager;
+    private CandidateSessionManager CandidateSessionManager => _candidateSessionManager ??= new CandidateSessionManager(_serviceLocator);
+
     private WebhookManager? _webhookManager;
     private DataFacade? _webhookDataFacade;
     private WebhookManager WebhookManager
@@ -66,6 +71,8 @@ public sealed partial class DomainFacade : IDisposable
             _jobManager?.Dispose();
             _interviewManager?.Dispose();
             _interviewConfigurationManager?.Dispose();
+            _interviewInviteManager?.Dispose();
+            _candidateSessionManager?.Dispose();
             _webhookManager?.Dispose();
             _conversationManager?.Dispose();
             _voiceManager?.Dispose();

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260214120002-create-interview-audit-logs-table" author="system">
+        <createTable tableName="interview_audit_logs">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="interview_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_interview_audit_logs_interview" references="interviews(id)"/>
+            </column>
+            <column name="invite_id" type="uuid">
+                <constraints nullable="true" foreignKeyName="fk_interview_audit_logs_invite" references="interview_invites(id)"/>
+            </column>
+            <column name="session_id" type="uuid">
+                <constraints nullable="true" foreignKeyName="fk_interview_audit_logs_session" references="candidate_sessions(id)"/>
+            </column>
+            <column name="event_type" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="event_data" type="jsonb">
+                <constraints nullable="true"/>
+            </column>
+            <column name="ip_address" type="varchar(45)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="user_agent" type="varchar(500)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="interview_audit_logs" indexName="idx_interview_audit_logs_interview_id">
+            <column name="interview_id"/>
+        </createIndex>
+
+        <createIndex tableName="interview_audit_logs" indexName="idx_interview_audit_logs_event_type">
+            <column name="event_type"/>
+        </createIndex>
+
+        <createIndex tableName="interview_audit_logs" indexName="idx_interview_audit_logs_created_at">
+            <column name="created_at"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

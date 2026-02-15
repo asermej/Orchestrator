@@ -34,6 +34,9 @@ public class InterviewResult : Entity
 
     [Column("webhook_response")]
     public string? WebhookResponse { get; set; }
+
+    [Column("question_scores")]
+    public string? QuestionScores { get; set; }
 }
 
 /// <summary>

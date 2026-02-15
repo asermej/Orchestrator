@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260214150000-add-interview-configuration-id-to-interviews" author="system">
+        <addColumn tableName="interviews" schemaName="public">
+            <column name="interview_configuration_id" type="UUID"/>
+        </addColumn>
+        <addForeignKeyConstraint
+            baseTableName="interviews"
+            baseColumnNames="interview_configuration_id"
+            constraintName="fk_interviews_interview_configuration_id"
+            referencedTableName="interview_configurations"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+        <createIndex tableName="interviews" indexName="idx_interviews_interview_configuration_id">
+            <column name="interview_configuration_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

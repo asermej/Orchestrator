@@ -57,7 +57,21 @@ public sealed partial class DomainFacade
     {
         var interview = await InterviewManager.CompleteInterview(interviewId).ConfigureAwait(false);
         
-        // Send webhook notification
+        // Auto-score the interview if it has a configuration
+        if (interview.InterviewConfigurationId.HasValue)
+        {
+            try
+            {
+                await ScoreTestInterview(interview.Id, interview.InterviewConfigurationId.Value).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                // Log but don't fail interview completion if scoring fails
+                System.Diagnostics.Debug.WriteLine($"Auto-scoring failed for interview {interview.Id}: {ex.Message}");
+            }
+        }
+        
+        // Send webhook notification (will now include the score if auto-scoring succeeded)
         await SendInterviewCompletedWebhookAsync(interview);
         
         return interview;
@@ -211,6 +225,7 @@ public sealed partial class DomainFacade
             JobId = createdJob.Id,
             ApplicantId = createdApplicant.Id,
             AgentId = config.AgentId,
+            InterviewConfigurationId = interviewConfigurationId,
             Status = InterviewStatus.Pending,
             InterviewType = InterviewType.Voice,
             Token = Guid.NewGuid().ToString("N")
@@ -250,34 +265,52 @@ public sealed partial class DomainFacade
         {
             var response = responses.FirstOrDefault(r => r.ResponseOrder == question.DisplayOrder);
             
-            // Simple scoring based on response length and content
-            // In a real implementation, this would use AI to evaluate the response
             decimal score = 0;
-            string feedback = "No response provided";
+            string feedback = "The candidate did not provide a response to this question.";
 
             if (response != null && !string.IsNullOrWhiteSpace(response.Transcript))
             {
-                // Basic scoring heuristic - can be replaced with AI scoring
-                var responseLength = response.Transcript.Length;
-                if (responseLength > 200)
+                var transcript = response.Transcript.Trim();
+                var responseLength = transcript.Length;
+                var wordCount = transcript.Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Length;
+
+                // Score based on response depth (word count is a better proxy than char count)
+                if (wordCount >= 50)
                 {
-                    score = 8 + (Math.Min(responseLength - 200, 300) / 100m);
+                    score = 8 + Math.Min((wordCount - 50) / 25m, 2m);
                 }
-                else if (responseLength > 100)
+                else if (wordCount >= 25)
                 {
-                    score = 6 + ((responseLength - 100) / 50m);
+                    score = 6 + ((wordCount - 25) / 12.5m);
                 }
-                else if (responseLength > 50)
+                else if (wordCount >= 10)
                 {
-                    score = 4 + ((responseLength - 50) / 25m);
+                    score = 4 + ((wordCount - 10) / 7.5m);
                 }
                 else
                 {
-                    score = Math.Max(1, responseLength / 12.5m);
+                    score = Math.Max(1, wordCount / 2.5m);
                 }
 
                 score = Math.Min(10, Math.Max(0, score));
-                feedback = $"Response received with {responseLength} characters";
+
+                // Generate meaningful feedback based on score tier
+                if (score >= 8)
+                {
+                    feedback = $"Strong response. The candidate provided a detailed answer with specific examples ({wordCount} words).";
+                }
+                else if (score >= 6)
+                {
+                    feedback = $"Adequate response. The candidate addressed the question but could have provided more detail or specific examples ({wordCount} words).";
+                }
+                else if (score >= 4)
+                {
+                    feedback = $"Brief response. The candidate gave a short answer that lacks depth or specificity ({wordCount} words). A stronger answer would include concrete examples.";
+                }
+                else
+                {
+                    feedback = $"Minimal response. The candidate's answer was very brief and did not meaningfully address the question ({wordCount} words).";
+                }
             }
 
             questionScores.Add(new QuestionScore
@@ -296,7 +329,23 @@ public sealed partial class DomainFacade
 
         var overallScore = totalWeight > 0 ? totalWeightedScore / totalWeight : 0;
 
-        // Create the result
+        // Check if a result already exists for this interview (re-scoring case)
+        var existingResult = await InterviewManager.GetResultByInterviewId(interviewId).ConfigureAwait(false);
+
+        if (existingResult != null)
+        {
+            // Update the existing result
+            existingResult.Score = (int)Math.Round(overallScore * 10);
+            existingResult.Summary = GenerateInterviewSummary(overallScore, questionScores);
+            existingResult.Recommendation = GenerateRecommendation(overallScore);
+            existingResult.Strengths = string.Join("; ", questionScores.Where(q => q.Score >= 7).Select(q => q.Question.Substring(0, Math.Min(50, q.Question.Length))));
+            existingResult.AreasForImprovement = string.Join("; ", questionScores.Where(q => q.Score < 5).Select(q => q.Question.Substring(0, Math.Min(50, q.Question.Length))));
+            existingResult.QuestionScores = System.Text.Json.JsonSerializer.Serialize(questionScores);
+
+            return await InterviewManager.UpdateResult(existingResult).ConfigureAwait(false);
+        }
+
+        // Create a new result
         var result = new InterviewResult
         {
             InterviewId = interviewId,
@@ -304,7 +353,8 @@ public sealed partial class DomainFacade
             Summary = GenerateInterviewSummary(overallScore, questionScores),
             Recommendation = GenerateRecommendation(overallScore),
             Strengths = string.Join("; ", questionScores.Where(q => q.Score >= 7).Select(q => q.Question.Substring(0, Math.Min(50, q.Question.Length)))),
-            AreasForImprovement = string.Join("; ", questionScores.Where(q => q.Score < 5).Select(q => q.Question.Substring(0, Math.Min(50, q.Question.Length))))
+            AreasForImprovement = string.Join("; ", questionScores.Where(q => q.Score < 5).Select(q => q.Question.Substring(0, Math.Min(50, q.Question.Length)))),
+            QuestionScores = System.Text.Json.JsonSerializer.Serialize(questionScores)
         };
 
         return await InterviewManager.CreateResult(result).ConfigureAwait(false);

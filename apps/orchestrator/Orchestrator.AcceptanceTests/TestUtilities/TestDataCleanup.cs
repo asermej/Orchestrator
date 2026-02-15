@@ -63,7 +63,23 @@ public static class TestDataCleanup
             const string testAgentIds =
                 "SELECT id FROM agents WHERE organization_id IN (" + testOrgIds + ")";
 
+            // ── Candidate session / invite subqueries ──────────────────────
+            const string testInviteIds =
+                "SELECT id FROM interview_invites WHERE organization_id IN (" + testOrgIds + ")";
+
             // ── Delete in reverse FK order ───────────────────────────────────
+
+            // 0a. Interview audit logs → interviews, invites, sessions
+            TryExecute(connection,
+                "DELETE FROM interview_audit_logs WHERE interview_id IN (" + testInterviewIds + ")");
+
+            // 0b. Candidate sessions → invites, interviews
+            TryExecute(connection,
+                "DELETE FROM candidate_sessions WHERE invite_id IN (" + testInviteIds + ")");
+
+            // 0c. Interview invites → interviews, organizations
+            TryExecute(connection,
+                "DELETE FROM interview_invites WHERE organization_id IN (" + testOrgIds + ")");
 
             // 1. Follow-up selection logs → interview_responses → interviews
             TryExecute(connection,

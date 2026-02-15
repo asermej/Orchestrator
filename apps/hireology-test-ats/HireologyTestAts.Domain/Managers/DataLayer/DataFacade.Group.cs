@@ -5,9 +5,9 @@ internal sealed partial class DataFacade
     private GroupDataManager? _groupDataManager;
     private GroupDataManager GroupDataManager => _groupDataManager ??= new GroupDataManager(_dbConnectionString);
 
-    public async Task<IReadOnlyList<Group>> GetGroups()
+    public async Task<IReadOnlyList<Group>> GetGroups(bool excludeTestData = false)
     {
-        return await GroupDataManager.ListAsync().ConfigureAwait(false);
+        return await GroupDataManager.ListAsync(excludeTestData).ConfigureAwait(false);
     }
 
     public async Task<Group?> GetGroupById(Guid id)

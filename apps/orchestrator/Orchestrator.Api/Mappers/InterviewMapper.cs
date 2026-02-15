@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Orchestrator.Domain;
 using Orchestrator.Api.ResourcesModels;
 
@@ -14,6 +15,7 @@ public static class InterviewMapper
             JobId = interview.JobId,
             ApplicantId = interview.ApplicantId,
             AgentId = interview.AgentId,
+            InterviewConfigurationId = interview.InterviewConfigurationId,
             Token = interview.Token,
             Status = interview.Status,
             InterviewType = interview.InterviewType,
@@ -56,6 +58,32 @@ public static class InterviewMapper
     public static InterviewResultResource ToResultResource(InterviewResult result)
     {
         ArgumentNullException.ThrowIfNull(result);
+
+        var questionScores = new List<QuestionScoreResource>();
+        if (!string.IsNullOrWhiteSpace(result.QuestionScores))
+        {
+            try
+            {
+                var scores = JsonSerializer.Deserialize<List<QuestionScore>>(result.QuestionScores, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (scores != null)
+                {
+                    questionScores = scores.Select(qs => new QuestionScoreResource
+                    {
+                        QuestionIndex = qs.QuestionIndex,
+                        Question = qs.Question,
+                        Score = qs.Score,
+                        MaxScore = qs.MaxScore,
+                        Weight = qs.Weight,
+                        Feedback = qs.Feedback
+                    }).ToList();
+                }
+            }
+            catch (JsonException)
+            {
+                // If JSON is malformed, return empty scores
+            }
+        }
+
         return new InterviewResultResource
         {
             Id = result.Id,
@@ -67,6 +95,7 @@ public static class InterviewMapper
             AreasForImprovement = result.AreasForImprovement,
             FullTranscriptUrl = result.FullTranscriptUrl,
             WebhookSentAt = result.WebhookSentAt,
+            QuestionScores = questionScores,
             CreatedAt = result.CreatedAt
         };
     }

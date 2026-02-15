@@ -2,9 +2,9 @@ namespace HireologyTestAts.Domain;
 
 public sealed partial class DomainFacade
 {
-    public async Task<IReadOnlyList<Organization>> GetOrganizations(Guid? groupId = null)
+    public async Task<IReadOnlyList<Organization>> GetOrganizations(Guid? groupId = null, bool excludeTestData = false)
     {
-        return await OrganizationManager.GetOrganizations(groupId).ConfigureAwait(false);
+        return await OrganizationManager.GetOrganizations(groupId, excludeTestData).ConfigureAwait(false);
     }
 
     public async Task<Organization> GetOrganizationById(Guid id)

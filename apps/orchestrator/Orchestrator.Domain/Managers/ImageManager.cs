@@ -1,23 +1,26 @@
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using Orchestrator.Domain.DataLayer;
 
 namespace Orchestrator.Domain;
 
 /// <summary>
-/// Manager for image upload and management operations
+/// Manager for image upload and management operations, including interview audio recordings
 /// </summary>
 internal class ImageManager : IDisposable
 {
     private readonly ServiceLocatorBase _serviceLocator;
     private readonly ImageDataManager _imageDataManager;
     private readonly ImageValidator _validator;
+    private readonly ConfigurationProviderBase _configurationProvider;
     private bool _disposed = false;
 
     public ImageManager(ServiceLocatorBase serviceLocator)
     {
         _serviceLocator = serviceLocator;
-        var configurationProvider = serviceLocator.CreateConfigurationProvider();
-        _imageDataManager = new ImageDataManager(configurationProvider);
-        _validator = new ImageValidator(configurationProvider);
+        _configurationProvider = serviceLocator.CreateConfigurationProvider();
+        _imageDataManager = new ImageDataManager(_configurationProvider);
+        _validator = new ImageValidator(_configurationProvider);
     }
 
     /// <summary>
@@ -63,6 +66,57 @@ internal class ImageManager : IDisposable
         }
 
         return await _imageDataManager.GetImageAsync(key);
+    }
+
+    /// <summary>
+    /// Uploads interview audio to Azure Blob Storage
+    /// </summary>
+    /// <param name="audioStream">The audio stream to upload</param>
+    /// <param name="contentType">The MIME type (e.g., audio/webm)</param>
+    /// <returns>The API-relative URL of the uploaded audio</returns>
+    public async Task<string> UploadInterviewAudioAsync(Stream audioStream, string contentType)
+    {
+        if (audioStream == null || audioStream.Length == 0)
+        {
+            throw new ImageValidationException("No audio data provided");
+        }
+
+        var connectionString = _configurationProvider.GetBlobConnectionString();
+        var containerName = _configurationProvider.GetInterviewRecordingsContainerName();
+        var blobServiceClient = new BlobServiceClient(connectionString);
+        var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+        await containerClient.CreateIfNotExistsAsync();
+
+        var extension = contentType.Contains("webm") ? ".webm" : ".mp3";
+        var blobKey = $"{Guid.NewGuid()}{extension}";
+        var blobClient = containerClient.GetBlobClient(blobKey);
+
+        var blobHttpHeaders = new BlobHttpHeaders { ContentType = contentType };
+        await blobClient.UploadAsync(audioStream, new BlobUploadOptions { HttpHeaders = blobHttpHeaders });
+
+        return $"/api/v1/interview-audio/{blobKey}";
+    }
+
+    /// <summary>
+    /// Retrieves interview audio from Azure Blob Storage
+    /// </summary>
+    /// <param name="key">The blob key (filename)</param>
+    /// <returns>The audio stream and content type, or null if not found</returns>
+    public async Task<(Stream Stream, string ContentType)?> GetInterviewAudioAsync(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return null;
+
+        var connectionString = _configurationProvider.GetBlobConnectionString();
+        var containerName = _configurationProvider.GetInterviewRecordingsContainerName();
+        var blobServiceClient = new BlobServiceClient(connectionString);
+        var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+        var blobClient = containerClient.GetBlobClient(key);
+
+        if (!await blobClient.ExistsAsync()) return null;
+
+        var response = await blobClient.DownloadStreamingAsync();
+        var properties = await blobClient.GetPropertiesAsync();
+        return (response.Value.Content, properties.Value.ContentType ?? "audio/webm");
     }
 
     public void Dispose()

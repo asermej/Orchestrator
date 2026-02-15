@@ -94,4 +94,15 @@
 
     <!-- Remove Category concept: drop agent_categories if present -->
     <include file="changes/20260211120000-drop-agent-categories-if-exists.xml" relativeToChangelogFile="true"/>
+
+    <!-- Candidate Interview Links: invite, session, and audit log tables -->
+    <include file="changes/20260214120000-InterviewInvite.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260214120001-CandidateSession.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260214120002-InterviewAuditLog.xml" relativeToChangelogFile="true"/>
+
+    <!-- Add interview_configuration_id to interviews for question loading -->
+    <include file="changes/20260214150000-add-interview-configuration-id-to-interviews.xml" relativeToChangelogFile="true"/>
+
+    <!-- Add per-question scores JSON to interview results -->
+    <include file="changes/20260215120000-add-question-scores-to-interview-results.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog> 

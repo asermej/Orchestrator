@@ -216,6 +216,9 @@ app.UseStaticFiles();
 // API key authentication for ATS endpoints (before JWT auth so it gets first chance)
 app.UseApiKeyAuth();
 
+// Candidate session JWT authentication for /api/v1/candidate/* endpoints
+app.UseCandidateSessionAuth();
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

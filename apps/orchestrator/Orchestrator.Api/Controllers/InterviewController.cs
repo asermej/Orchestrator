@@ -39,20 +39,52 @@ public class InterviewController : ControllerBase
     }
 
     /// <summary>
-    /// Gets an interview by ID (requires authentication)
+    /// Gets an interview by ID with full detail (requires authentication)
     /// </summary>
     [HttpGet("{id}")]
     [Authorize]
-    [ProducesResponseType(typeof(InterviewResource), 200)]
+    [ProducesResponseType(typeof(InterviewDetailResource), 200)]
     [ProducesResponseType(404)]
-    public async Task<ActionResult<InterviewResource>> GetById(Guid id)
+    public async Task<ActionResult<InterviewDetailResource>> GetById(Guid id)
     {
         var interview = await _domainFacade.GetInterviewById(id);
         if (interview == null)
         {
             return NotFound($"Interview with ID {id} not found");
         }
-        return Ok(InterviewMapper.ToResource(interview));
+
+        // Get related data
+        var job = await _domainFacade.GetJobById(interview.JobId);
+        var applicant = await _domainFacade.GetApplicantById(interview.ApplicantId);
+        var agent = await _domainFacade.GetAgentById(interview.AgentId);
+        var responses = await _domainFacade.GetInterviewResponsesByInterviewId(interview.Id);
+        var result = await _domainFacade.GetInterviewResultByInterviewId(interview.Id);
+
+        var response = new InterviewDetailResource
+        {
+            Id = interview.Id,
+            JobId = interview.JobId,
+            ApplicantId = interview.ApplicantId,
+            AgentId = interview.AgentId,
+            InterviewConfigurationId = interview.InterviewConfigurationId,
+            Token = interview.Token,
+            Status = interview.Status,
+            InterviewType = interview.InterviewType,
+            ScheduledAt = interview.ScheduledAt,
+            StartedAt = interview.StartedAt,
+            CompletedAt = interview.CompletedAt,
+            CurrentQuestionIndex = interview.CurrentQuestionIndex,
+            CreatedAt = interview.CreatedAt,
+            UpdatedAt = interview.UpdatedAt,
+            Job = job != null ? JobMapper.ToResource(job) : null,
+            Applicant = applicant != null ? ApplicantMapper.ToResource(applicant) : null,
+            Agent = agent != null ? AgentMapper.ToResource(agent) : null,
+            Questions = new List<InterviewQuestionResource>(),
+            Responses = responses.Select(InterviewMapper.ToResponseResource).ToList(),
+            Result = result != null ? InterviewMapper.ToResultResource(result) : null
+        };
+
+        return Ok(response);
     }
 
     /// <summary>
@@ -86,6 +118,7 @@ public class InterviewController : ControllerBase
             JobId = interview.JobId,
             ApplicantId = interview.ApplicantId,
             AgentId = interview.AgentId,
+            InterviewConfigurationId = interview.InterviewConfigurationId,
             Token = interview.Token,
             Status = interview.Status,
             InterviewType = interview.InterviewType,

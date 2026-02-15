@@ -11,9 +11,9 @@ internal sealed class OrganizationManager : IDisposable
         _dataFacade = new DataFacade(configProvider.GetDbConnectionString());
     }
 
-    public async Task<IReadOnlyList<Organization>> GetOrganizations(Guid? groupId)
+    public async Task<IReadOnlyList<Organization>> GetOrganizations(Guid? groupId = null, bool excludeTestData = false)
     {
-        return await _dataFacade.GetOrganizations(groupId).ConfigureAwait(false);
+        return await _dataFacade.GetOrganizations(groupId, excludeTestData).ConfigureAwait(false);
     }
 
     public async Task<Organization> GetOrganizationById(Guid id)

@@ -1,6 +1,6 @@
 "use server";
 
-import { apiGet, apiDelete } from "@/lib/api-client-server";
+import { apiGet, apiDelete, apiPost } from "@/lib/api-client-server";
 
 export interface InterviewResponse {
   id: string;
@@ -8,19 +8,32 @@ export interface InterviewResponse {
   questionText: string;
   transcript: string;
   audioUrl?: string;
+  durationSeconds?: number;
   responseOrder: number;
+  isFollowUp: boolean;
+  questionType: string;
+  aiAnalysis?: string;
   createdAt: string;
+}
+
+export interface QuestionScore {
+  questionIndex: number;
+  question: string;
+  score: number;
+  maxScore: number;
+  weight: number;
+  feedback: string;
 }
 
 export interface InterviewResult {
   id: string;
   interviewId: string;
   summary?: string;
-  strengths?: string;
-  weaknesses?: string;
-  overallScore?: number;
+  score?: number;
   recommendation?: string;
-  aiAnalysis?: string;
+  strengths?: string;
+  areasForImprovement?: string;
+  questionScores?: QuestionScore[];
   createdAt: string;
 }
 
@@ -28,6 +41,8 @@ export interface InterviewItem {
   id: string;
   token: string;
   status: string;
+  interviewType?: string;
+  interviewConfigurationId?: string;
   scheduledAt?: string;
   startedAt?: string;
   completedAt?: string;
@@ -85,4 +100,15 @@ export async function getInterview(id: string): Promise<InterviewItem> {
 
 export async function deleteInterview(id: string): Promise<void> {
   await apiDelete(`/Interview/${id}`);
+}
+
+export async function scoreInterview(
+  interviewId: string,
+  interviewConfigurationId: string
+): Promise<InterviewResult> {
+  const result = await apiPost<InterviewResult>(
+    `/Interview/test/${interviewId}/score`,
+    { interviewConfigurationId }
+  );
+  return result as InterviewResult;
 }

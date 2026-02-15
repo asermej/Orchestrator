@@ -18,6 +18,8 @@ interface VoiceInputReturn {
   /** Stops recording. Optional callback is invoked when recognition has ended (after final transcript may have been delivered). */
   stopRecording: (onStopped?: () => void) => void;
   toggleRecording: () => void;
+  /** Returns the recorded audio blob (webm format) from the last recording session, or null if unavailable. */
+  getAudioBlob: () => Blob | null;
 }
 
 declare global {
@@ -40,6 +42,10 @@ export function useVoiceInput({
   const recognitionRef = useRef<any>(null);
   const onStoppedRef = useRef<(() => void) | null>(null);
   const hasTranscriptRef = useRef(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const audioBlobRef = useRef<Blob | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
 
   // Check browser compatibility on mount
   useEffect(() => {
@@ -155,8 +161,40 @@ export function useVoiceInput({
     try {
       setError(null);
       hasTranscriptRef.current = false; // Reset transcript tracking when starting new recording
+      audioBlobRef.current = null;
+      audioChunksRef.current = [];
       recognitionRef.current.start();
       setIsRecording(true);
+
+      // Start MediaRecorder in parallel for audio capture
+      navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+        mediaStreamRef.current = stream;
+        const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+          ? "audio/webm;codecs=opus"
+          : "audio/webm";
+        const recorder = new MediaRecorder(stream, { mimeType });
+        mediaRecorderRef.current = recorder;
+
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) {
+            audioChunksRef.current.push(e.data);
+          }
+        };
+
+        recorder.onstop = () => {
+          if (audioChunksRef.current.length > 0) {
+            audioBlobRef.current = new Blob(audioChunksRef.current, { type: mimeType });
+          }
+          // Release mic
+          stream.getTracks().forEach((t) => t.stop());
+          mediaStreamRef.current = null;
+        };
+
+        recorder.start(1000); // collect chunks every second
+      }).catch((err) => {
+        // Audio capture failed, but SpeechRecognition still works for transcript
+        console.warn("MediaRecorder not available, transcript-only mode:", err);
+      });
     } catch (e: any) {
       // Recognition might already be started
       if (e.message && !e.message.includes("already started")) {
@@ -179,6 +217,16 @@ export function useVoiceInput({
       onStoppedRef.current = onStopped;
     }
 
+    // Stop MediaRecorder
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (e) {
+        // Ignore errors on stop
+      }
+      mediaRecorderRef.current = null;
+    }
+
     try {
       recognitionRef.current.stop();
       setIsRecording(false);
@@ -199,6 +247,22 @@ export function useVoiceInput({
     }
   }, [isRecording, startRecording, stopRecording]);
 
+  const getAudioBlob = useCallback(() => {
+    return audioBlobRef.current;
+  }, []);
+
+  // Cleanup MediaRecorder on unmount
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        try { mediaRecorderRef.current.stop(); } catch (e) { /* ignore */ }
+      }
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+    };
+  }, []);
+
   return {
     isRecording,
     isSupported,
@@ -206,6 +270,7 @@ export function useVoiceInput({
     startRecording,
     stopRecording,
     toggleRecording,
+    getAudioBlob,
   };
 }
 

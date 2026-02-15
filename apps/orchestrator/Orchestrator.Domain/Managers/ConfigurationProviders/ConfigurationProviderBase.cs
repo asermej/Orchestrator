@@ -85,6 +85,20 @@ public abstract class ConfigurationProviderBase
     }
 
     /// <summary>
+    /// Gets the Azure Blob Storage container name for interview audio recordings.
+    /// </summary>
+    /// <returns>The container name, defaults to "interview-recordings"</returns>
+    public string GetInterviewRecordingsContainerName()
+    {
+        var containerName = RetrieveConfigurationSettingValue("Storage:InterviewRecordingsContainer");
+        if (string.IsNullOrWhiteSpace(containerName))
+        {
+            return "interview-recordings";
+        }
+        return containerName;
+    }
+
+    /// <summary>
     /// Gets the Azure Blob Storage container name for voice samples (private).
     /// </summary>
     /// <returns>The container name, defaults to "voice-samples"</returns>
@@ -153,6 +167,15 @@ public abstract class ConfigurationProviderBase
     public string? GetConfigurationValue(string key)
     {
         return RetrieveConfigurationSettingValue(key);
+    }
+
+    /// <summary>
+    /// Gets the HMAC secret used for signing candidate session JWTs.
+    /// Must be at least 32 characters for HS256.
+    /// </summary>
+    public string GetCandidateTokenSecret()
+    {
+        return RetrieveConfigurationSettingValueThrowIfMissing("CandidateSession:TokenSecret");
     }
 
     private string RetrieveConfigurationSettingValueThrowIfMissing(string key)

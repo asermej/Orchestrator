@@ -43,7 +43,7 @@ public class DomainFacadeTestsGroup
     {
         var group = new Group
         {
-            Name = $"TestGroup_{suffix}{Guid.NewGuid():N}"[..50]
+            Name = $"TestGroup_{suffix}{Guid.NewGuid():N}"
         };
         var result = await _domainFacade.CreateGroup(group);
         Assert.IsNotNull(result, "Failed to create test Group");
@@ -55,7 +55,7 @@ public class DomainFacadeTestsGroup
     {
         var group = new Group
         {
-            Name = $"TestGroup_{Guid.NewGuid():N}"[..50]
+            Name = $"TestGroup_{Guid.NewGuid():N}"
         };
 
         var result = await _domainFacade.CreateGroup(group);
@@ -111,7 +111,7 @@ public class DomainFacadeTestsGroup
     public async Task UpdateGroup_ValidData_UpdatesSuccessfully()
     {
         var created = await CreateTestGroupAsync();
-        var updates = new Group { Name = $"TestGroup_Updated_{Guid.NewGuid():N}"[..50] };
+        var updates = new Group { Name = $"TestGroup_Updated_{Guid.NewGuid():N}" };
 
         var result = await _domainFacade.UpdateGroup(created.Id, updates);
 

@@ -12,6 +12,7 @@ public class InterviewResource
     public Guid JobId { get; set; }
     public Guid ApplicantId { get; set; }
     public Guid AgentId { get; set; }
+    public Guid? InterviewConfigurationId { get; set; }
     public string Token { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public string InterviewType { get; set; } = string.Empty;
@@ -71,8 +72,16 @@ public class CreateInterviewWithApplicantResource
     public string? ApplicantEmail { get; set; }
     public string? ApplicantPhone { get; set; }
 
-    [Required]
+    /// <summary>
+    /// The agent to conduct the interview. Required if InterviewConfigurationId is not provided.
+    /// </summary>
     public Guid AgentId { get; set; }
+
+    /// <summary>
+    /// The interview configuration that defines agent, questions, and scoring.
+    /// When provided, AgentId is determined from the configuration.
+    /// </summary>
+    public Guid? InterviewConfigurationId { get; set; }
 
     public string InterviewType { get; set; } = "voice";
 
@@ -150,7 +159,21 @@ public class InterviewResultResource
     public string? AreasForImprovement { get; set; }
     public string? FullTranscriptUrl { get; set; }
     public DateTime? WebhookSentAt { get; set; }
+    public List<QuestionScoreResource> QuestionScores { get; set; } = new();
     public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>
+/// Represents a per-question score in API responses
+/// </summary>
+public class QuestionScoreResource
+{
+    public int QuestionIndex { get; set; }
+    public string Question { get; set; } = string.Empty;
+    public decimal Score { get; set; }
+    public decimal MaxScore { get; set; }
+    public decimal Weight { get; set; }
+    public string Feedback { get; set; } = string.Empty;
 }
 
 /// <summary>

@@ -200,6 +200,27 @@ public class UpdateAgentResource
 }
 
 /// <summary>
+/// Lightweight agent resource for ATS integration endpoints
+/// </summary>
+public class AtsAgentResource
+{
+    /// <summary>
+    /// The unique identifier of the Agent
+    /// </summary>
+    public Guid Id { get; set; }
+
+    /// <summary>
+    /// The display name of the agent
+    /// </summary>
+    public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The profile image URL for this agent
+    /// </summary>
+    public string? ProfileImageUrl { get; set; }
+}
+
+/// <summary>
 /// Request model for searching Agents
 /// </summary>
 public class SearchAgentRequest : PaginatedRequest

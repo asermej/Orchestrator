@@ -43,7 +43,7 @@ public class DomainFacadeTestsOrganization
     {
         var group = new Group
         {
-            Name = $"TestGroup_{suffix}{Guid.NewGuid():N}"[..50]
+            Name = $"TestGroup_{suffix}{Guid.NewGuid():N}"
         };
         return await _domainFacade.CreateGroup(group);
     }
@@ -54,7 +54,7 @@ public class DomainFacadeTestsOrganization
         var org = new Organization
         {
             GroupId = group.Id,
-            Name = $"TestOrg_{suffix}{Guid.NewGuid():N}"[..50],
+            Name = $"TestOrg_{suffix}{Guid.NewGuid():N}",
             City = "Chicago",
             State = "IL"
         };
@@ -70,7 +70,7 @@ public class DomainFacadeTestsOrganization
         var org = new Organization
         {
             GroupId = group.Id,
-            Name = $"TestOrg_{Guid.NewGuid():N}"[..50],
+            Name = $"TestOrg_{Guid.NewGuid():N}",
             City = "Chicago",
             State = "IL"
         };
@@ -103,7 +103,7 @@ public class DomainFacadeTestsOrganization
         var org = new Organization
         {
             GroupId = Guid.Empty,
-            Name = $"TestOrg_{Guid.NewGuid():N}"[..50]
+            Name = $"TestOrg_{Guid.NewGuid():N}"
         };
 
         await Assert.ThrowsExceptionAsync<OrganizationValidationException>(() =>
@@ -149,7 +149,7 @@ public class DomainFacadeTestsOrganization
         var created = await CreateTestOrganizationAsync();
         var updates = new Organization
         {
-            Name = $"TestOrg_Updated_{Guid.NewGuid():N}"[..50],
+            Name = $"TestOrg_Updated_{Guid.NewGuid():N}",
             City = "New York",
             State = "NY"
         };

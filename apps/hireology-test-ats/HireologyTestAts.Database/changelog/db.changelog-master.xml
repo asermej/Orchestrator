@@ -22,4 +22,5 @@
     <include file="changes/20260214120005-add-include-children-to-user-org-access.xml" relativeToChangelogFile="true"/>
     <include file="changes/20260214120006-make-auth0sub-nullable.xml" relativeToChangelogFile="true"/>
     <include file="changes/20260214130000-create-applicants-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260214140000-create-interview-requests-table.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

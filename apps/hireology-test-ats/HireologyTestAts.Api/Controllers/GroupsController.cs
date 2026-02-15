@@ -24,7 +24,7 @@ public class GroupsController : ControllerBase
     [ProducesResponseType(typeof(IReadOnlyList<GroupResource>), 200)]
     public async Task<ActionResult<IReadOnlyList<GroupResource>>> List()
     {
-        var groups = await _domainFacade.GetGroups();
+        var groups = await _domainFacade.GetGroups(excludeTestData: true);
         return Ok(GroupMapper.ToResource(groups));
     }
 

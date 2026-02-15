@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260214120001-create-candidate-sessions-table" author="system">
+        <createTable tableName="candidate_sessions">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="invite_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_candidate_sessions_invite" references="interview_invites(id)"/>
+            </column>
+            <column name="interview_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_candidate_sessions_interview" references="interviews(id)"/>
+            </column>
+            <column name="jti" type="varchar(50)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uk_candidate_sessions_jti"/>
+            </column>
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="ip_address" type="varchar(45)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="user_agent" type="varchar(500)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="started_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_activity_at" type="timestamptz">
+                <constraints nullable="true"/>
+            </column>
+            <column name="expires_at" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+            <!-- Audit fields -->
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamptz">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_deleted" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamptz">
+                <constraints nullable="true"/>
+            </column>
+            <column name="deleted_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="candidate_sessions" indexName="idx_candidate_sessions_jti">
+            <column name="jti"/>
+        </createIndex>
+
+        <createIndex tableName="candidate_sessions" indexName="idx_candidate_sessions_invite_id">
+            <column name="invite_id"/>
+        </createIndex>
+
+        <createIndex tableName="candidate_sessions" indexName="idx_candidate_sessions_interview_id">
+            <column name="interview_id"/>
+        </createIndex>
+
+        <createIndex tableName="candidate_sessions" indexName="idx_candidate_sessions_is_deleted">
+            <column name="is_deleted"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

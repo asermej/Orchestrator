@@ -11,9 +11,9 @@ internal sealed class GroupManager : IDisposable
         _dataFacade = new DataFacade(configProvider.GetDbConnectionString());
     }
 
-    public async Task<IReadOnlyList<Group>> GetGroups()
+    public async Task<IReadOnlyList<Group>> GetGroups(bool excludeTestData = false)
     {
-        return await _dataFacade.GetGroups().ConfigureAwait(false);
+        return await _dataFacade.GetGroups(excludeTestData).ConfigureAwait(false);
     }
 
     public async Task<Group> GetGroupById(Guid id)

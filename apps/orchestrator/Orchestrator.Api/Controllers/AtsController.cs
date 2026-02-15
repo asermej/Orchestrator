@@ -30,6 +30,29 @@ public class AtsController : ControllerBase
         throw new UnauthorizedAccessException("Organization not found in context");
     }
 
+    // Settings Endpoints
+
+    /// <summary>
+    /// Updates the webhook URL for the authenticated organization
+    /// </summary>
+    [HttpPut("settings/webhook")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public async Task<ActionResult> UpdateWebhookUrl([FromBody] UpdateWebhookResource resource)
+    {
+        var organizationId = GetOrganizationId();
+        var organization = await _domainFacade.GetOrganizationById(organizationId);
+        if (organization == null)
+        {
+            return NotFound("Organization not found");
+        }
+
+        organization.WebhookUrl = resource.WebhookUrl;
+        await _domainFacade.UpdateOrganization(organization);
+
+        return Ok(new { webhookUrl = organization.WebhookUrl });
+    }
+
     // Job Endpoints
 
     /// <summary>
@@ -206,6 +229,70 @@ public class AtsController : ControllerBase
         });
     }
 
+    // Agent Endpoints
+
+    /// <summary>
+    /// Lists agents available for the authenticated organization
+    /// </summary>
+    [HttpGet("agents")]
+    [ProducesResponseType(typeof(IEnumerable<AtsAgentResource>), 200)]
+    [ProducesResponseType(401)]
+    public async Task<ActionResult<IEnumerable<AtsAgentResource>>> ListAgents()
+    {
+        var organizationId = GetOrganizationId();
+        var result = await _domainFacade.SearchAgents(
+            organizationId, null, null, null, 1, 100);
+
+        var resources = result.Items.Select(a => new AtsAgentResource
+        {
+            Id = a.Id,
+            DisplayName = a.DisplayName,
+            ProfileImageUrl = a.ProfileImageUrl
+        });
+
+        return Ok(resources);
+    }
+
+    // Interview Configuration Endpoints
+
+    /// <summary>
+    /// Lists interview configurations available for the authenticated organization.
+    /// Each configuration defines the agent, questions, and scoring rubric for an interview.
+    /// </summary>
+    [HttpGet("configurations")]
+    [ProducesResponseType(typeof(IEnumerable<AtsInterviewConfigurationResource>), 200)]
+    [ProducesResponseType(401)]
+    public async Task<ActionResult<IEnumerable<AtsInterviewConfigurationResource>>> ListConfigurations()
+    {
+        var organizationId = GetOrganizationId();
+        var result = await _domainFacade.SearchInterviewConfigurations(
+            organizationId, null, null, true, null, 1, 100);
+
+        // Fetch agent names for display
+        var agentIds = result.Items.Select(c => c.AgentId).Distinct().ToList();
+        var agentNames = new Dictionary<Guid, string>();
+        foreach (var agentId in agentIds)
+        {
+            var agent = await _domainFacade.GetAgentById(agentId);
+            if (agent != null)
+            {
+                agentNames[agentId] = agent.DisplayName;
+            }
+        }
+
+        var resources = result.Items.Select(c => new AtsInterviewConfigurationResource
+        {
+            Id = c.Id,
+            Name = c.Name,
+            Description = c.Description,
+            AgentId = c.AgentId,
+            AgentDisplayName = agentNames.GetValueOrDefault(c.AgentId),
+            QuestionCount = c.QuestionCount
+        });
+
+        return Ok(resources);
+    }
+
     // Interview Endpoints
 
     /// <summary>
@@ -235,11 +322,26 @@ public class AtsController : ControllerBase
             resource.ApplicantEmail,
             resource.ApplicantPhone);
 
+        // Resolve agent from configuration or direct AgentId
+        Guid agentId = resource.AgentId;
+        Guid? interviewConfigurationId = resource.InterviewConfigurationId;
+
+        if (interviewConfigurationId.HasValue)
+        {
+            // Use the configuration to determine agent and questions
+            var config = await _domainFacade.GetInterviewConfigurationById(interviewConfigurationId.Value);
+            if (config == null || config.OrganizationId != organizationId)
+            {
+                return BadRequest($"Interview configuration with ID {interviewConfigurationId} not found or does not belong to this organization.");
+            }
+            agentId = config.AgentId;
+        }
+
         // Validate agent exists and belongs to organization
-        var agent = await _domainFacade.GetAgentById(resource.AgentId);
+        var agent = await _domainFacade.GetAgentById(agentId);
         if (agent == null || agent.OrganizationId != organizationId)
         {
-            return BadRequest($"Agent with ID {resource.AgentId} not found or does not belong to this organization.");
+            return BadRequest($"Agent with ID {agentId} not found or does not belong to this organization.");
         }
 
         // Create interview
@@ -247,33 +349,103 @@ public class AtsController : ControllerBase
         {
             JobId = job.Id,
             ApplicantId = applicant.Id,
-            AgentId = resource.AgentId,
+            AgentId = agentId,
+            InterviewConfigurationId = interviewConfigurationId,
             InterviewType = resource.InterviewType,
             ScheduledAt = resource.ScheduledAt
         };
 
         var created = await _domainFacade.CreateInterview(interview);
 
-        // Return with interview URL
+        // Auto-create an invite for the interview so the ATS gets an invite URL
+        var invite = await _domainFacade.CreateInterviewInvite(
+            created.Id, organizationId, maxUses: 3, expiryDays: 7);
+
+        // Return with interview URL and invite info
         var response = InterviewMapper.ToResource(created);
-        return Created($"/api/v1/ats/interviews/{created.Id}", response);
+        var inviteResource = CandidateMapper.ToInviteResource(invite);
+        return Created($"/api/v1/ats/interviews/{created.Id}", new
+        {
+            interview = response,
+            invite = inviteResource,
+            interviewConfigurationId = interviewConfigurationId,
+        });
     }
 
     /// <summary>
-    /// Gets an interview by ID
+    /// Gets an interview by ID, including current invite status
     /// </summary>
     [HttpGet("interviews/{id}")]
-    [ProducesResponseType(typeof(InterviewResource), 200)]
+    [ProducesResponseType(typeof(object), 200)]
     [ProducesResponseType(404)]
     [ProducesResponseType(401)]
-    public async Task<ActionResult<InterviewResource>> GetInterview(Guid id)
+    public async Task<ActionResult> GetInterview(Guid id)
     {
         var interview = await _domainFacade.GetInterviewById(id);
         if (interview == null)
         {
             return NotFound($"Interview with ID {id} not found");
         }
-        return Ok(InterviewMapper.ToResource(interview));
+
+        var invite = await _domainFacade.GetInterviewInviteByInterviewId(id);
+        var inviteStatus = "none";
+        if (invite != null)
+        {
+            if (invite.Status == InviteStatus.Revoked)
+                inviteStatus = "revoked";
+            else if (invite.ExpiresAt < DateTime.UtcNow)
+                inviteStatus = "expired";
+            else if (invite.UseCount >= invite.MaxUses)
+                inviteStatus = "max_uses_reached";
+            else
+                inviteStatus = invite.Status; // "active" or "consumed"
+        }
+
+        return Ok(new
+        {
+            interview = InterviewMapper.ToResource(interview),
+            inviteStatus,
+            inviteUseCount = invite?.UseCount,
+            inviteMaxUses = invite?.MaxUses,
+            inviteExpiresAt = invite?.ExpiresAt,
+        });
+    }
+
+    /// <summary>
+    /// Creates a new invite for an existing interview, revoking any previous invite.
+    /// Use this when the original invite link has expired or reached max uses.
+    /// </summary>
+    [HttpPost("interviews/{id}/refresh-invite")]
+    [ProducesResponseType(typeof(object), 200)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(401)]
+    public async Task<ActionResult> RefreshInvite(Guid id)
+    {
+        var organizationId = GetOrganizationId();
+        var interview = await _domainFacade.GetInterviewById(id);
+        if (interview == null)
+        {
+            return NotFound($"Interview with ID {id} not found");
+        }
+
+        // Revoke existing invite if any
+        var existingInvite = await _domainFacade.GetInterviewInviteByInterviewId(id);
+        if (existingInvite != null && existingInvite.Status == InviteStatus.Active)
+        {
+            await _domainFacade.RevokeInterviewInvite(existingInvite.Id, "ats_refresh");
+        }
+
+        // Create a fresh invite
+        var newInvite = await _domainFacade.CreateInterviewInvite(id, organizationId, maxUses: 3, expiryDays: 7);
+
+        var inviteResource = CandidateMapper.ToInviteResource(newInvite);
+        var inviteUrl = $"http://localhost:3000/i/{newInvite.ShortCode}";
+
+        return Ok(new
+        {
+            invite = inviteResource,
+            inviteUrl,
+        });
     }
 
     /// <summary>

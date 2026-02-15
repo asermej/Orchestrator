@@ -45,6 +45,14 @@ public class UpdateOrganizationResource
 }
 
 /// <summary>
+/// Request model for updating webhook URL via ATS API
+/// </summary>
+public class UpdateWebhookResource
+{
+    public string? WebhookUrl { get; set; }
+}
+
+/// <summary>
 /// Request model for searching Organizations
 /// </summary>
 public class SearchOrganizationRequest : PaginatedRequest

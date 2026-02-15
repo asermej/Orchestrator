@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260214140000-create-interview-requests-table" author="system">
+        <createTable tableName="interview_requests">
+            <column name="id" type="uuid">
+                <constraints primaryKey="true" nullable="false" />
+            </column>
+            <column name="applicant_id" type="uuid">
+                <constraints nullable="false" references="applicants(id)" foreignKeyName="fk_interview_requests_applicant" />
+            </column>
+            <column name="job_id" type="uuid">
+                <constraints nullable="false" references="jobs(id)" foreignKeyName="fk_interview_requests_job" />
+            </column>
+            <column name="orchestrator_interview_id" type="uuid">
+                <constraints nullable="true" />
+            </column>
+            <column name="invite_url" type="varchar(500)">
+                <constraints nullable="true" />
+            </column>
+            <column name="short_code" type="varchar(50)">
+                <constraints nullable="true" />
+            </column>
+            <column name="status" type="varchar(50)" defaultValue="not_started">
+                <constraints nullable="false" />
+            </column>
+            <column name="score" type="int">
+                <constraints nullable="true" />
+            </column>
+            <column name="result_summary" type="text">
+                <constraints nullable="true" />
+            </column>
+            <column name="result_recommendation" type="varchar(100)">
+                <constraints nullable="true" />
+            </column>
+            <column name="result_strengths" type="text">
+                <constraints nullable="true" />
+            </column>
+            <column name="result_areas_for_improvement" type="text">
+                <constraints nullable="true" />
+            </column>
+            <column name="webhook_received_at" type="timestamptz">
+                <constraints nullable="true" />
+            </column>
+            <column name="created_at" type="timestamptz" defaultValueComputed="NOW()">
+                <constraints nullable="false" />
+            </column>
+            <column name="updated_at" type="timestamptz" defaultValueComputed="NOW()">
+                <constraints nullable="false" />
+            </column>
+        </createTable>
+
+        <createIndex tableName="interview_requests" indexName="idx_interview_requests_applicant_id">
+            <column name="applicant_id" />
+        </createIndex>
+        <createIndex tableName="interview_requests" indexName="idx_interview_requests_job_id">
+            <column name="job_id" />
+        </createIndex>
+        <createIndex tableName="interview_requests" indexName="idx_interview_requests_orchestrator_interview_id">
+            <column name="orchestrator_interview_id" />
+        </createIndex>
+        <createIndex tableName="interview_requests" indexName="idx_interview_requests_status">
+            <column name="status" />
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

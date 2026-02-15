@@ -12,15 +12,18 @@ internal sealed class OrganizationDataManager
         _connectionString = connectionString;
     }
 
-    public async Task<IReadOnlyList<Organization>> ListAsync(Guid? groupId)
+    public async Task<IReadOnlyList<Organization>> ListAsync(Guid? groupId, bool excludeTestData = false)
     {
-        const string sqlBase = @"
+        var sqlBase = @"
             SELECT id AS Id, group_id AS GroupId, parent_organization_id AS ParentOrganizationId,
                    name AS Name, city AS City, state AS State,
                    created_at AS CreatedAt, updated_at AS UpdatedAt
             FROM organizations";
-        var sql = groupId.HasValue
-            ? sqlBase + " WHERE group_id = @GroupId ORDER BY name"
+        var conditions = new List<string>();
+        if (excludeTestData) conditions.Add("name NOT LIKE 'TestOrg_%'");
+        if (groupId.HasValue) conditions.Add("group_id = @GroupId");
+        var sql = conditions.Count > 0
+            ? sqlBase + " WHERE " + string.Join(" AND ", conditions) + " ORDER BY name"
             : sqlBase + " ORDER BY name";
         await using var conn = new NpgsqlConnection(_connectionString);
         var items = await conn.QueryAsync<Organization>(

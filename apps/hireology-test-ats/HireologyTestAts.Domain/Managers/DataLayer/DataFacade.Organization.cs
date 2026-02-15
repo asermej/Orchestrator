@@ -5,9 +5,9 @@ internal sealed partial class DataFacade
     private OrganizationDataManager? _organizationDataManager;
     private OrganizationDataManager OrganizationDataManager => _organizationDataManager ??= new OrganizationDataManager(_dbConnectionString);
 
-    public async Task<IReadOnlyList<Organization>> GetOrganizations(Guid? groupId)
+    public async Task<IReadOnlyList<Organization>> GetOrganizations(Guid? groupId = null, bool excludeTestData = false)
     {
-        return await OrganizationDataManager.ListAsync(groupId).ConfigureAwait(false);
+        return await OrganizationDataManager.ListAsync(groupId, excludeTestData).ConfigureAwait(false);
     }
 
     public async Task<Organization?> GetOrganizationById(Guid id)

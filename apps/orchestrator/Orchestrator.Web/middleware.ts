@@ -1,7 +1,13 @@
 import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth0 } from './lib/auth0';
 
 export async function middleware(request: NextRequest) {
+  // Skip Auth0 for candidate interview routes -- these use their own session token
+  if (request.nextUrl.pathname.startsWith('/i/')) {
+    return NextResponse.next();
+  }
+
   return await auth0.middleware(request);
 }
 

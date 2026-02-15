@@ -78,6 +78,29 @@ public class ImageController : ControllerBase
 
         return File(result.Stream, result.ContentType);
     }
+
+    /// <summary>
+    /// Retrieves an interview audio recording by key from blob storage
+    /// </summary>
+    /// <param name="key">The audio blob key (filename)</param>
+    /// <returns>The audio file</returns>
+    /// <response code="200">Returns the audio file</response>
+    /// <response code="404">If the audio is not found</response>
+    [HttpGet("/api/v1/interview-audio/{key}")]
+    [Authorize]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetInterviewAudio(string key)
+    {
+        var result = await _domainFacade.GetInterviewAudioAsync(key);
+
+        if (result == null)
+        {
+            return NotFound();
+        }
+
+        return File(result.Value.Stream, result.Value.ContentType);
+    }
 }
 
 /// <summary>

@@ -22,6 +22,9 @@ public sealed partial class DomainFacade : IDisposable
     private ApplicantManager? _applicantManager;
     private ApplicantManager ApplicantManager => _applicantManager ??= new ApplicantManager(_serviceLocator);
 
+    private InterviewRequestManager? _interviewRequestManager;
+    private InterviewRequestManager InterviewRequestManager => _interviewRequestManager ??= new InterviewRequestManager(_serviceLocator);
+
     public DomainFacade() : this(new ServiceLocator()) { }
 
     internal DomainFacade(ServiceLocatorBase serviceLocator)
@@ -38,6 +41,7 @@ public sealed partial class DomainFacade : IDisposable
             _jobManager?.Dispose();
             _userManager?.Dispose();
             _applicantManager?.Dispose();
+            _interviewRequestManager?.Dispose();
             _disposed = true;
         }
     }

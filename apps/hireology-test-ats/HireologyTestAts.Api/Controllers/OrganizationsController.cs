@@ -24,7 +24,7 @@ public class OrganizationsController : ControllerBase
     [ProducesResponseType(typeof(IReadOnlyList<OrganizationResource>), 200)]
     public async Task<ActionResult<IReadOnlyList<OrganizationResource>>> List([FromQuery] Guid? groupId)
     {
-        var orgs = await _domainFacade.GetOrganizations(groupId);
+        var orgs = await _domainFacade.GetOrganizations(groupId, excludeTestData: true);
         return Ok(OrganizationMapper.ToResource(orgs));
     }
 

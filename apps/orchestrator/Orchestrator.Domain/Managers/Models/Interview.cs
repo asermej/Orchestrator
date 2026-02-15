@@ -17,6 +17,9 @@ public class Interview : Entity
     [Column("agent_id")]
     public Guid AgentId { get; set; }
 
+    [Column("interview_configuration_id")]
+    public Guid? InterviewConfigurationId { get; set; }
+
     [Column("token")]
     public string Token { get; set; } = string.Empty;
 

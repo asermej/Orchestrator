@@ -92,6 +92,10 @@ export default function InterviewsPage() {
       setInterviews(data.items);
       setTotalCount(data.totalCount);
     } catch (err) {
+      // Re-throw Next.js redirect errors (e.g. 401 → login) so navigation works
+      if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) {
+        throw err;
+      }
       console.error("Error loading interviews:", err);
       setError("Failed to load interviews. Please try again.");
     } finally {

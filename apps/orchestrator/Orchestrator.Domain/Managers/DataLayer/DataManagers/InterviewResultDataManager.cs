@@ -19,7 +19,7 @@ internal sealed class InterviewResultDataManager
     public async Task<InterviewResult?> GetById(Guid id)
     {
         const string sql = @"
-            SELECT id, interview_id, summary, score, recommendation, strengths, areas_for_improvement, full_transcript_url, webhook_sent_at, webhook_response, created_at, updated_at, is_deleted
+            SELECT id, interview_id, summary, score, recommendation, strengths, areas_for_improvement, full_transcript_url, webhook_sent_at, webhook_response, question_scores, created_at, updated_at, is_deleted
             FROM interview_results
             WHERE id = @id AND is_deleted = false";
         using var connection = new NpgsqlConnection(_dbConnectionString);
@@ -29,7 +29,7 @@ internal sealed class InterviewResultDataManager
     public async Task<InterviewResult?> GetByInterviewId(Guid interviewId)
     {
         const string sql = @"
-            SELECT id, interview_id, summary, score, recommendation, strengths, areas_for_improvement, full_transcript_url, webhook_sent_at, webhook_response, created_at, updated_at, is_deleted
+            SELECT id, interview_id, summary, score, recommendation, strengths, areas_for_improvement, full_transcript_url, webhook_sent_at, webhook_response, question_scores, created_at, updated_at, is_deleted
             FROM interview_results
             WHERE interview_id = @InterviewId AND is_deleted = false";
         using var connection = new NpgsqlConnection(_dbConnectionString);
@@ -44,9 +44,9 @@ internal sealed class InterviewResultDataManager
         }
 
         const string sql = @"
-            INSERT INTO interview_results (id, interview_id, summary, score, recommendation, strengths, areas_for_improvement, full_transcript_url, created_by)
-            VALUES (@Id, @InterviewId, @Summary, @Score, @Recommendation, @Strengths, @AreasForImprovement, @FullTranscriptUrl, @CreatedBy)
-            RETURNING id, interview_id, summary, score, recommendation, strengths, areas_for_improvement, full_transcript_url, webhook_sent_at, webhook_response, created_at, updated_at, is_deleted";
+            INSERT INTO interview_results (id, interview_id, summary, score, recommendation, strengths, areas_for_improvement, full_transcript_url, question_scores, created_by)
+            VALUES (@Id, @InterviewId, @Summary, @Score, @Recommendation, @Strengths, @AreasForImprovement, @FullTranscriptUrl, @QuestionScores, @CreatedBy)
+            RETURNING id, interview_id, summary, score, recommendation, strengths, areas_for_improvement, full_transcript_url, webhook_sent_at, webhook_response, question_scores, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var newItem = await connection.QueryFirstOrDefaultAsync<InterviewResult>(sql, result);
@@ -66,10 +66,11 @@ internal sealed class InterviewResultDataManager
                 full_transcript_url = @FullTranscriptUrl,
                 webhook_sent_at = @WebhookSentAt,
                 webhook_response = @WebhookResponse,
+                question_scores = @QuestionScores,
                 updated_at = CURRENT_TIMESTAMP,
                 updated_by = @UpdatedBy
             WHERE id = @Id AND is_deleted = false
-            RETURNING id, interview_id, summary, score, recommendation, strengths, areas_for_improvement, full_transcript_url, webhook_sent_at, webhook_response, created_at, updated_at, is_deleted";
+            RETURNING id, interview_id, summary, score, recommendation, strengths, areas_for_improvement, full_transcript_url, webhook_sent_at, webhook_response, question_scores, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var updatedItem = await connection.QueryFirstOrDefaultAsync<InterviewResult>(sql, result);
