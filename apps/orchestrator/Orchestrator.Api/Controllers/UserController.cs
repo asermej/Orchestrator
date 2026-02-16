@@ -25,8 +25,8 @@ public class UserController : ControllerBase
     }
 
     /// <summary>
-    /// Returns the current user's display name from the ATS user context.
-    /// Used by the Orchestrator Web to show the user's name in the sidebar.
+    /// Returns the current user's display name and accessible organizations from the ATS user context.
+    /// Used by the Orchestrator Web to populate the header bar.
     /// </summary>
     [HttpGet("me-context")]
     [ProducesResponseType(typeof(UserMeContextResource), 200)]
@@ -36,7 +36,19 @@ public class UserController : ControllerBase
         return Ok(new UserMeContextResource
         {
             UserName = userContext?.UserName,
-            Auth0Sub = userContext?.Auth0Sub
+            Auth0Sub = userContext?.Auth0Sub,
+            CurrentGroupRootOrganizationId = userContext?.CurrentGroupRootOrganizationId,
+            AccessibleOrganizations = (userContext?.AccessibleOrganizations ?? [])
+                .Select(o => new OrganizationContextItem
+                {
+                    Id = o.Id,
+                    GroupId = o.GroupId,
+                    ParentOrganizationId = o.ParentOrganizationId,
+                    Name = o.Name,
+                    City = o.City,
+                    State = o.State
+                })
+                .ToList()
         });
     }
 

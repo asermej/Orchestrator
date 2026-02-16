@@ -39,6 +39,9 @@ internal class AtsGroupInfoResponse
 
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("rootOrganizationId")]
+    public Guid? RootOrganizationId { get; set; }
 }
 
 internal class AtsOrganizationInfoResponse
@@ -49,6 +52,15 @@ internal class AtsOrganizationInfoResponse
     [JsonPropertyName("groupId")]
     public Guid GroupId { get; set; }
 
+    [JsonPropertyName("parentOrganizationId")]
+    public Guid? ParentOrganizationId { get; set; }
+
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("city")]
+    public string? City { get; set; }
+
+    [JsonPropertyName("state")]
+    public string? State { get; set; }
 }

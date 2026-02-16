@@ -73,9 +73,16 @@ public class JobsController : ControllerBase
 
         var items = await _domainFacade.GetJobs(pageNumber, pageSize, orgFilter);
         var totalCount = await _domainFacade.GetJobCount(orgFilter);
+        var jobIds = items.Select(j => j.Id).ToList();
+        var applicantCountByJob = await _domainFacade.GetApplicantCountByJobIds(jobIds);
+        var resources = JobMapper.ToResource(items).ToList();
+        foreach (var resource in resources)
+        {
+            resource.ApplicantCount = applicantCountByJob.TryGetValue(resource.Id, out var count) ? count : 0;
+        }
         return Ok(new JobListResponse
         {
-            Items = JobMapper.ToResource(items),
+            Items = resources,
             TotalCount = totalCount,
             PageNumber = pageNumber,
             PageSize = pageSize

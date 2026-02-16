@@ -9,13 +9,7 @@ export default async function JobsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-slate-900">Jobs</h1>
-        <p className="text-slate-600 mt-1">
-          Jobs synced from your ATS. Create and manage jobs in your ATS, then sync them here to use in interviews.
-        </p>
-      </div>
+    <div className="mx-auto px-6 py-6">
       <JobsList />
     </div>
   );

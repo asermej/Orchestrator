@@ -20,11 +20,15 @@ public class AtsGroupAccess
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
+    public Guid? RootOrganizationId { get; set; }
 }
 
 public class AtsOrganizationAccess
 {
     public Guid Id { get; set; }
     public Guid GroupId { get; set; }
+    public Guid? ParentOrganizationId { get; set; }
     public string Name { get; set; } = string.Empty;
+    public string? City { get; set; }
+    public string? State { get; set; }
 }

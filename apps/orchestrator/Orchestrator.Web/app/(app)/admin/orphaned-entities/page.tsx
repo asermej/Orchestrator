@@ -199,7 +199,7 @@ export default function OrphanedEntitiesPage() {
               <CardHeader>
                 <CardTitle className="text-lg">Unknown Organization IDs</CardTitle>
                 <CardDescription>
-                  These organization IDs are referenced by entities in the Orchestrator
+                  These organization IDs are referenced by entities in AI Assistants
                   but do not exist in the ATS. They may have been deleted.
                 </CardDescription>
               </CardHeader>

@@ -5,9 +5,9 @@ import { Toaster } from '@/components/ui/sonner';
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Orchestrator - AI Interviewer",
+  title: "AI Assistants - AI Interviewer",
   description: "AI-powered interview and recruiting platform",
-  generator: "Orchestrator",
+  generator: "AI Assistants",
 };
 
 // Force dynamic rendering since we need session/cookie access

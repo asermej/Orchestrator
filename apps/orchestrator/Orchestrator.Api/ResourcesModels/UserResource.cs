@@ -180,4 +180,27 @@ public class UserMeContextResource
     /// The user's Auth0 sub claim
     /// </summary>
     public string? Auth0Sub { get; set; }
+
+    /// <summary>
+    /// Root organization ID for the current group (excluded from selectable list; group name is section header only)
+    /// </summary>
+    public Guid? CurrentGroupRootOrganizationId { get; set; }
+
+    /// <summary>
+    /// Organizations the user has access to in the current group (with hierarchy for nested dropdown)
+    /// </summary>
+    public IReadOnlyList<OrganizationContextItem> AccessibleOrganizations { get; set; } = Array.Empty<OrganizationContextItem>();
+}
+
+/// <summary>
+/// Organization reference with hierarchy for the me-context response
+/// </summary>
+public class OrganizationContextItem
+{
+    public Guid Id { get; set; }
+    public Guid GroupId { get; set; }
+    public Guid? ParentOrganizationId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? City { get; set; }
+    public string? State { get; set; }
 }

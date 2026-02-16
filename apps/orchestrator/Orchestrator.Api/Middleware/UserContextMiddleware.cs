@@ -101,13 +101,23 @@ public class UserContextMiddleware
                 userContext.IsSuperadmin = atsAccess.IsSuperadmin;
                 userContext.IsGroupAdmin = atsAccess.IsGroupAdmin;
                 userContext.AdminGroupIds = atsAccess.AdminGroupIds;
-                userContext.AccessibleOrganizationIds = atsAccess.AccessibleOrganizations
-                    .Select(o => o.Id)
+                // Restrict to the current group only so Orchestrator shows the same org list as ATS for this group.
+                // Root orgs are excluded from the selectable list in the UI (group name is section header only, e.g. "Griswold").
+                var orgsInGroup = atsAccess.AccessibleOrganizations
+                    .Where(o => o.GroupId == externalGroupId)
                     .ToList();
+                userContext.AccessibleOrganizationIds = orgsInGroup.Select(o => o.Id).ToList();
+                userContext.AccessibleOrganizations = orgsInGroup
+                    .Select(o => new UserContext.AccessibleOrganization(o.Id, o.GroupId, o.ParentOrganizationId, o.Name, o.City, o.State))
+                    .ToList();
+                var currentAtsGroup = atsAccess.AccessibleGroups.FirstOrDefault(g => g.Id == externalGroupId);
+                userContext.CurrentGroupRootOrganizationId = currentAtsGroup?.RootOrganizationId;
             }
 
             context.Items["UserContext"] = userContext;
-            _cache[cacheKey] = new CachedUserContext(userContext, DateTime.UtcNow.Add(CacheTtl));
+            // Only cache when we have org data so a retry (e.g. ATS 404 for user) can succeed on next request
+            if (userContext.AccessibleOrganizations.Count > 0)
+                _cache[cacheKey] = new CachedUserContext(userContext, DateTime.UtcNow.Add(CacheTtl));
 
             // Lazily evict expired entries
             EvictExpiredEntries();

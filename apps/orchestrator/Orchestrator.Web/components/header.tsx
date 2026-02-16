@@ -24,10 +24,10 @@ export function Header({ user }: HeaderProps) {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <Link
-            href="/"
+            href="/my-agents"
             className="text-2xl font-semibold hover:opacity-80 transition-opacity"
           >
-            Orchestrator
+            AI Assistants
           </Link>
 
           <div className="flex items-center gap-4">

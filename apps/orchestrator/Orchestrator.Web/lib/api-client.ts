@@ -11,6 +11,15 @@ function getGroupIdFromCookie(): string | null {
 }
 
 /**
+ * Reads the orchestrator_selected_org cookie from document.cookie (client-side).
+ */
+function getSelectedOrgIdFromCookie(): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(/(?:^|;\s*)orchestrator_selected_org=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+/**
  * API client with automatic authentication and error handling.
  * Sends X-Group-Id header from the stored group context cookie.
  */
@@ -27,6 +36,7 @@ export class ApiClient {
   async fetch(url: string, options: RequestInit = {}): Promise<Response> {
     const accessToken = await getAccessToken();
     const groupId = getGroupIdFromCookie();
+    const selectedOrgId = getSelectedOrgIdFromCookie();
     
     const fullUrl = url.startsWith('http') ? url : `${this.baseUrl}${url}`;
     
@@ -37,6 +47,7 @@ export class ApiClient {
         'Content-Type': 'application/json',
         ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
         ...(groupId && { 'X-Group-Id': groupId }),
+        ...(selectedOrgId && { 'X-Organization-Id': selectedOrgId }),
       },
     });
     

@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState, createContext, useContext } from "react";
+import { useEffect, useRef, useState, createContext, useContext } from "react";
+import { usePathname } from "next/navigation";
 import { testAtsApi } from "@/lib/test-ats-api";
+import { AppHeader } from "./app-header";
 import { AppSidebar } from "./app-sidebar";
 import { Briefcase, Users, Globe, Settings, ArrowRight } from "lucide-react";
 
@@ -53,6 +55,8 @@ export function useMeContext() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const hasSyncedOrgFromUrl = useRef(false);
+  const pathname = usePathname();
 
   const loadMe = async () => {
     try {
@@ -68,6 +72,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     loadMe();
   }, []);
+
+  // When returning from Orchestrator with organizationId in the URL, sync ATS context and strip the param
+  useEffect(() => {
+    if (!me || hasSyncedOrgFromUrl.current || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const organizationId = params.get("organizationId");
+    if (!organizationId) return;
+    hasSyncedOrgFromUrl.current = true;
+    testAtsApi
+      .put("/api/v1/me/context", { selectedOrganizationId: organizationId })
+      .then(() => loadMe())
+      .catch(() => {})
+      .finally(() => {
+        params.delete("organizationId");
+        const newSearch = params.toString();
+        const newUrl = pathname + (newSearch ? `?${newSearch}` : "");
+        window.history.replaceState(null, "", newUrl);
+      });
+  }, [me, pathname]);
 
   // ── Loading state ──────────────────────────────────────────────────────
 
@@ -136,15 +159,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // ── Authenticated: sidebar + content ───────────────────────────────────
+  // ── Authenticated: header + sidebar + content ─────────────────────────
 
   return (
     <MeContext.Provider value={{ me, refreshMe: loadMe }}>
-      <div className="flex min-h-screen">
-        <AppSidebar me={me} onMeChange={loadMe} />
-        <main className="flex-1 overflow-auto px-8 py-8 max-w-6xl">
-          {children}
-        </main>
+      <div className="flex flex-col min-h-screen">
+        <AppHeader me={me} onMeChange={loadMe} />
+        <div className="flex flex-1 overflow-hidden">
+          <AppSidebar me={me} />
+          <main className="flex-1 overflow-auto px-8 py-8 max-w-6xl">
+            {children}
+          </main>
+        </div>
       </div>
     </MeContext.Provider>
   );

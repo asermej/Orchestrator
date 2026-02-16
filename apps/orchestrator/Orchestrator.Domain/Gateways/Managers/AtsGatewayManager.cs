@@ -125,7 +125,10 @@ internal sealed class AtsGatewayManager : IDisposable
             {
                 Id = o.Id,
                 GroupId = o.GroupId,
-                Name = o.Name
+                ParentOrganizationId = o.ParentOrganizationId,
+                Name = o.Name,
+                City = o.City,
+                State = o.State
             }).ToList();
         }
         catch (HttpRequestException ex)
@@ -163,13 +166,17 @@ internal sealed class AtsGatewayManager : IDisposable
             AccessibleGroups = response.AccessibleGroups.Select(g => new AtsGroupAccess
             {
                 Id = g.Id,
-                Name = g.Name
+                Name = g.Name,
+                RootOrganizationId = g.RootOrganizationId
             }).ToList(),
             AccessibleOrganizations = response.AccessibleOrganizations.Select(o => new AtsOrganizationAccess
             {
                 Id = o.Id,
                 GroupId = o.GroupId,
-                Name = o.Name
+                ParentOrganizationId = o.ParentOrganizationId,
+                Name = o.Name,
+                City = o.City,
+                State = o.State
             }).ToList()
         };
     }

@@ -24,6 +24,15 @@ public class UserContext
     /// <summary>Organization IDs the user has access to in the current group</summary>
     public IReadOnlyList<Guid> AccessibleOrganizationIds { get; set; } = Array.Empty<Guid>();
 
+    /// <summary>Organizations (with names and hierarchy) the user has access to in the current group</summary>
+    public IReadOnlyList<AccessibleOrganization> AccessibleOrganizations { get; set; } = Array.Empty<AccessibleOrganization>();
+
+    /// <summary>Root organization ID for the current group (excluded from selectable list in UI; group name is section header only)</summary>
+    public Guid? CurrentGroupRootOrganizationId { get; set; }
+
+    /// <summary>Lightweight record for an accessible organization with display name and hierarchy</summary>
+    public record AccessibleOrganization(Guid Id, Guid GroupId, Guid? ParentOrganizationId, string Name, string? City, string? State);
+
     /// <summary>Group IDs where the user is an admin</summary>
     public IReadOnlyList<Guid> AdminGroupIds { get; set; } = Array.Empty<Guid>();
 

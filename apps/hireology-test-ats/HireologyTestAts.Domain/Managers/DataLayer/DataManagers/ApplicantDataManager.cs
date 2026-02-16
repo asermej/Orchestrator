@@ -88,6 +88,21 @@ internal sealed class ApplicantDataManager
         return await conn.QueryFirstOrDefaultAsync<Applicant>(new CommandDefinition(sql, new { Id = id }));
     }
 
+    public async Task<IReadOnlyDictionary<Guid, int>> GetApplicantCountByJobIdsAsync(IReadOnlyList<Guid> jobIds)
+    {
+        if (jobIds == null || jobIds.Count == 0)
+            return new Dictionary<Guid, int>();
+
+        const string sql = @"
+            SELECT job_id AS JobId, COUNT(*) AS Cnt
+            FROM applicants
+            WHERE job_id = ANY(@JobIds)
+            GROUP BY job_id";
+        await using var conn = new NpgsqlConnection(_connectionString);
+        var rows = await conn.QueryAsync<(Guid JobId, int Cnt)>(new CommandDefinition(sql, new { JobIds = jobIds.ToArray() }));
+        return rows.ToDictionary(r => r.JobId, r => r.Cnt);
+    }
+
     public async Task<Applicant> CreateAsync(Applicant applicant)
     {
         if (applicant.Id == Guid.Empty) applicant.Id = Guid.NewGuid();

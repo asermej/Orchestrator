@@ -12,6 +12,11 @@ public sealed partial class DomainFacade
         return await ApplicantManager.GetApplicantCount(allowedOrganizationIds).ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyDictionary<Guid, int>> GetApplicantCountByJobIds(IReadOnlyList<Guid> jobIds)
+    {
+        return await ApplicantManager.GetApplicantCountByJobIds(jobIds).ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyList<Applicant>> GetApplicantsByJobId(Guid jobId)
     {
         return await ApplicantManager.GetApplicantsByJobId(jobId).ConfigureAwait(false);

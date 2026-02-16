@@ -21,6 +21,11 @@ internal sealed class ApplicantManager : IDisposable
         return await _dataFacade.GetApplicantCount(allowedOrganizationIds).ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyDictionary<Guid, int>> GetApplicantCountByJobIds(IReadOnlyList<Guid> jobIds)
+    {
+        return await _dataFacade.GetApplicantCountByJobIds(jobIds).ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyList<Applicant>> GetApplicantsByJobId(Guid jobId)
     {
         return await _dataFacade.GetApplicantsByJobId(jobId).ConfigureAwait(false);

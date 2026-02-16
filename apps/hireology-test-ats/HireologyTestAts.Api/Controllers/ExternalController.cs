@@ -39,9 +39,8 @@ public class ExternalController : ControllerBase
         if (string.IsNullOrWhiteSpace(auth0Sub))
             return BadRequest(new { message = "auth0Sub query parameter is required" });
 
-        var user = await _domainFacade.GetUserByAuth0Sub(auth0Sub);
-        if (user == null)
-            return NotFound(new { message = $"User with auth0Sub '{auth0Sub}' not found" });
+        // Ensure user exists so Orchestrator always gets a 200 (user may exist in ATS session but not yet in DB)
+        var user = await _domainFacade.GetOrCreateUser(auth0Sub, null, null);
 
         var groups = user.IsSuperadmin
             ? await _domainFacade.GetGroups(excludeTestData: true)
@@ -64,13 +63,17 @@ public class ExternalController : ControllerBase
             AccessibleGroups = groups.Select(g => new ExternalGroupInfo
             {
                 Id = g.Id,
-                Name = g.Name
+                Name = g.Name,
+                RootOrganizationId = g.RootOrganizationId
             }).ToList(),
             AccessibleOrganizations = organizations.Select(o => new ExternalOrganizationInfo
             {
                 Id = o.Id,
                 GroupId = o.GroupId,
-                Name = o.Name
+                ParentOrganizationId = o.ParentOrganizationId,
+                Name = o.Name,
+                City = o.City,
+                State = o.State
             }).ToList()
         });
     }
@@ -92,7 +95,10 @@ public class ExternalController : ControllerBase
         {
             Id = o.Id,
             GroupId = o.GroupId,
-            Name = o.Name
+            ParentOrganizationId = o.ParentOrganizationId,
+            Name = o.Name,
+            City = o.City,
+            State = o.State
         }).ToList();
 
         return Ok(result);
@@ -128,11 +134,15 @@ public class ExternalGroupInfo
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
+    public Guid? RootOrganizationId { get; set; }
 }
 
 public class ExternalOrganizationInfo
 {
     public Guid Id { get; set; }
     public Guid GroupId { get; set; }
+    public Guid? ParentOrganizationId { get; set; }
     public string Name { get; set; } = string.Empty;
+    public string? City { get; set; }
+    public string? State { get; set; }
 }

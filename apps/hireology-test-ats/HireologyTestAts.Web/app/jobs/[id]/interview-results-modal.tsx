@@ -61,8 +61,9 @@ function RecommendationBadge({ recommendation }: { recommendation: string }) {
 }
 
 export function InterviewResultsModal({ request, applicant, onClose }: Props) {
+  const orchestratorBaseUrl = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || "http://localhost:3000";
   const orchestratorUrl = request.orchestratorInterviewId
-    ? `http://localhost:3000/interviews/${request.orchestratorInterviewId}`
+    ? `${orchestratorBaseUrl}/interviews/${request.orchestratorInterviewId}`
     : null;
 
   return (
@@ -141,8 +142,6 @@ export function InterviewResultsModal({ request, applicant, onClose }: Props) {
             </p>
             <a
               href={orchestratorUrl}
-              target="_blank"
-              rel="noopener noreferrer"
               className="text-sm text-indigo-600 hover:text-indigo-800 underline font-mono break-all"
             >
               {orchestratorUrl}

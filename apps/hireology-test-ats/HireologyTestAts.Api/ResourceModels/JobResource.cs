@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace HireologyTestAts.Api.ResourceModels;
 
 public class JobResource
@@ -11,6 +13,9 @@ public class JobResource
     public Guid? OrganizationId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    /// <summary>Total number of applicants who have applied to this job.</summary>
+    [JsonPropertyName("applicantCount")]
+    public int ApplicantCount { get; set; }
 }
 
 public class CreateJobResource

@@ -15,6 +15,11 @@ internal sealed partial class DataFacade
         return await ApplicantDataManager.CountAsync(allowedOrganizationIds).ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyDictionary<Guid, int>> GetApplicantCountByJobIds(IReadOnlyList<Guid> jobIds)
+    {
+        return await ApplicantDataManager.GetApplicantCountByJobIdsAsync(jobIds).ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyList<Applicant>> GetApplicantsByJobId(Guid jobId)
     {
         return await ApplicantDataManager.ListByJobIdAsync(jobId).ConfigureAwait(false);
