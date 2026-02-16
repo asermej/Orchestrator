@@ -55,36 +55,6 @@ export default function SettingsPage() {
       <h1 className="text-2xl font-bold text-slate-900 mb-4">Settings</h1>
 
       <div className="max-w-xl">
-        {/* Profile Link */}
-        <a
-          href="/settings/profile"
-          className="block bg-white border border-slate-200 rounded-lg p-5 mb-6 hover:border-indigo-300 hover:bg-indigo-50/30 transition-colors group"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900 group-hover:text-indigo-900">
-                Profile
-              </h2>
-              <p className="text-sm text-slate-600">
-                Update your name and email address.
-              </p>
-            </div>
-            <svg
-              className="w-5 h-5 text-slate-400 group-hover:text-indigo-500"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5l7 7-7 7"
-              />
-            </svg>
-          </div>
-        </a>
-
         {/* Webhook Configuration */}
         <div className="bg-white border border-slate-200 rounded-lg p-5 mb-6">
           <h2 className="text-lg font-semibold text-slate-900 mb-2">

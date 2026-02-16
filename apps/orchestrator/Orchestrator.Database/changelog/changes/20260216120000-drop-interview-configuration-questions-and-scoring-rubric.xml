@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Remove FK references from follow_up_templates before dropping the table -->
+    <changeSet id="20260216120000-nullify-config-question-fk-in-follow-up-templates" author="system">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="follow_up_templates" columnName="interview_configuration_question_id"/>
+        </preConditions>
+        <sql>
+            UPDATE follow_up_templates SET interview_configuration_question_id = NULL
+            WHERE interview_configuration_question_id IS NOT NULL;
+        </sql>
+        <dropColumn tableName="follow_up_templates" columnName="interview_configuration_question_id"/>
+    </changeSet>
+
+    <!-- Drop the interview_configuration_questions table -->
+    <changeSet id="20260216120000-drop-interview-configuration-questions-table" author="system">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="interview_configuration_questions"/>
+        </preConditions>
+        <dropTable tableName="interview_configuration_questions"/>
+    </changeSet>
+
+    <!-- Remove the scoring_rubric column from interview_configurations -->
+    <changeSet id="20260216120000-drop-scoring-rubric-from-interview-configurations" author="system">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="interview_configurations" columnName="scoring_rubric"/>
+        </preConditions>
+        <dropColumn tableName="interview_configurations" columnName="scoring_rubric"/>
+    </changeSet>
+
+</databaseChangeLog>

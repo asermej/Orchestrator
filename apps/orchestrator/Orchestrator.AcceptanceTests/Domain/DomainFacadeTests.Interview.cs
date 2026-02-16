@@ -163,7 +163,7 @@ public class DomainFacadeTestsInterview
         var i1 = await CreateTestInterviewAsync("1");
         var i2 = await CreateTestInterviewAsync("2");
 
-        var result = await _domainFacade.SearchInterviews(_testJobId, null, null, null, 1, 10);
+        var result = await _domainFacade.SearchInterviews(null, _testJobId, null, null, null, 1, 10);
 
         Assert.IsNotNull(result);
         Assert.IsTrue(result.TotalCount >= 2, $"Should find at least 2 interviews, found {result.TotalCount}");
@@ -173,7 +173,7 @@ public class DomainFacadeTestsInterview
     [TestMethod]
     public async Task SearchInterviews_NoResults_ReturnsEmptyList()
     {
-        var result = await _domainFacade.SearchInterviews(Guid.NewGuid(), null, null, null, 1, 10);
+        var result = await _domainFacade.SearchInterviews(null, Guid.NewGuid(), null, null, null, 1, 10);
 
         Assert.IsNotNull(result);
         Assert.AreEqual(0, result.TotalCount);
@@ -235,7 +235,7 @@ public class DomainFacadeTestsInterview
         var updated = await _domainFacade.UpdateInterview(retrieved);
         Assert.IsNotNull(updated);
 
-        var searchResult = await _domainFacade.SearchInterviews(_testJobId, _testApplicantId, _testAgentId, InterviewStatus.InProgress, 1, 10);
+        var searchResult = await _domainFacade.SearchInterviews(null, _testJobId, _testApplicantId, _testAgentId, InterviewStatus.InProgress, 1, 10);
         Assert.IsNotNull(searchResult);
         Assert.IsTrue(searchResult.TotalCount > 0);
 

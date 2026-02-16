@@ -44,10 +44,11 @@ internal sealed class UserManager : IDisposable
         var existing = await _dataFacade.GetUserByAuth0Sub(auth0Sub).ConfigureAwait(false);
         if (existing != null)
         {
-            // Sync email/name from Auth0 claims on each login
+            // Only fill in email/name from Auth0 claims when the user doesn't already have them.
+            // This prevents overwriting values the user explicitly set on their profile page.
             var needsUpdate = false;
-            if (!string.IsNullOrEmpty(email) && existing.Email != email) { existing.Email = email; needsUpdate = true; }
-            if (!string.IsNullOrEmpty(name) && existing.Name != name) { existing.Name = name; needsUpdate = true; }
+            if (!string.IsNullOrEmpty(email) && string.IsNullOrEmpty(existing.Email)) { existing.Email = email; needsUpdate = true; }
+            if (!string.IsNullOrEmpty(name) && string.IsNullOrEmpty(existing.Name)) { existing.Name = name; needsUpdate = true; }
             if (needsUpdate)
             {
                 var updated = await _dataFacade.UpdateUser(existing).ConfigureAwait(false);

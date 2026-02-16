@@ -39,7 +39,10 @@ public class InterviewConfigurationController : ControllerBase
     [ProducesResponseType(400)]
     public async Task<ActionResult<InterviewConfigurationResource>> Create([FromBody] CreateInterviewConfigurationResource resource)
     {
-        var config = InterviewConfigurationMapper.ToDomain(resource);
+        var userContext = GetUserContext();
+        var groupId = userContext?.GroupId ?? resource.GroupId;
+
+        var config = InterviewConfigurationMapper.ToDomain(resource, groupId);
         var createdConfig = await _domainFacade.CreateInterviewConfiguration(config);
 
         var response = InterviewConfigurationMapper.ToResource(createdConfig);
@@ -51,25 +54,15 @@ public class InterviewConfigurationController : ControllerBase
     /// Gets an interview configuration by ID
     /// </summary>
     /// <param name="id">The ID of the configuration</param>
-    /// <param name="includeQuestions">Whether to include questions in the response</param>
     /// <returns>The configuration if found</returns>
     /// <response code="200">Returns the configuration</response>
     /// <response code="404">If the configuration is not found</response>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(InterviewConfigurationResource), 200)]
     [ProducesResponseType(404)]
-    public async Task<ActionResult<InterviewConfigurationResource>> GetById(Guid id, [FromQuery] bool includeQuestions = true)
+    public async Task<ActionResult<InterviewConfigurationResource>> GetById(Guid id)
     {
-        InterviewConfiguration? config;
-        
-        if (includeQuestions)
-        {
-            config = await _domainFacade.GetInterviewConfigurationByIdWithQuestions(id);
-        }
-        else
-        {
-            config = await _domainFacade.GetInterviewConfigurationById(id);
-        }
+        var config = await _domainFacade.GetInterviewConfigurationById(id);
         
         if (config == null)
         {
@@ -148,21 +141,7 @@ public class InterviewConfigurationController : ControllerBase
 
         // Map update to domain object
         var configToUpdate = InterviewConfigurationMapper.ToDomain(resource, existingConfig);
-        
-        InterviewConfiguration updatedConfig;
-        
-        // If questions are provided, replace them all
-        if (resource.Questions != null)
-        {
-            var questions = InterviewConfigurationMapper.ToQuestionsDomain(resource.Questions);
-            updatedConfig = await _domainFacade.UpdateInterviewConfigurationWithQuestions(configToUpdate, questions);
-        }
-        else
-        {
-            updatedConfig = await _domainFacade.UpdateInterviewConfiguration(configToUpdate);
-            // Reload with questions
-            updatedConfig = (await _domainFacade.GetInterviewConfigurationByIdWithQuestions(id))!;
-        }
+        var updatedConfig = await _domainFacade.UpdateInterviewConfiguration(configToUpdate);
 
         var response = InterviewConfigurationMapper.ToResource(updatedConfig);
         
@@ -185,88 +164,6 @@ public class InterviewConfigurationController : ControllerBase
         if (!deleted)
         {
             return NotFound($"Interview configuration with ID {id} not found");
-        }
-
-        return NoContent();
-    }
-
-    /// <summary>
-    /// Gets all questions for a configuration
-    /// </summary>
-    /// <param name="id">The ID of the configuration</param>
-    /// <returns>The list of questions</returns>
-    /// <response code="200">Returns the questions</response>
-    /// <response code="404">If the configuration is not found</response>
-    [HttpGet("{id}/questions")]
-    [ProducesResponseType(typeof(List<InterviewConfigurationQuestionResource>), 200)]
-    [ProducesResponseType(404)]
-    public async Task<ActionResult<List<InterviewConfigurationQuestionResource>>> GetQuestions(Guid id)
-    {
-        // Verify configuration exists
-        var config = await _domainFacade.GetInterviewConfigurationById(id);
-        if (config == null)
-        {
-            return NotFound($"Interview configuration with ID {id} not found");
-        }
-
-        var questions = await _domainFacade.GetInterviewConfigurationQuestions(id);
-        var response = questions.Select(InterviewConfigurationMapper.ToQuestionResource).ToList();
-        
-        return Ok(response);
-    }
-
-    /// <summary>
-    /// Adds a question to a configuration
-    /// </summary>
-    /// <param name="id">The ID of the configuration</param>
-    /// <param name="resource">The question data</param>
-    /// <returns>The created question</returns>
-    /// <response code="201">Returns the newly created question</response>
-    /// <response code="404">If the configuration is not found</response>
-    [HttpPost("{id}/questions")]
-    [ProducesResponseType(typeof(InterviewConfigurationQuestionResource), 201)]
-    [ProducesResponseType(404)]
-    public async Task<ActionResult<InterviewConfigurationQuestionResource>> AddQuestion(Guid id, [FromBody] CreateInterviewConfigurationQuestionResource resource)
-    {
-        // Verify configuration exists
-        var config = await _domainFacade.GetInterviewConfigurationById(id);
-        if (config == null)
-        {
-            return NotFound($"Interview configuration with ID {id} not found");
-        }
-
-        var question = new InterviewConfigurationQuestion
-        {
-            InterviewConfigurationId = id,
-            Question = resource.Question,
-            DisplayOrder = resource.DisplayOrder,
-            ScoringWeight = resource.ScoringWeight,
-            ScoringGuidance = resource.ScoringGuidance
-        };
-
-        var createdQuestion = await _domainFacade.AddInterviewConfigurationQuestion(question);
-        var response = InterviewConfigurationMapper.ToQuestionResource(createdQuestion);
-        
-        return CreatedAtAction(nameof(GetQuestions), new { id }, response);
-    }
-
-    /// <summary>
-    /// Deletes a question from a configuration
-    /// </summary>
-    /// <param name="id">The ID of the configuration</param>
-    /// <param name="questionId">The ID of the question</param>
-    /// <returns>No content on success</returns>
-    /// <response code="204">If the question was deleted</response>
-    /// <response code="404">If the question is not found</response>
-    [HttpDelete("{id}/questions/{questionId}")]
-    [ProducesResponseType(204)]
-    [ProducesResponseType(404)]
-    public async Task<ActionResult> DeleteQuestion(Guid id, Guid questionId)
-    {
-        var deleted = await _domainFacade.DeleteInterviewConfigurationQuestion(questionId);
-        if (!deleted)
-        {
-            return NotFound($"Question with ID {questionId} not found");
         }
 
         return NoContent();

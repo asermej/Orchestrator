@@ -44,8 +44,10 @@ public class AgentController : ControllerBase
     [ProducesResponseType(400)]
     public async Task<ActionResult<AgentResource>> Create([FromBody] CreateAgentResource resource)
     {
-        // Resolve group ID - use provided or get/create default
-        var groupId = resource.GroupId ?? await GetOrCreateDefaultGroupAsync();
+        // Use the internal group ID resolved by UserContextMiddleware (external → internal),
+        // falling back to the resource value or a default group
+        var userContext = GetUserContext();
+        var groupId = userContext?.GroupId ?? resource.GroupId ?? await GetOrCreateDefaultGroupAsync();
         
         var agent = AgentMapper.ToDomain(resource, groupId);
         var createdAgent = await _domainFacade.CreateAgent(agent);

@@ -24,6 +24,7 @@ interface GroupInfo {
 interface AppSidebarProps {
   user?: UserProfile | null;
   groupInfo?: GroupInfo | null;
+  displayName?: string | null;
 }
 
 const navItems = [
@@ -35,7 +36,7 @@ const navItems = [
   { href: "/jobs", label: "Jobs", icon: Briefcase },
 ];
 
-export function AppSidebar({ user, groupInfo }: AppSidebarProps) {
+export function AppSidebar({ user, groupInfo, displayName }: AppSidebarProps) {
   const pathname = usePathname();
 
   const isActive = (href: string) => {
@@ -127,14 +128,14 @@ export function AppSidebar({ user, groupInfo }: AppSidebarProps) {
         <div className="border-t p-3">
           <div className="flex items-center gap-3 rounded-md px-3 py-2">
             <Avatar className="h-8 w-8 shrink-0">
-              <AvatarImage src={user.picture || ""} alt={user.name || ""} />
+              <AvatarImage src={user.picture || ""} alt={displayName || user.name || ""} />
               <AvatarFallback className="text-xs">
-                {(user.name?.charAt(0) || user.email?.charAt(0) || "U").toUpperCase()}
+                {(displayName?.charAt(0) || user.name?.charAt(0) || user.email?.charAt(0) || "U").toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
               <p className="truncate text-sm font-medium leading-none">
-                {user.name || user.email || "User"}
+                {displayName || user.name || user.email || "User"}
               </p>
               <p className="truncate text-xs text-sidebar-foreground/60 mt-1">
                 {user.email || ""}

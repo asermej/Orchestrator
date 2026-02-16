@@ -72,13 +72,13 @@ public static class InterviewGuideMapper
     /// <summary>
     /// Maps a CreateInterviewGuideResource to an InterviewGuide domain object.
     /// </summary>
-    public static InterviewGuide ToDomain(CreateInterviewGuideResource createResource)
+    public static InterviewGuide ToDomain(CreateInterviewGuideResource createResource, Guid groupId)
     {
         ArgumentNullException.ThrowIfNull(createResource);
 
         var guide = new InterviewGuide
         {
-            GroupId = createResource.GroupId,
+            GroupId = groupId,
             OrganizationId = createResource.OrganizationId,
             Name = createResource.Name,
             Description = createResource.Description,

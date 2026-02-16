@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { testAtsApi } from "@/lib/test-ats-api";
+import { useMeContext, useMe } from "@/components/app-shell";
 
 interface MeUser {
   id: string;
@@ -14,6 +15,8 @@ interface MeResponse {
 }
 
 export default function ProfilePage() {
+  const meCtx = useMeContext();
+  const me = useMe();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
@@ -22,6 +25,15 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Use the already-loaded me data from AppShell context if available,
+    // otherwise fall back to an API call
+    if (me?.user) {
+      setName(me.user.name ?? "");
+      setEmail(me.user.email ?? "");
+      setLoading(false);
+      return;
+    }
+
     const fetchMe = async () => {
       try {
         const data = await testAtsApi.get<MeResponse>("/api/v1/me");
@@ -34,7 +46,7 @@ export default function ProfilePage() {
       }
     };
     fetchMe();
-  }, []);
+  }, [me]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +61,7 @@ export default function ProfilePage() {
       setName(data.user.name ?? "");
       setEmail(data.user.email ?? "");
       setSuccess("Profile updated successfully.");
+      meCtx?.refreshMe();
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Failed to update profile."

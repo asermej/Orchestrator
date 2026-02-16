@@ -32,9 +32,9 @@ internal sealed partial class DataFacade
         return InterviewDataManager.Delete(id);
     }
 
-    public Task<PaginatedResult<Interview>> SearchInterviews(Guid? jobId, Guid? applicantId, Guid? agentId, string? status, int pageNumber, int pageSize)
+    public Task<PaginatedResult<Interview>> SearchInterviews(Guid? groupId, Guid? jobId, Guid? applicantId, Guid? agentId, string? status, int pageNumber, int pageSize)
     {
-        return InterviewDataManager.Search(jobId, applicantId, agentId, status, pageNumber, pageSize);
+        return InterviewDataManager.Search(groupId, jobId, applicantId, agentId, status, pageNumber, pageSize);
     }
 
     // Interview Responses

@@ -40,7 +40,10 @@ public class InterviewGuideController : ControllerBase
     {
         _logger.LogInformation("Creating InterviewGuide: {@Resource}", resource);
 
-        var guide = InterviewGuideMapper.ToDomain(resource);
+        var userContext = GetUserContext();
+        var groupId = userContext?.GroupId ?? resource.GroupId;
+
+        var guide = InterviewGuideMapper.ToDomain(resource, groupId);
         var createdGuide = await _domainFacade.CreateInterviewGuide(guide);
 
         var response = InterviewGuideMapper.ToResource(createdGuide);

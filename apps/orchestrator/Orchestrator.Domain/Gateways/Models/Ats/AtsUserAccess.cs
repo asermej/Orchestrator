@@ -8,6 +8,7 @@ public class AtsUserAccess
 {
     public Guid UserId { get; set; }
     public string Auth0Sub { get; set; } = string.Empty;
+    public string? UserName { get; set; }
     public bool IsSuperadmin { get; set; }
     public bool IsGroupAdmin { get; set; }
     public IReadOnlyList<Guid> AdminGroupIds { get; set; } = Array.Empty<Guid>();

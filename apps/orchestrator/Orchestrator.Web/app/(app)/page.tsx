@@ -58,12 +58,16 @@ export default async function HomePage() {
     );
   }
 
+  // Display name comes from Auth0 session; the layout's sidebar already
+  // fetches the ATS display name separately, so no duplicate API call needed.
+  const greeting = session.user.name || session.user.email;
+
   // For logged-in users, show dashboard with quick-access cards
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-slate-900">
-          Welcome back, {session.user.name || session.user.email}
+          Welcome back, {greeting}
         </h1>
         <p className="text-slate-600 mt-2">
           Manage your AI agents, interview configurations, and interviews.

@@ -36,9 +36,9 @@ internal sealed class InterviewManager : IDisposable
         return await DataFacade.GetInterviewByToken(token).ConfigureAwait(false);
     }
 
-    public async Task<PaginatedResult<Interview>> SearchInterviews(Guid? jobId, Guid? applicantId, Guid? agentId, string? status, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Interview>> SearchInterviews(Guid? groupId, Guid? jobId, Guid? applicantId, Guid? agentId, string? status, int pageNumber, int pageSize)
     {
-        return await DataFacade.SearchInterviews(jobId, applicantId, agentId, status, pageNumber, pageSize).ConfigureAwait(false);
+        return await DataFacade.SearchInterviews(groupId, jobId, applicantId, agentId, status, pageNumber, pageSize).ConfigureAwait(false);
     }
 
     public async Task<Interview> UpdateInterview(Interview interview)

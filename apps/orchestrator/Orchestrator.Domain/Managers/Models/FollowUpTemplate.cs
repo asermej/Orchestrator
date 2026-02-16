@@ -11,9 +11,6 @@ public class FollowUpTemplate : Entity
     [Column("interview_question_id")]
     public Guid? InterviewQuestionId { get; set; }
 
-    [Column("interview_configuration_question_id")]
-    public Guid? InterviewConfigurationQuestionId { get; set; }
-
     [Column("competency_tag")]
     public string? CompetencyTag { get; set; }
 

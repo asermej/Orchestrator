@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Orchestrator.Domain;
 using Orchestrator.Api.ResourcesModels;
 using Orchestrator.Api.Mappers;
+using Orchestrator.Api.Middleware;
 using Orchestrator.Api.Common;
 
 namespace Orchestrator.Api.Controllers;
@@ -21,6 +22,22 @@ public class UserController : ControllerBase
     public UserController(DomainFacade domainFacade)
     {
         _domainFacade = domainFacade;
+    }
+
+    /// <summary>
+    /// Returns the current user's display name from the ATS user context.
+    /// Used by the Orchestrator Web to show the user's name in the sidebar.
+    /// </summary>
+    [HttpGet("me-context")]
+    [ProducesResponseType(typeof(UserMeContextResource), 200)]
+    public ActionResult<UserMeContextResource> GetMeContext()
+    {
+        var userContext = HttpContext.Items["UserContext"] as UserContext;
+        return Ok(new UserMeContextResource
+        {
+            UserName = userContext?.UserName,
+            Auth0Sub = userContext?.Auth0Sub
+        });
     }
 
     /// <summary>

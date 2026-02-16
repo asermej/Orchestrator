@@ -26,6 +26,7 @@ internal sealed class InterviewRequestManager : IDisposable
 
         var apiKey = await ResolveApiKeyForJob(job).ConfigureAwait(false);
 
+        await _gatewayFacade.SyncJob(job, apiKey).ConfigureAwait(false);
         await _gatewayFacade.SyncApplicant(applicant, job.ExternalJobId, apiKey).ConfigureAwait(false);
 
         var result = await _gatewayFacade.CreateInterview(

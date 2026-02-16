@@ -13,14 +13,9 @@ public class FollowUpTemplateResource
     public Guid Id { get; set; }
 
     /// <summary>
-    /// The interview question this follow-up is attached to (for Interview Questions)
+    /// The interview question this follow-up is attached to
     /// </summary>
     public Guid? InterviewQuestionId { get; set; }
-
-    /// <summary>
-    /// The interview configuration question this follow-up is attached to (for Interview Configuration Questions)
-    /// </summary>
-    public Guid? InterviewConfigurationQuestionId { get; set; }
 
     /// <summary>
     /// Competency tag (e.g., "Safety", "Reliability", "Communication")

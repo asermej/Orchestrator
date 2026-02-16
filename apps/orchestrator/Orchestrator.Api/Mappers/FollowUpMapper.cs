@@ -21,7 +21,6 @@ public static class FollowUpMapper
         {
             Id = domain.Id,
             InterviewQuestionId = domain.InterviewQuestionId,
-            InterviewConfigurationQuestionId = domain.InterviewConfigurationQuestionId,
             CompetencyTag = domain.CompetencyTag,
             TriggerHints = domain.TriggerHints?.ToList(),
             CanonicalText = domain.CanonicalText,

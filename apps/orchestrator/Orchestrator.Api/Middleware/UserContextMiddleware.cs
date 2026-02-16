@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Claims;
 using Orchestrator.Domain;
 
@@ -8,11 +9,17 @@ namespace Orchestrator.Api.Middleware;
 /// For JWT-authenticated requests (not ATS API-key or candidate-session routes),
 /// extracts the Auth0 sub and X-Group-Id header, calls the ATS gateway to determine
 /// what organizations the user can access, and stores the result in HttpContext.Items["UserContext"].
+///
+/// Uses a short-lived in-memory cache so that concurrent API calls from the same
+/// page load (same user + group) share a single ATS round-trip instead of one each.
 /// </summary>
 public class UserContextMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<UserContextMiddleware> _logger;
+
+    private static readonly ConcurrentDictionary<string, CachedUserContext> _cache = new();
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromSeconds(30);
 
     public UserContextMiddleware(RequestDelegate next, ILogger<UserContextMiddleware> logger)
     {
@@ -55,6 +62,15 @@ public class UserContextMiddleware
             return;
         }
 
+        // Check cache first to avoid redundant ATS round-trips for concurrent requests
+        var cacheKey = $"{auth0Sub}:{externalGroupId}";
+        if (_cache.TryGetValue(cacheKey, out var cached) && cached.ExpiresAt > DateTime.UtcNow)
+        {
+            context.Items["UserContext"] = cached.UserContext;
+            await _next(context);
+            return;
+        }
+
         // Resolve external ATS group ID to internal Orchestrator group
         var group = await domainFacade.GetGroupByExternalGroupId(externalGroupId);
         var groupId = group?.Id ?? Guid.Empty;
@@ -81,6 +97,7 @@ public class UserContextMiddleware
 
             if (atsAccess != null)
             {
+                userContext.UserName = atsAccess.UserName;
                 userContext.IsSuperadmin = atsAccess.IsSuperadmin;
                 userContext.IsGroupAdmin = atsAccess.IsGroupAdmin;
                 userContext.AdminGroupIds = atsAccess.AdminGroupIds;
@@ -90,6 +107,10 @@ public class UserContextMiddleware
             }
 
             context.Items["UserContext"] = userContext;
+            _cache[cacheKey] = new CachedUserContext(userContext, DateTime.UtcNow.Add(CacheTtl));
+
+            // Lazily evict expired entries
+            EvictExpiredEntries();
         }
         catch (Exception ex)
         {
@@ -107,6 +128,18 @@ public class UserContextMiddleware
 
         await _next(context);
     }
+
+    private static void EvictExpiredEntries()
+    {
+        var now = DateTime.UtcNow;
+        foreach (var key in _cache.Keys)
+        {
+            if (_cache.TryGetValue(key, out var entry) && entry.ExpiresAt <= now)
+                _cache.TryRemove(key, out _);
+        }
+    }
+
+    private sealed record CachedUserContext(UserContext UserContext, DateTime ExpiresAt);
 }
 
 public static class UserContextMiddlewareExtensions

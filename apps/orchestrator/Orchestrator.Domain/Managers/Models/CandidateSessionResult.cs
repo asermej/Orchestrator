@@ -32,9 +32,9 @@ public class CandidateSessionResult
     public Applicant? Applicant { get; set; }
 
     /// <summary>
-    /// The interview questions from the configuration
+    /// The interview questions from the interview guide
     /// </summary>
-    public List<InterviewConfigurationQuestion> Questions { get; set; } = new();
+    public List<InterviewGuideQuestion> Questions { get; set; } = new();
 
     /// <summary>
     /// The candidate session record

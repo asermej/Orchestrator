@@ -164,4 +164,20 @@ public class DateTimeRange
     /// The end of the date range (inclusive)
     /// </summary>
     public DateTime? To { get; set; }
-} 
+}
+
+/// <summary>
+/// Response model for the me-context endpoint (current user's display info from ATS)
+/// </summary>
+public class UserMeContextResource
+{
+    /// <summary>
+    /// The user's display name from the ATS
+    /// </summary>
+    public string? UserName { get; set; }
+
+    /// <summary>
+    /// The user's Auth0 sub claim
+    /// </summary>
+    public string? Auth0Sub { get; set; }
+}

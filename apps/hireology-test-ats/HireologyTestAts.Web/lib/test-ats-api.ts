@@ -9,9 +9,21 @@ interface TokenInfo {
   name?: string;
 }
 
+let redirectingToLogin = false;
+
+function redirectToLogin() {
+  if (redirectingToLogin) return;
+  redirectingToLogin = true;
+  window.location.href = "/api/auth/login";
+}
+
 async function getTokenInfo(): Promise<TokenInfo> {
   if (typeof window === "undefined") return { accessToken: null };
   const res = await fetch("/api/auth/token");
+  if (res.status === 401) {
+    redirectToLogin();
+    return { accessToken: null };
+  }
   if (!res.ok) return { accessToken: null };
   const data = await res.json();
   return {
@@ -30,7 +42,11 @@ async function fetchWithAuth(
   if (info.accessToken) headers.set("Authorization", `Bearer ${info.accessToken}`);
   if (info.email) headers.set("X-User-Email", info.email);
   if (info.name) headers.set("X-User-Name", info.name);
-  return fetch(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  if (res.status === 401 && typeof window !== "undefined") {
+    redirectToLogin();
+  }
+  return res;
 }
 
 export const testAtsApi = {

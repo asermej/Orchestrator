@@ -4,6 +4,7 @@ using Orchestrator.Domain;
 using Orchestrator.Api.ResourcesModels;
 using Orchestrator.Api.Mappers;
 using Orchestrator.Api.Common;
+using Orchestrator.Api.Middleware;
 using System.Diagnostics;
 
 namespace Orchestrator.Api.Controllers;
@@ -22,6 +23,9 @@ public class InterviewController : ControllerBase
     {
         _domainFacade = domainFacade;
     }
+
+    private UserContext? GetUserContext()
+        => HttpContext.Items.TryGetValue("UserContext", out var ctx) ? ctx as UserContext : null;
 
     /// <summary>
     /// Creates a new interview
@@ -147,7 +151,11 @@ public class InterviewController : ControllerBase
     [ProducesResponseType(typeof(PaginatedResponse<InterviewResource>), 200)]
     public async Task<ActionResult<PaginatedResponse<InterviewResource>>> Search([FromQuery] SearchInterviewRequest request)
     {
+        var userContext = GetUserContext();
+        var groupId = userContext?.GroupId;
+
         var result = await _domainFacade.SearchInterviews(
+            groupId,
             request.JobId,
             request.ApplicantId,
             request.AgentId,

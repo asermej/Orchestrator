@@ -22,7 +22,7 @@ public static class CandidateMapper
         };
     }
 
-    public static CandidateQuestionResource ToQuestionResource(InterviewConfigurationQuestion question)
+    public static CandidateQuestionResource ToQuestionResource(InterviewGuideQuestion question)
     {
         ArgumentNullException.ThrowIfNull(question);
         return new CandidateQuestionResource

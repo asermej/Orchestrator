@@ -13,6 +13,9 @@ internal class AtsUserAccessResponse
     [JsonPropertyName("auth0Sub")]
     public string Auth0Sub { get; set; } = string.Empty;
 
+    [JsonPropertyName("userName")]
+    public string? UserName { get; set; }
+
     [JsonPropertyName("isSuperadmin")]
     public bool IsSuperadmin { get; set; }
 

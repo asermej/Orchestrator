@@ -34,8 +34,17 @@ export interface MeResponse {
 
 // ── Context so children can access me data ─────────────────────────────────
 
-const MeContext = createContext<MeResponse | null>(null);
+interface MeContextValue {
+  me: MeResponse;
+  refreshMe: () => Promise<void>;
+}
+
+const MeContext = createContext<MeContextValue | null>(null);
 export function useMe() {
+  const ctx = useContext(MeContext);
+  return ctx?.me ?? null;
+}
+export function useMeContext() {
   return useContext(MeContext);
 }
 
@@ -46,7 +55,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const loadMe = async () => {
-    setLoading(true);
     try {
       const data = await testAtsApi.get<MeResponse>("/api/v1/me");
       setMe(data);
@@ -131,7 +139,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // ── Authenticated: sidebar + content ───────────────────────────────────
 
   return (
-    <MeContext.Provider value={me}>
+    <MeContext.Provider value={{ me, refreshMe: loadMe }}>
       <div className="flex min-h-screen">
         <AppSidebar me={me} onMeChange={loadMe} />
         <main className="flex-1 overflow-auto px-8 py-8 max-w-6xl">

@@ -56,12 +56,6 @@ public static class TestDataCleanup
             const string testInterviewIds =
                 "SELECT id FROM interviews WHERE job_id IN (" + testJobIds + ")";
 
-            const string testInterviewConfigIds =
-                "SELECT id FROM interview_configurations WHERE group_id IN (" + testGroupIds + ")";
-
-            const string testInterviewConfigQuestionIds =
-                "SELECT id FROM interview_configuration_questions WHERE interview_configuration_id IN (" + testInterviewConfigIds + ")";
-
             const string testInterviewGuideIds =
                 "SELECT id FROM interview_guides WHERE group_id IN (" + testGroupIds + ")";
 
@@ -98,10 +92,6 @@ public static class TestDataCleanup
             TryExecute(connection,
                 "DELETE FROM follow_up_templates WHERE interview_guide_question_id IN (" + testInterviewGuideQuestionIds + ")");
 
-            // 2b. Follow-up templates → interview_configuration_questions
-            TryExecute(connection,
-                "DELETE FROM follow_up_templates WHERE interview_config_question_id IN (" + testInterviewConfigQuestionIds + ")");
-
             // 3. Interview responses → interviews
             TryExecute(connection,
                 "DELETE FROM interview_responses WHERE interview_id IN (" + testInterviewIds + ")");
@@ -114,11 +104,7 @@ public static class TestDataCleanup
             TryExecute(connection,
                 "DELETE FROM interviews WHERE job_id IN (" + testJobIds + ")");
 
-            // 6. Interview configuration questions → interview_configurations
-            TryExecute(connection,
-                "DELETE FROM interview_configuration_questions WHERE interview_configuration_id IN (" + testInterviewConfigIds + ")");
-
-            // 7. Interview configurations → groups, agents, interview_guides
+            // 6. Interview configurations → groups, agents, interview_guides
             TryExecute(connection,
                 "DELETE FROM interview_configurations WHERE group_id IN (" + testGroupIds + ")");
 

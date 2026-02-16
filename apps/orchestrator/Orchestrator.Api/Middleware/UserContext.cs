@@ -9,6 +9,9 @@ public class UserContext
     /// <summary>The user's Auth0 sub claim</summary>
     public string Auth0Sub { get; set; } = string.Empty;
 
+    /// <summary>The user's display name from the ATS</summary>
+    public string? UserName { get; set; }
+
     /// <summary>The Orchestrator group ID the user is operating in</summary>
     public Guid GroupId { get; set; }
 

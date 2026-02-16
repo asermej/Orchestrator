@@ -57,6 +57,7 @@ public class ExternalController : ControllerBase
         {
             UserId = user.Id,
             Auth0Sub = user.Auth0Sub,
+            UserName = user.Name,
             IsSuperadmin = user.IsSuperadmin,
             IsGroupAdmin = adminGroupIds.Count > 0 || user.IsSuperadmin,
             AdminGroupIds = adminGroupIds,
@@ -115,6 +116,7 @@ public class ExternalUserAccessResponse
 {
     public Guid UserId { get; set; }
     public string Auth0Sub { get; set; } = string.Empty;
+    public string? UserName { get; set; }
     public bool IsSuperadmin { get; set; }
     public bool IsGroupAdmin { get; set; }
     public IReadOnlyList<Guid> AdminGroupIds { get; set; } = Array.Empty<Guid>();

@@ -88,49 +88,58 @@ internal sealed class InterviewDataManager
         return rowsAffected > 0;
     }
 
-    public async Task<PaginatedResult<Interview>> Search(Guid? jobId, Guid? applicantId, Guid? agentId, string? status, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Interview>> Search(Guid? groupId, Guid? jobId, Guid? applicantId, Guid? agentId, string? status, int pageNumber, int pageSize)
     {
         var whereClauses = new List<string>();
         var parameters = new DynamicParameters();
+        var joinSql = "";
+
+        if (groupId.HasValue)
+        {
+            joinSql = "INNER JOIN agents a ON i.agent_id = a.id";
+            whereClauses.Add("a.group_id = @GroupId");
+            parameters.Add("GroupId", groupId.Value);
+        }
 
         if (jobId.HasValue)
         {
-            whereClauses.Add("job_id = @JobId");
+            whereClauses.Add("i.job_id = @JobId");
             parameters.Add("JobId", jobId.Value);
         }
 
         if (applicantId.HasValue)
         {
-            whereClauses.Add("applicant_id = @ApplicantId");
+            whereClauses.Add("i.applicant_id = @ApplicantId");
             parameters.Add("ApplicantId", applicantId.Value);
         }
 
         if (agentId.HasValue)
         {
-            whereClauses.Add("agent_id = @AgentId");
+            whereClauses.Add("i.agent_id = @AgentId");
             parameters.Add("AgentId", agentId.Value);
         }
 
         if (!string.IsNullOrWhiteSpace(status))
         {
-            whereClauses.Add("status = @Status");
+            whereClauses.Add("i.status = @Status");
             parameters.Add("Status", status);
         }
 
-        whereClauses.Add("is_deleted = false");
+        whereClauses.Add("i.is_deleted = false");
 
         var whereSql = $"WHERE {string.Join(" AND ", whereClauses)}";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
-        var countSql = $"SELECT COUNT(*) FROM interviews {whereSql}";
+        var countSql = $"SELECT COUNT(*) FROM interviews i {joinSql} {whereSql}";
         var totalCount = await connection.QueryFirstOrDefaultAsync<int>(countSql, parameters);
 
         var offset = (pageNumber - 1) * pageSize;
         var querySql = $@"
-            SELECT id, job_id, applicant_id, agent_id, interview_configuration_id, token, status, interview_type, scheduled_at, started_at, completed_at, current_question_index, created_at, updated_at, is_deleted
-            FROM interviews
+            SELECT i.id, i.job_id, i.applicant_id, i.agent_id, i.interview_configuration_id, i.token, i.status, i.interview_type, i.scheduled_at, i.started_at, i.completed_at, i.current_question_index, i.created_at, i.updated_at, i.is_deleted
+            FROM interviews i
+            {joinSql}
             {whereSql}
-            ORDER BY created_at DESC
+            ORDER BY i.created_at DESC
             LIMIT @PageSize OFFSET @Offset";
 
         parameters.Add("PageSize", pageSize);

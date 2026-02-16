@@ -29,6 +29,9 @@ function getAuth0Client(): Auth0Client {
       },
       session: {
         rolling: true,
+        cookie: {
+          name: '__test_ats_session', // Unique cookie name to avoid collisions with other apps on localhost
+        },
       },
       routes: {
         login: "/api/auth/login",

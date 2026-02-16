@@ -82,17 +82,21 @@ internal sealed class CandidateSessionManager : IDisposable
         Agent? agent = null;
         Job? job = null;
         Applicant? applicant = null;
-        List<InterviewConfigurationQuestion> questions = new();
+        List<InterviewGuideQuestion> questions = new();
         if (interview != null)
         {
             agent = await DataFacade.GetAgentById(interview.AgentId).ConfigureAwait(false);
             job = await DataFacade.GetJobById(interview.JobId).ConfigureAwait(false);
             applicant = await DataFacade.GetApplicantById(interview.ApplicantId).ConfigureAwait(false);
 
-            // Load questions from interview configuration
+            // Load questions from the interview guide linked to the configuration
             if (interview.InterviewConfigurationId.HasValue)
             {
-                questions = await DataFacade.GetInterviewConfigurationQuestions(interview.InterviewConfigurationId.Value).ConfigureAwait(false);
+                var config = await DataFacade.GetInterviewConfigurationById(interview.InterviewConfigurationId.Value).ConfigureAwait(false);
+                if (config != null)
+                {
+                    questions = await DataFacade.GetInterviewGuideQuestions(config.InterviewGuideId).ConfigureAwait(false);
+                }
             }
         }
 

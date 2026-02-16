@@ -2,7 +2,7 @@ namespace HireologyTestAts.Domain;
 
 /// <summary>
 /// Represents an interview configuration from the Orchestrator.
-/// Bundles an agent, question set, and scoring rubric.
+/// Pairs an agent with an interview guide.
 /// </summary>
 public class OrchestratorInterviewConfiguration
 {

@@ -19,7 +19,7 @@ internal sealed class FollowUpTemplateDataManager
     public async Task<FollowUpTemplate?> GetById(Guid id)
     {
         const string sql = @"
-            SELECT id, interview_question_id, interview_configuration_question_id, competency_tag, trigger_hints, canonical_text, allow_paraphrase, is_approved, created_by, created_at, updated_at, is_deleted
+            SELECT id, interview_question_id, competency_tag, trigger_hints, canonical_text, allow_paraphrase, is_approved, created_by, created_at, updated_at, is_deleted
             FROM follow_up_templates
             WHERE id = @id AND is_deleted = false";
         using var connection = new NpgsqlConnection(_dbConnectionString);
@@ -29,7 +29,7 @@ internal sealed class FollowUpTemplateDataManager
     public async Task<IEnumerable<FollowUpTemplate>> GetByInterviewQuestionId(Guid interviewQuestionId)
     {
         const string sql = @"
-            SELECT id, interview_question_id, interview_configuration_question_id, competency_tag, trigger_hints, canonical_text, allow_paraphrase, is_approved, created_by, created_at, updated_at, is_deleted
+            SELECT id, interview_question_id, competency_tag, trigger_hints, canonical_text, allow_paraphrase, is_approved, created_by, created_at, updated_at, is_deleted
             FROM follow_up_templates
             WHERE interview_question_id = @interviewQuestionId AND is_deleted = false
             ORDER BY created_at ASC";
@@ -37,37 +37,15 @@ internal sealed class FollowUpTemplateDataManager
         return await connection.QueryAsync<FollowUpTemplate>(sql, new { interviewQuestionId });
     }
 
-    public async Task<IEnumerable<FollowUpTemplate>> GetByInterviewConfigurationQuestionId(Guid interviewConfigurationQuestionId)
-    {
-        const string sql = @"
-            SELECT id, interview_question_id, interview_configuration_question_id, competency_tag, trigger_hints, canonical_text, allow_paraphrase, is_approved, created_by, created_at, updated_at, is_deleted
-            FROM follow_up_templates
-            WHERE interview_configuration_question_id = @interviewConfigurationQuestionId AND is_deleted = false
-            ORDER BY created_at ASC";
-        using var connection = new NpgsqlConnection(_dbConnectionString);
-        return await connection.QueryAsync<FollowUpTemplate>(sql, new { interviewConfigurationQuestionId });
-    }
-
     public async Task<IEnumerable<FollowUpTemplate>> GetApprovedByInterviewQuestionId(Guid interviewQuestionId)
     {
         const string sql = @"
-            SELECT id, interview_question_id, interview_configuration_question_id, competency_tag, trigger_hints, canonical_text, allow_paraphrase, is_approved, created_by, created_at, updated_at, is_deleted
+            SELECT id, interview_question_id, competency_tag, trigger_hints, canonical_text, allow_paraphrase, is_approved, created_by, created_at, updated_at, is_deleted
             FROM follow_up_templates
             WHERE interview_question_id = @interviewQuestionId AND is_approved = true AND is_deleted = false
             ORDER BY created_at ASC";
         using var connection = new NpgsqlConnection(_dbConnectionString);
         return await connection.QueryAsync<FollowUpTemplate>(sql, new { interviewQuestionId });
-    }
-
-    public async Task<IEnumerable<FollowUpTemplate>> GetApprovedByInterviewConfigurationQuestionId(Guid interviewConfigurationQuestionId)
-    {
-        const string sql = @"
-            SELECT id, interview_question_id, interview_configuration_question_id, competency_tag, trigger_hints, canonical_text, allow_paraphrase, is_approved, created_by, created_at, updated_at, is_deleted
-            FROM follow_up_templates
-            WHERE interview_configuration_question_id = @interviewConfigurationQuestionId AND is_approved = true AND is_deleted = false
-            ORDER BY created_at ASC";
-        using var connection = new NpgsqlConnection(_dbConnectionString);
-        return await connection.QueryAsync<FollowUpTemplate>(sql, new { interviewConfigurationQuestionId });
     }
 
     public async Task<FollowUpTemplate> Add(FollowUpTemplate template)
@@ -78,9 +56,9 @@ internal sealed class FollowUpTemplateDataManager
         }
 
         const string sql = @"
-            INSERT INTO follow_up_templates (id, interview_question_id, interview_configuration_question_id, competency_tag, trigger_hints, canonical_text, allow_paraphrase, is_approved, created_by, created_at, updated_at, is_deleted)
-            VALUES (@Id, @InterviewQuestionId, @InterviewConfigurationQuestionId, @CompetencyTag, @TriggerHints, @CanonicalText, @AllowParaphrase, @IsApproved, @CreatedBy, @CreatedAt, @UpdatedAt, @IsDeleted)
-            RETURNING id, interview_question_id, interview_configuration_question_id, competency_tag, trigger_hints, canonical_text, allow_paraphrase, is_approved, created_by, created_at, updated_at, is_deleted";
+            INSERT INTO follow_up_templates (id, interview_question_id, competency_tag, trigger_hints, canonical_text, allow_paraphrase, is_approved, created_by, created_at, updated_at, is_deleted)
+            VALUES (@Id, @InterviewQuestionId, @CompetencyTag, @TriggerHints, @CanonicalText, @AllowParaphrase, @IsApproved, @CreatedBy, @CreatedAt, @UpdatedAt, @IsDeleted)
+            RETURNING id, interview_question_id, competency_tag, trigger_hints, canonical_text, allow_paraphrase, is_approved, created_by, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var newItem = await connection.QueryFirstOrDefaultAsync<FollowUpTemplate>(sql, template);
@@ -100,7 +78,7 @@ internal sealed class FollowUpTemplateDataManager
                 updated_at = CURRENT_TIMESTAMP,
                 updated_by = @UpdatedBy
             WHERE id = @Id AND is_deleted = false
-            RETURNING id, interview_question_id, interview_configuration_question_id, competency_tag, trigger_hints, canonical_text, allow_paraphrase, is_approved, created_by, created_at, updated_at, is_deleted";
+            RETURNING id, interview_question_id, competency_tag, trigger_hints, canonical_text, allow_paraphrase, is_approved, created_by, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var updatedItem = await connection.QueryFirstOrDefaultAsync<FollowUpTemplate>(sql, template);

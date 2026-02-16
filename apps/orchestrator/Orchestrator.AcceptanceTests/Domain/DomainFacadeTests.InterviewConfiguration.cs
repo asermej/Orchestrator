@@ -78,7 +78,6 @@ public class DomainFacadeTestsInterviewConfiguration
             AgentId = _testAgentId,
             Name = Truncate($"TestConfig{suffix}_{Guid.NewGuid():N}", 80),
             Description = null,
-            ScoringRubric = null,
             IsActive = true
         };
         var result = await _domainFacade.CreateInterviewConfiguration(config);
@@ -142,29 +141,6 @@ public class DomainFacadeTestsInterviewConfiguration
     }
 
     [TestMethod]
-    public async Task GetInterviewConfigurationByIdWithQuestions_WithQuestions_ReturnsConfigurationWithQuestions()
-    {
-        var config = await CreateTestInterviewConfigurationAsync();
-        var question = new InterviewConfigurationQuestion
-        {
-            InterviewConfigurationId = config.Id,
-            Question = "Test question?",
-            DisplayOrder = 0,
-            ScoringWeight = 1.0m,
-            FollowUpsEnabled = true,
-            MaxFollowUps = 2,
-            CreatedAt = DateTime.UtcNow
-        };
-        var added = await _domainFacade.AddInterviewConfigurationQuestion(question);
-
-        var result = await _domainFacade.GetInterviewConfigurationByIdWithQuestions(config.Id);
-
-        Assert.IsNotNull(result);
-        Assert.AreEqual(config.Id, result.Id);
-        Assert.IsTrue(result.Questions != null && result.Questions.Count >= 1, "Should have at least one question");
-    }
-
-    [TestMethod]
     public async Task SearchInterviewConfigurations_WithResults_ReturnsPaginatedList()
     {
         var c1 = await CreateTestInterviewConfigurationAsync("1");
@@ -209,107 +185,6 @@ public class DomainFacadeTestsInterviewConfiguration
 
         await Assert.ThrowsExceptionAsync<InterviewConfigurationValidationException>(() =>
             _domainFacade.UpdateInterviewConfiguration(config), "Should throw validation exception");
-    }
-
-    [TestMethod]
-    public async Task AddInterviewConfigurationQuestion_ValidQuestion_ReturnsQuestion()
-    {
-        var config = await CreateTestInterviewConfigurationAsync();
-        var question = new InterviewConfigurationQuestion
-        {
-            InterviewConfigurationId = config.Id,
-            Question = "What is your experience?",
-            DisplayOrder = 0,
-            ScoringWeight = 1.0m,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        var result = await _domainFacade.AddInterviewConfigurationQuestion(question);
-
-        Assert.IsNotNull(result);
-        Assert.AreNotEqual(Guid.Empty, result.Id);
-        Assert.AreEqual(question.Question, result.Question);
-    }
-
-    [TestMethod]
-    public async Task GetInterviewConfigurationQuestions_ReturnsQuestions()
-    {
-        var config = await CreateTestInterviewConfigurationAsync();
-        var q = new InterviewConfigurationQuestion
-        {
-            InterviewConfigurationId = config.Id,
-            Question = "Follow up?",
-            DisplayOrder = 0,
-            ScoringWeight = 1.0m,
-            CreatedAt = DateTime.UtcNow
-        };
-        var added = await _domainFacade.AddInterviewConfigurationQuestion(q);
-
-        var questions = await _domainFacade.GetInterviewConfigurationQuestions(config.Id);
-
-        Assert.IsNotNull(questions);
-        Assert.IsTrue(questions.Count >= 1);
-    }
-
-    [TestMethod]
-    public async Task UpdateInterviewConfigurationQuestion_ValidData_UpdatesSuccessfully()
-    {
-        var config = await CreateTestInterviewConfigurationAsync();
-        var question = new InterviewConfigurationQuestion
-        {
-            InterviewConfigurationId = config.Id,
-            Question = "Original?",
-            DisplayOrder = 0,
-            ScoringWeight = 1.0m,
-            CreatedAt = DateTime.UtcNow
-        };
-        var added = await _domainFacade.AddInterviewConfigurationQuestion(question);
-
-        added.Question = "Updated question?";
-        var result = await _domainFacade.UpdateInterviewConfigurationQuestion(added);
-
-        Assert.IsNotNull(result);
-        Assert.AreEqual("Updated question?", result.Question);
-    }
-
-    [TestMethod]
-    public async Task GetInterviewConfigurationQuestionById_Existing_ReturnsQuestion()
-    {
-        var config = await CreateTestInterviewConfigurationAsync();
-        var question = new InterviewConfigurationQuestion
-        {
-            InterviewConfigurationId = config.Id,
-            Question = "Get by id?",
-            DisplayOrder = 0,
-            ScoringWeight = 1.0m,
-            CreatedAt = DateTime.UtcNow
-        };
-        var added = await _domainFacade.AddInterviewConfigurationQuestion(question);
-
-        var result = await _domainFacade.GetInterviewConfigurationQuestionById(added.Id);
-
-        Assert.IsNotNull(result);
-        Assert.AreEqual(added.Id, result.Id);
-    }
-
-    [TestMethod]
-    public async Task DeleteInterviewConfigurationQuestion_Existing_DeletesSuccessfully()
-    {
-        var config = await CreateTestInterviewConfigurationAsync();
-        var question = new InterviewConfigurationQuestion
-        {
-            InterviewConfigurationId = config.Id,
-            Question = "To delete?",
-            DisplayOrder = 0,
-            ScoringWeight = 1.0m,
-            CreatedAt = DateTime.UtcNow
-        };
-        var added = await _domainFacade.AddInterviewConfigurationQuestion(question);
-
-        var result = await _domainFacade.DeleteInterviewConfigurationQuestion(added.Id);
-
-        Assert.IsTrue(result);
-        Assert.IsNull(await _domainFacade.GetInterviewConfigurationQuestionById(added.Id));
     }
 
     [TestMethod]

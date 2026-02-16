@@ -27,18 +27,10 @@ internal sealed class FollowUpManager : IDisposable
     /// </summary>
     public async Task<List<FollowUpSuggestion>> GenerateFollowUpSuggestions(Guid questionId, string questionText)
     {
-        return await GenerateFollowUpSuggestionsInternal(questionId, null, questionText).ConfigureAwait(false);
+        return await GenerateFollowUpSuggestionsInternal(questionId, questionText).ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Generates follow-up suggestions for a main question using AI (for Interview Configuration Questions)
-    /// </summary>
-    public async Task<List<FollowUpSuggestion>> GenerateFollowUpSuggestionsForConfigQuestion(Guid configQuestionId, string questionText)
-    {
-        return await GenerateFollowUpSuggestionsInternal(null, configQuestionId, questionText).ConfigureAwait(false);
-    }
-
-    private async Task<List<FollowUpSuggestion>> GenerateFollowUpSuggestionsInternal(Guid? questionId, Guid? configQuestionId, string questionText)
+    private async Task<List<FollowUpSuggestion>> GenerateFollowUpSuggestionsInternal(Guid? questionId, string questionText)
     {
         var systemPrompt = @"You are an expert interview question designer. Generate 6-10 relevant follow-up questions for the given main interview question.
 
@@ -94,7 +86,6 @@ Return format (strict JSON array):
                 var template = new FollowUpTemplate
                 {
                     InterviewQuestionId = questionId,
-                    InterviewConfigurationQuestionId = configQuestionId,
                     CompetencyTag = suggestion.CompetencyTag,
                     TriggerHints = suggestion.TriggerHints?.ToArray(),
                     CanonicalText = suggestion.CanonicalText.Trim(),

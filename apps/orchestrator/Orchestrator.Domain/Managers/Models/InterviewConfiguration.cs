@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Orchestrator.Domain;
 
 /// <summary>
-/// Represents an Interview Configuration that combines an InterviewGuide with an Agent.
+/// Represents an Interview Configuration that pairs an InterviewGuide with an Agent.
 /// The guide contains questions, scoring rubric, and opening/closing templates.
 /// </summary>
 [Table("interview_configurations")]
@@ -27,9 +27,6 @@ public class InterviewConfiguration : Entity
     [Column("description")]
     public string? Description { get; set; }
 
-    [Column("scoring_rubric")]
-    public string? ScoringRubric { get; set; }
-
     [Column("is_active")]
     public bool IsActive { get; set; } = true;
 
@@ -37,15 +34,11 @@ public class InterviewConfiguration : Entity
     [NotMapped]
     public InterviewGuide? InterviewGuide { get; set; }
 
-    // Navigation property (not mapped to DB, populated by manager)
-    [NotMapped]
-    public List<InterviewConfigurationQuestion> Questions { get; set; } = new();
-
     // Navigation property for the agent (not mapped to DB, populated by manager)
     [NotMapped]
     public Agent? Agent { get; set; }
 
-    // Computed property for question count (populated by search query)
+    // Computed property for question count from the linked guide (populated by search query)
     [NotMapped]
     public int QuestionCount { get; set; }
 }

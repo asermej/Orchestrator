@@ -29,9 +29,9 @@ public sealed partial class DomainFacade
     /// <summary>
     /// Searches for Interviews
     /// </summary>
-    public async Task<PaginatedResult<Interview>> SearchInterviews(Guid? jobId, Guid? applicantId, Guid? agentId, string? status, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Interview>> SearchInterviews(Guid? groupId, Guid? jobId, Guid? applicantId, Guid? agentId, string? status, int pageNumber, int pageSize)
     {
-        return await InterviewManager.SearchInterviews(jobId, applicantId, agentId, status, pageNumber, pageSize).ConfigureAwait(false);
+        return await InterviewManager.SearchInterviews(groupId, jobId, applicantId, agentId, status, pageNumber, pageSize).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -189,8 +189,8 @@ public sealed partial class DomainFacade
     /// </summary>
     public async Task<Interview> CreateTestInterview(Guid interviewConfigurationId, string? testUserName = null)
     {
-        // Get the configuration with questions
-        var config = await InterviewConfigurationManager.GetConfigurationByIdWithQuestions(interviewConfigurationId).ConfigureAwait(false);
+        // Get the configuration
+        var config = await InterviewConfigurationManager.GetConfigurationById(interviewConfigurationId).ConfigureAwait(false);
         if (config == null)
         {
             throw new InterviewConfigurationNotFoundException($"Interview configuration with ID {interviewConfigurationId} not found");
@@ -246,22 +246,25 @@ public sealed partial class DomainFacade
             throw new InterviewNotFoundException($"Interview with ID {interviewId} not found");
         }
 
-        // Get the configuration with questions
-        var config = await InterviewConfigurationManager.GetConfigurationByIdWithQuestions(interviewConfigurationId).ConfigureAwait(false);
+        // Get the configuration to find the interview guide
+        var config = await InterviewConfigurationManager.GetConfigurationById(interviewConfigurationId).ConfigureAwait(false);
         if (config == null)
         {
             throw new InterviewConfigurationNotFoundException($"Interview configuration with ID {interviewConfigurationId} not found");
         }
 
+        // Get the guide's questions
+        var guideQuestions = await InterviewGuideManager.GetQuestionsByGuideId(config.InterviewGuideId).ConfigureAwait(false);
+
         // Get the responses
         var responses = await InterviewManager.GetResponsesByInterviewId(interviewId).ConfigureAwait(false);
 
-        // Calculate scores based on responses and configuration
+        // Calculate scores based on responses and guide questions
         var questionScores = new List<QuestionScore>();
         decimal totalWeightedScore = 0;
         decimal totalWeight = 0;
 
-        foreach (var question in config.Questions.OrderBy(q => q.DisplayOrder))
+        foreach (var question in guideQuestions.OrderBy(q => q.DisplayOrder))
         {
             var response = responses.FirstOrDefault(r => r.ResponseOrder == question.DisplayOrder);
             

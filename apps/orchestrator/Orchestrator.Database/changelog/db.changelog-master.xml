@@ -113,4 +113,7 @@
 
     <!-- Multi-Tenant: Rename organizations to groups + add ATS org scoping -->
     <include file="changes/20260215180000-rename-organizations-to-groups.xml" relativeToChangelogFile="true"/>
+
+    <!-- Simplify InterviewConfiguration: remove config-level questions and scoring rubric -->
+    <include file="changes/20260216120000-drop-interview-configuration-questions-and-scoring-rubric.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog> 

@@ -23,16 +23,6 @@ internal sealed partial class DataFacade
         return await FollowUpTemplateDataManager.GetApprovedByInterviewQuestionId(interviewQuestionId).ConfigureAwait(false);
     }
 
-    public async Task<IEnumerable<FollowUpTemplate>> GetFollowUpTemplatesByInterviewConfigurationQuestionId(Guid interviewConfigurationQuestionId)
-    {
-        return await FollowUpTemplateDataManager.GetByInterviewConfigurationQuestionId(interviewConfigurationQuestionId).ConfigureAwait(false);
-    }
-
-    public async Task<IEnumerable<FollowUpTemplate>> GetApprovedFollowUpTemplatesByInterviewConfigurationQuestionId(Guid interviewConfigurationQuestionId)
-    {
-        return await FollowUpTemplateDataManager.GetApprovedByInterviewConfigurationQuestionId(interviewConfigurationQuestionId).ConfigureAwait(false);
-    }
-
     public async Task<FollowUpTemplate> AddFollowUpTemplate(FollowUpTemplate template)
     {
         return await FollowUpTemplateDataManager.Add(template).ConfigureAwait(false);

@@ -46,22 +46,12 @@ public class InterviewConfigurationResource
     public string? Description { get; set; }
 
     /// <summary>
-    /// The scoring rubric for evaluating interview responses
-    /// </summary>
-    public string? ScoringRubric { get; set; }
-
-    /// <summary>
     /// Whether this configuration is active
     /// </summary>
     public bool IsActive { get; set; }
 
     /// <summary>
-    /// The questions in this configuration
-    /// </summary>
-    public List<InterviewConfigurationQuestionResource> Questions { get; set; } = new();
-
-    /// <summary>
-    /// The number of questions in this configuration (for list views)
+    /// The number of questions from the linked interview guide (for list views)
     /// </summary>
     public int QuestionCount { get; set; }
 
@@ -94,52 +84,6 @@ public class InterviewConfigurationResource
     /// Who last updated this configuration
     /// </summary>
     public string? UpdatedBy { get; set; }
-}
-
-/// <summary>
-/// Represents a question within an Interview Configuration
-/// </summary>
-public class InterviewConfigurationQuestionResource
-{
-    /// <summary>
-    /// The unique identifier of the question
-    /// </summary>
-    public Guid Id { get; set; }
-
-    /// <summary>
-    /// The configuration this question belongs to
-    /// </summary>
-    public Guid InterviewConfigurationId { get; set; }
-
-    /// <summary>
-    /// The question text
-    /// </summary>
-    public string Question { get; set; } = string.Empty;
-
-    /// <summary>
-    /// The display order of this question
-    /// </summary>
-    public int DisplayOrder { get; set; }
-
-    /// <summary>
-    /// The weight of this question in scoring (default 1.0)
-    /// </summary>
-    public decimal ScoringWeight { get; set; }
-
-    /// <summary>
-    /// Guidance for scoring this question
-    /// </summary>
-    public string? ScoringGuidance { get; set; }
-
-    /// <summary>
-    /// When this question was created
-    /// </summary>
-    public DateTime CreatedAt { get; set; }
-
-    /// <summary>
-    /// When this question was last updated
-    /// </summary>
-    public DateTime? UpdatedAt { get; set; }
 }
 
 /// <summary>
@@ -182,51 +126,14 @@ public class CreateInterviewConfigurationResource
     public string? Description { get; set; }
 
     /// <summary>
-    /// The scoring rubric for evaluating interview responses
-    /// </summary>
-    public string? ScoringRubric { get; set; }
-
-    /// <summary>
     /// Whether this configuration is active (default true)
     /// </summary>
     public bool IsActive { get; set; } = true;
 
     /// <summary>
-    /// The questions to create with this configuration
-    /// </summary>
-    public List<CreateInterviewConfigurationQuestionResource>? Questions { get; set; }
-
-    /// <summary>
     /// Who is creating this configuration
     /// </summary>
     public string? CreatedBy { get; set; }
-}
-
-/// <summary>
-/// Request model for creating a question within a configuration
-/// </summary>
-public class CreateInterviewConfigurationQuestionResource
-{
-    /// <summary>
-    /// The question text
-    /// </summary>
-    [Required(ErrorMessage = "Question is required")]
-    public string Question { get; set; } = string.Empty;
-
-    /// <summary>
-    /// The display order of this question
-    /// </summary>
-    public int DisplayOrder { get; set; }
-
-    /// <summary>
-    /// The weight of this question in scoring (default 1.0)
-    /// </summary>
-    public decimal ScoringWeight { get; set; } = 1.0m;
-
-    /// <summary>
-    /// Guidance for scoring this question
-    /// </summary>
-    public string? ScoringGuidance { get; set; }
 }
 
 /// <summary>
@@ -250,19 +157,9 @@ public class UpdateInterviewConfigurationResource
     public string? Description { get; set; }
 
     /// <summary>
-    /// The scoring rubric for evaluating interview responses
-    /// </summary>
-    public string? ScoringRubric { get; set; }
-
-    /// <summary>
     /// Whether this configuration is active
     /// </summary>
     public bool? IsActive { get; set; }
-
-    /// <summary>
-    /// The questions to replace (if provided, replaces all existing questions)
-    /// </summary>
-    public List<CreateInterviewConfigurationQuestionResource>? Questions { get; set; }
 
     /// <summary>
     /// Who is updating this configuration

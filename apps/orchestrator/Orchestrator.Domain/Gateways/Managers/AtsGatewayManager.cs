@@ -156,6 +156,7 @@ internal sealed class AtsGatewayManager : IDisposable
         {
             UserId = response.UserId,
             Auth0Sub = response.Auth0Sub,
+            UserName = response.UserName,
             IsSuperadmin = response.IsSuperadmin,
             IsGroupAdmin = response.IsGroupAdmin,
             AdminGroupIds = response.AdminGroupIds,
