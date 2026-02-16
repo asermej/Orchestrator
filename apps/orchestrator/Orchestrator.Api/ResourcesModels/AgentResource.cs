@@ -89,6 +89,16 @@ public class AgentResource
     /// When this Agent was last updated
     /// </summary>
     public DateTime? UpdatedAt { get; set; }
+
+    /// <summary>
+    /// Whether this agent is inherited from a parent organization
+    /// </summary>
+    public bool IsInherited { get; set; }
+
+    /// <summary>
+    /// The name of the organization that owns this agent (for inherited agents)
+    /// </summary>
+    public string? OwnerOrganizationName { get; set; }
 }
 
 /// <summary>
@@ -102,9 +112,14 @@ public class CreateAgentResource
     public Guid? GroupId { get; set; }
 
     /// <summary>
-    /// The ATS organization this agent is scoped to (null = group-wide)
+    /// The ATS organization this agent is scoped to (required)
     /// </summary>
     public Guid? OrganizationId { get; set; }
+
+    /// <summary>
+    /// The visibility scope for this agent (organization_only, organization_and_descendants, descendants_only)
+    /// </summary>
+    public string? VisibilityScope { get; set; }
 
     /// <summary>
     /// The display name of the agent
@@ -167,6 +182,11 @@ public class UpdateAgentResource
     /// The display name of the agent
     /// </summary>
     public string? DisplayName { get; set; }
+
+    /// <summary>
+    /// The visibility scope for this agent (organization_only, organization_and_descendants, descendants_only)
+    /// </summary>
+    public string? VisibilityScope { get; set; }
 
     /// <summary>
     /// The profile image URL for this agent
@@ -259,4 +279,10 @@ public class SearchAgentRequest : PaginatedRequest
     /// Sort by field (e.g., "displayName", "createdAt")
     /// </summary>
     public new string? SortBy { get; set; }
+
+    /// <summary>
+    /// Filter by source: "local" for agents created at the current org,
+    /// "inherited" for agents from ancestor orgs. Omit for legacy behavior.
+    /// </summary>
+    public string? Source { get; set; }
 }

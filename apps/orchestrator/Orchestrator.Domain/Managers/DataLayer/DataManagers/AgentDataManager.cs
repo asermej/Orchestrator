@@ -168,4 +168,120 @@ internal sealed class AgentDataManager
 
         return new PaginatedResult<Agent>(items, totalCount, pageNumber, pageSize);
     }
+
+    /// <summary>
+    /// Searches for local agents (created at the specified organization).
+    /// </summary>
+    public async Task<PaginatedResult<Agent>> SearchLocal(Guid groupId, Guid organizationId, string? displayName, string? sortBy, int pageNumber, int pageSize)
+    {
+        var whereClauses = new List<string>
+        {
+            "group_id = @GroupId",
+            "organization_id = @OrganizationId",
+            "is_deleted = false"
+        };
+        var parameters = new DynamicParameters();
+        parameters.Add("GroupId", groupId);
+        parameters.Add("OrganizationId", organizationId);
+
+        if (!string.IsNullOrWhiteSpace(displayName))
+        {
+            whereClauses.Add("display_name ILIKE @DisplayName");
+            parameters.Add("DisplayName", $"%{displayName}%");
+        }
+
+        var whereSql = $"WHERE {string.Join(" AND ", whereClauses)}";
+
+        var orderByClause = sortBy?.ToLowerInvariant() switch
+        {
+            "alphabetical" => "display_name ASC",
+            "recent" => "created_at DESC",
+            _ => "created_at DESC"
+        };
+
+        using var connection = new NpgsqlConnection(_dbConnectionString);
+
+        var countSql = $"SELECT COUNT(*) FROM agents {whereSql}";
+        var totalCount = await connection.QueryFirstOrDefaultAsync<int>(countSql, parameters);
+
+        var offset = (pageNumber - 1) * pageSize;
+        var querySql = $@"
+            SELECT id, group_id, organization_id, display_name, profile_image_url,
+                   system_prompt, interview_guidelines,
+                   elevenlabs_voice_id, voice_stability, voice_similarity_boost,
+                   voice_provider, voice_type, voice_name, visibility_scope,
+                   created_at, updated_at, created_by, is_deleted
+            FROM agents
+            {whereSql}
+            ORDER BY {orderByClause}
+            LIMIT @PageSize OFFSET @Offset";
+
+        parameters.Add("PageSize", pageSize);
+        parameters.Add("Offset", offset);
+
+        var items = await connection.QueryAsync<Agent>(querySql, parameters);
+
+        return new PaginatedResult<Agent>(items, totalCount, pageNumber, pageSize);
+    }
+
+    /// <summary>
+    /// Searches for inherited agents (from ancestor organizations with propagating visibility).
+    /// </summary>
+    public async Task<PaginatedResult<Agent>> SearchInherited(Guid groupId, IReadOnlyList<Guid> ancestorOrgIds, string? displayName, string? sortBy, int pageNumber, int pageSize)
+    {
+        if (ancestorOrgIds == null || ancestorOrgIds.Count == 0)
+        {
+            return new PaginatedResult<Agent>(Enumerable.Empty<Agent>(), 0, pageNumber, pageSize);
+        }
+
+        var whereClauses = new List<string>
+        {
+            "group_id = @GroupId",
+            "organization_id = ANY(@AncestorOrgIds)",
+            "visibility_scope IN ('organization_and_descendants', 'descendants_only')",
+            "is_deleted = false"
+        };
+        var parameters = new DynamicParameters();
+        parameters.Add("GroupId", groupId);
+        parameters.Add("AncestorOrgIds", ancestorOrgIds.ToArray());
+
+        if (!string.IsNullOrWhiteSpace(displayName))
+        {
+            whereClauses.Add("display_name ILIKE @DisplayName");
+            parameters.Add("DisplayName", $"%{displayName}%");
+        }
+
+        var whereSql = $"WHERE {string.Join(" AND ", whereClauses)}";
+
+        var orderByClause = sortBy?.ToLowerInvariant() switch
+        {
+            "alphabetical" => "display_name ASC",
+            "recent" => "created_at DESC",
+            _ => "created_at DESC"
+        };
+
+        using var connection = new NpgsqlConnection(_dbConnectionString);
+
+        var countSql = $"SELECT COUNT(*) FROM agents {whereSql}";
+        var totalCount = await connection.QueryFirstOrDefaultAsync<int>(countSql, parameters);
+
+        var offset = (pageNumber - 1) * pageSize;
+        var querySql = $@"
+            SELECT id, group_id, organization_id, display_name, profile_image_url,
+                   system_prompt, interview_guidelines,
+                   elevenlabs_voice_id, voice_stability, voice_similarity_boost,
+                   voice_provider, voice_type, voice_name, visibility_scope,
+                   created_at, updated_at, created_by, is_deleted
+            FROM agents
+            {whereSql}
+            ORDER BY {orderByClause}
+            LIMIT @PageSize OFFSET @Offset";
+
+        parameters.Add("PageSize", pageSize);
+        parameters.Add("Offset", offset);
+
+        var items = await connection.QueryAsync<Agent>(querySql, parameters);
+
+        return new PaginatedResult<Agent>(items, totalCount, pageNumber, pageSize);
+    }
 }

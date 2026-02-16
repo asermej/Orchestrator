@@ -16,33 +16,42 @@ const UUID_REGEX = /^[0-9a-f-]{36}$/i;
  * Flow:
  * 1. ATS links here with the user's current group ID in the query string,
  *    optional returnUrl, and optional organizationId (current location selection).
- * 2. Since both apps share the same Auth0 tenant and domain, the browser
- *    already has a valid Auth0 session cookie -- no re-authentication prompt.
- * 3. If there's no session (e.g., cookie expired), we redirect to login
- *    which will use the existing Auth0 session and immediately redirect back.
- * 4. We store the groupId in a cookie so the API client can send it as
- *    the X-Group-Id header on every request.
- * 5. We store the returnUrl in a cookie so the Orchestrator UI can render
- *    a "Back to Hireology" link that returns the user to the ATS.
- * 6. If organizationId is present and valid, we set the selected-org cookie so
- *    the same organization is selected in Orchestrator.
- * 7. Redirect to the Orchestrator home page.
+ * 2. On first arrival (no "fresh" flag), we always redirect through Auth0's
+ *    login flow so the Orchestrator session is rebuilt from the current Auth0
+ *    SSO cookie. This prevents a stale session from a previous user from
+ *    being reused. The login redirect includes a "fresh=1" flag in returnTo.
+ * 3. Auth0 sees the shared SSO cookie and silently issues new tokens (no
+ *    login prompt). The callback creates a fresh Orchestrator session.
+ * 4. On the return visit (with "fresh=1"), we verify the session is valid,
+ *    store the groupId cookie, returnUrl cookie, and organizationId cookie,
+ *    then redirect to the Orchestrator home page.
  */
 export async function GET(request: NextRequest) {
   const groupId = request.nextUrl.searchParams.get("groupId");
   const returnUrl = request.nextUrl.searchParams.get("returnUrl");
   const organizationId = request.nextUrl.searchParams.get("organizationId");
+  const fresh = request.nextUrl.searchParams.get("fresh");
 
   // Validate groupId
   if (!groupId || !UUID_REGEX.test(groupId)) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  const returnToParams = new URLSearchParams({ groupId });
+  // Build the returnTo URL with a "fresh" flag so we know we've already
+  // been through the login flow and can skip the forced re-auth.
+  const returnToParams = new URLSearchParams({ groupId, fresh: "1" });
   if (returnUrl) returnToParams.set("returnUrl", returnUrl);
   if (organizationId && UUID_REGEX.test(organizationId)) returnToParams.set("organizationId", organizationId);
   const returnTo = `/sso?${returnToParams.toString()}`;
   const loginUrl = new URL(`/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`, request.url);
+
+  // When arriving from the ATS (no "fresh" flag), always force re-authentication
+  // through Auth0's SSO flow. This ensures the Orchestrator session is rebuilt
+  // from the current Auth0 SSO cookie, which reflects the ATS user — not a
+  // stale session from a previous login by a different user.
+  if (!fresh) {
+    return NextResponse.redirect(loginUrl);
+  }
 
   const session = await auth0.getSession();
   if (!session?.user) {

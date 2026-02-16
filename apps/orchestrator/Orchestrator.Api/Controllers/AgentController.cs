@@ -33,6 +33,43 @@ public class AgentController : ControllerBase
         => HttpContext.Items.TryGetValue("UserContext", out var ctx) ? ctx as UserContext : null;
 
     /// <summary>
+    /// Reads the X-Organization-Id header to determine the currently selected organization.
+    /// </summary>
+    private Guid? GetSelectedOrganizationId()
+    {
+        if (HttpContext.Request.Headers.TryGetValue("X-Organization-Id", out var orgIdHeader)
+            && Guid.TryParse(orgIdHeader.FirstOrDefault(), out var orgId))
+        {
+            return orgId;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Computes the ancestor organization IDs for the given org by walking up the parent chain.
+    /// </summary>
+    private List<Guid> GetAncestorOrgIds(Guid currentOrgId, UserContext userContext)
+    {
+        var ancestors = new List<Guid>();
+        var orgMap = userContext.AccessibleOrganizations.ToDictionary(o => o.Id);
+        var currentId = currentOrgId;
+        while (orgMap.TryGetValue(currentId, out var org) && org.ParentOrganizationId.HasValue)
+        {
+            ancestors.Add(org.ParentOrganizationId.Value);
+            currentId = org.ParentOrganizationId.Value;
+        }
+        return ancestors;
+    }
+
+    /// <summary>
+    /// Builds a lookup of organization ID to name from the user context.
+    /// </summary>
+    private Dictionary<Guid, string> BuildOrgNameLookup(UserContext userContext)
+    {
+        return userContext.AccessibleOrganizations.ToDictionary(o => o.Id, o => o.Name);
+    }
+
+    /// <summary>
     /// Creates a new agent
     /// </summary>
     /// <param name="resource">The agent data</param>
@@ -48,6 +85,12 @@ public class AgentController : ControllerBase
         // falling back to the resource value or a default group
         var userContext = GetUserContext();
         var groupId = userContext?.GroupId ?? resource.GroupId ?? await GetOrCreateDefaultGroupAsync();
+
+        // Set organization ID from header if not explicitly provided in the request body
+        if (!resource.OrganizationId.HasValue)
+        {
+            resource.OrganizationId = GetSelectedOrganizationId();
+        }
         
         var agent = AgentMapper.ToDomain(resource, groupId);
         var createdAgent = await _domainFacade.CreateAgent(agent);
@@ -114,9 +157,63 @@ public class AgentController : ControllerBase
     [ProducesResponseType(typeof(PaginatedResponse<AgentResource>), 200)]
     public async Task<ActionResult<PaginatedResponse<AgentResource>>> Search([FromQuery] SearchAgentRequest request)
     {
-        // Apply organization filtering from user context if available
         var userContext = GetUserContext();
         var groupId = request.GroupId ?? userContext?.GroupId;
+        var selectedOrgId = GetSelectedOrganizationId();
+
+        // When Source is specified (local/inherited), require an organization to be selected
+        if (!string.IsNullOrWhiteSpace(request.Source) && !selectedOrgId.HasValue)
+        {
+            return BadRequest("An organization must be selected to filter by source.");
+        }
+
+        // Handle local/inherited source filtering
+        if (!string.IsNullOrWhiteSpace(request.Source) && selectedOrgId.HasValue && groupId.HasValue && userContext != null)
+        {
+            var orgNameLookup = BuildOrgNameLookup(userContext);
+
+            if (request.Source.Equals("local", StringComparison.OrdinalIgnoreCase))
+            {
+                var localResult = await _domainFacade.SearchLocalAgents(
+                    groupId.Value,
+                    selectedOrgId.Value,
+                    request.DisplayName,
+                    request.SortBy,
+                    request.PageNumber,
+                    request.PageSize);
+
+                return Ok(new PaginatedResponse<AgentResource>
+                {
+                    Items = AgentMapper.ToResource(localResult.Items, isInherited: false, orgNameLookup: orgNameLookup),
+                    TotalCount = localResult.TotalCount,
+                    PageNumber = localResult.PageNumber,
+                    PageSize = localResult.PageSize
+                });
+            }
+
+            if (request.Source.Equals("inherited", StringComparison.OrdinalIgnoreCase))
+            {
+                var ancestorOrgIds = GetAncestorOrgIds(selectedOrgId.Value, userContext);
+
+                var inheritedResult = await _domainFacade.SearchInheritedAgents(
+                    groupId.Value,
+                    ancestorOrgIds,
+                    request.DisplayName,
+                    request.SortBy,
+                    request.PageNumber,
+                    request.PageSize);
+
+                return Ok(new PaginatedResponse<AgentResource>
+                {
+                    Items = AgentMapper.ToResource(inheritedResult.Items, isInherited: true, orgNameLookup: orgNameLookup),
+                    TotalCount = inheritedResult.TotalCount,
+                    PageNumber = inheritedResult.PageNumber,
+                    PageSize = inheritedResult.PageSize
+                });
+            }
+        }
+
+        // Legacy behavior: return all agents the user can access
         var orgFilter = (userContext is { IsResolved: true, IsSuperadmin: false, IsGroupAdmin: false })
             ? userContext.AccessibleOrganizationIds
             : null;
@@ -161,6 +258,14 @@ public class AgentController : ControllerBase
             return NotFound($"Agent with ID {id} not found");
         }
 
+        // Ownership guard: only the creating org can edit an agent
+        var selectedOrgId = GetSelectedOrganizationId();
+        if (selectedOrgId.HasValue && existingAgent.OrganizationId.HasValue
+            && selectedOrgId.Value != existingAgent.OrganizationId.Value)
+        {
+            return StatusCode(403, "Cannot edit an agent owned by a different organization.");
+        }
+
         // Map update to domain object
         var agentToUpdate = AgentMapper.ToDomain(resource, existingAgent);
         var updatedAgent = await _domainFacade.UpdateAgent(agentToUpdate);
@@ -182,6 +287,15 @@ public class AgentController : ControllerBase
     [ProducesResponseType(404)]
     public async Task<ActionResult> Delete(Guid id)
     {
+        // Ownership guard: only the creating org can delete an agent
+        var selectedOrgId = GetSelectedOrganizationId();
+        var existingAgent = await _domainFacade.GetAgentById(id);
+        if (existingAgent != null && selectedOrgId.HasValue && existingAgent.OrganizationId.HasValue
+            && selectedOrgId.Value != existingAgent.OrganizationId.Value)
+        {
+            return StatusCode(403, "Cannot delete an agent owned by a different organization.");
+        }
+
         var deleted = await _domainFacade.DeleteAgent(id);
         if (!deleted)
         {
@@ -189,6 +303,40 @@ public class AgentController : ControllerBase
         }
 
         return NoContent();
+    }
+
+    /// <summary>
+    /// Clones an inherited agent into the currently selected organization as a local agent.
+    /// </summary>
+    /// <param name="id">The ID of the agent to clone</param>
+    /// <returns>The newly created cloned agent</returns>
+    /// <response code="201">Returns the cloned agent</response>
+    /// <response code="400">If no organization is selected</response>
+    /// <response code="404">If the source agent is not found</response>
+    [HttpPost("{id}/clone")]
+    [ProducesResponseType(typeof(AgentResource), 201)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<AgentResource>> Clone(Guid id)
+    {
+        var userContext = GetUserContext();
+        var selectedOrgId = GetSelectedOrganizationId();
+        var groupId = userContext?.GroupId;
+
+        if (!selectedOrgId.HasValue)
+        {
+            return BadRequest("An organization must be selected to clone an agent.");
+        }
+
+        if (!groupId.HasValue)
+        {
+            return BadRequest("Group context is required.");
+        }
+
+        var clonedAgent = await _domainFacade.CloneAgent(id, selectedOrgId.Value, groupId.Value);
+        var response = AgentMapper.ToResource(clonedAgent);
+
+        return CreatedAtAction(nameof(GetById), new { id = response.Id }, response);
     }
 
     /// <summary>

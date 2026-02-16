@@ -88,6 +88,15 @@ public class UserContextMiddleware
         {
             var atsAccess = await domainFacade.GetUserAccessFromAts(groupId, auth0Sub);
 
+            if (atsAccess == null)
+            {
+                _logger.LogWarning(
+                    "ATS user access returned null for auth0Sub={Auth0Sub}, groupId={GroupId}. " +
+                    "The group may be missing AtsBaseUrl or AtsApiKey configuration. " +
+                    "Re-sync the group from the ATS settings to populate these fields.",
+                    auth0Sub, groupId);
+            }
+
             var userContext = new UserContext
             {
                 Auth0Sub = auth0Sub,

@@ -122,4 +122,7 @@
 
     <!-- Add ats_api_key to groups for Orchestrator→ATS callback authentication -->
     <include file="changes/20260216160000-add-ats-api-key-to-groups.xml" relativeToChangelogFile="true"/>
+
+    <!-- Agent visibility scope: migrate owner_only to organization_only + add CHECK constraint -->
+    <include file="changes/20260216180000-agent-visibility-scope-values.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog> 

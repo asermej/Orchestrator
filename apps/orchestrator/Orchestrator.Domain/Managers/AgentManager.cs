@@ -53,6 +53,63 @@ internal sealed class AgentManager : IDisposable
     }
 
     /// <summary>
+    /// Searches for local agents (created at the specified organization).
+    /// </summary>
+    public async Task<PaginatedResult<Agent>> SearchLocalAgents(Guid groupId, Guid organizationId, string? displayName, string? sortBy, int pageNumber, int pageSize)
+    {
+        return await DataFacade.SearchLocalAgents(groupId, organizationId, displayName, sortBy, pageNumber, pageSize).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Searches for inherited agents (from ancestor organizations with propagating visibility).
+    /// </summary>
+    public async Task<PaginatedResult<Agent>> SearchInheritedAgents(Guid groupId, IReadOnlyList<Guid> ancestorOrgIds, string? displayName, string? sortBy, int pageNumber, int pageSize)
+    {
+        return await DataFacade.SearchInheritedAgents(groupId, ancestorOrgIds, displayName, sortBy, pageNumber, pageSize).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Clones an agent into a target organization as a local, organization-only agent.
+    /// </summary>
+    public async Task<Agent> CloneAgent(Guid agentId, Guid targetOrganizationId, Guid targetGroupId)
+    {
+        var source = await DataFacade.GetAgentById(agentId).ConfigureAwait(false);
+        if (source == null)
+        {
+            throw new AgentNotFoundException($"Agent with ID {agentId} not found.");
+        }
+
+        var clone = new Agent
+        {
+            GroupId = targetGroupId,
+            OrganizationId = targetOrganizationId,
+            DisplayName = source.DisplayName,
+            ProfileImageUrl = source.ProfileImageUrl,
+            SystemPrompt = source.SystemPrompt,
+            InterviewGuidelines = source.InterviewGuidelines,
+            ElevenlabsVoiceId = source.ElevenlabsVoiceId,
+            VoiceStability = source.VoiceStability,
+            VoiceSimilarityBoost = source.VoiceSimilarityBoost,
+            VoiceProvider = source.VoiceProvider,
+            VoiceType = source.VoiceType,
+            VoiceName = source.VoiceName,
+            VisibilityScope = AgentVisibilityScope.OrganizationOnly,
+        };
+
+        AgentValidator.Validate(clone);
+
+        // Check for duplicate display name in the target org
+        var existingAgents = await DataFacade.SearchLocalAgents(targetGroupId, targetOrganizationId, clone.DisplayName, null, 1, 1).ConfigureAwait(false);
+        if (existingAgents.Items.Any())
+        {
+            // Append "(Copy)" to avoid duplicate name conflict
+            clone.DisplayName = $"{clone.DisplayName} (Copy)";
+        }
+
+        return await DataFacade.AddAgent(clone).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Updates an Agent
     /// </summary>
     public async Task<Agent> UpdateAgent(Agent agent)

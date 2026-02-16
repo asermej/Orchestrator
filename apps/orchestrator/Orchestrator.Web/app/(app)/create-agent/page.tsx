@@ -8,19 +8,27 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ImageUpload } from "@/components/image-upload";
-import { Loader2 } from "lucide-react";
+import { Loader2, Building2 } from "lucide-react";
 import Link from "next/link";
 import { createAgent } from "./actions";
 import { uploadImage } from "@/lib/upload-image";
 import { useServerAction } from "@/lib/use-server-action";
 
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 export default function CreateAgent() {
   const { user, isLoading } = useUser();
   const router = useRouter();
   const [profileImageUrl, setProfileImageUrl] = useState<string>("");
+  const [visibilityScope, setVisibilityScope] = useState<string>("organization_only");
   
-  // Use the new useServerAction hook for better error handling
-  // Note: No onSuccess callback - the server action handles the redirect to edit page with onboarding flag
+  const selectedOrgId = getCookie("orchestrator_selected_org");
+  const hasOrgSelected = !!selectedOrgId;
+
   const { execute, isLoading: isSubmitting, error } = useServerAction(createAgent, {
     successMessage: "Agent created successfully!",
   });
@@ -38,6 +46,7 @@ export default function CreateAgent() {
     if (profileImageUrl) {
       formData.set("profileImageUrl", profileImageUrl);
     }
+    formData.set("visibilityScope", visibilityScope);
 
     await execute(formData);
   };
@@ -51,7 +60,23 @@ export default function CreateAgent() {
   }
 
   if (!user) {
-    return null; // Will redirect to login
+    return null;
+  }
+
+  if (!hasOrgSelected) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-2xl font-semibold mb-6">Create Agent</h1>
+        <div className="text-center py-20">
+          <Building2 className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-xl font-semibold mb-2">Select an organization</h3>
+          <p className="text-muted-foreground max-w-md mx-auto">
+            Please select an organization from the dropdown in the top-right corner
+            before creating an agent. Agents must belong to a specific organization.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -62,7 +87,7 @@ export default function CreateAgent() {
             <CardHeader>
               <CardTitle>Profile Information</CardTitle>
               <CardDescription>
-                Update the basic information for this agent
+                Set up the basic information for this agent
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -107,6 +132,67 @@ export default function CreateAgent() {
                     name="profileImageUrl" 
                     value={profileImageUrl} 
                   />
+                </div>
+
+                {/* Visibility Scope */}
+                <div className="space-y-3">
+                  <Label>Visibility</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Control which organizations can see and use this agent.
+                  </p>
+                  <div className="space-y-2">
+                    <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
+                      <input
+                        type="radio"
+                        name="visibilityScopeRadio"
+                        value="organization_only"
+                        checked={visibilityScope === "organization_only"}
+                        onChange={(e) => setVisibilityScope(e.target.value)}
+                        className="mt-0.5"
+                        disabled={isSubmitting}
+                      />
+                      <div>
+                        <div className="font-medium text-sm">This organization only</div>
+                        <div className="text-xs text-muted-foreground">
+                          Only visible at the current organization.
+                        </div>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
+                      <input
+                        type="radio"
+                        name="visibilityScopeRadio"
+                        value="organization_and_descendants"
+                        checked={visibilityScope === "organization_and_descendants"}
+                        onChange={(e) => setVisibilityScope(e.target.value)}
+                        className="mt-0.5"
+                        disabled={isSubmitting}
+                      />
+                      <div>
+                        <div className="font-medium text-sm">This organization and sub-organizations</div>
+                        <div className="text-xs text-muted-foreground">
+                          Visible here and at all sub-organizations below.
+                        </div>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
+                      <input
+                        type="radio"
+                        name="visibilityScopeRadio"
+                        value="descendants_only"
+                        checked={visibilityScope === "descendants_only"}
+                        onChange={(e) => setVisibilityScope(e.target.value)}
+                        className="mt-0.5"
+                        disabled={isSubmitting}
+                      />
+                      <div>
+                        <div className="font-medium text-sm">Sub-organizations only</div>
+                        <div className="text-xs text-muted-foreground">
+                          Only visible at sub-organizations, not at this organization.
+                        </div>
+                      </div>
+                    </label>
+                  </div>
                 </div>
 
                 {/* Save Button */}

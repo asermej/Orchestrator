@@ -52,6 +52,8 @@ export default function EditAgent() {
   // Profile state
   const [displayName, setDisplayName] = useState("");
   const [profileImageUrl, setProfileImageUrl] = useState("");
+  const [visibilityScope, setVisibilityScope] = useState("organization_only");
+  const [isInherited, setIsInherited] = useState(false);
 
   // Voice state
   const [voiceName, setVoiceName] = useState<string | null>(null);
@@ -77,6 +79,7 @@ export default function EditAgent() {
       await updateAgent(agentId, {
         displayName: displayName.trim(),
         profileImageUrl: profileImageUrl.trim() || null,
+        visibilityScope,
       });
     },
     {
@@ -115,6 +118,8 @@ export default function EditAgent() {
       setDisplayName(agent.displayName);
       setProfileImageUrl(agent.profileImageUrl || "");
       setVoiceName(agent.voiceName ?? null);
+      setVisibilityScope(agent.visibilityScope || "organization_only");
+      setIsInherited(agent.isInherited ?? false);
     } catch (err) {
       console.error("Error loading agent:", err);
       setError("Failed to load agent. Please try again.");
@@ -234,6 +239,13 @@ export default function EditAgent() {
     }
   };
 
+  // Redirect if this is an inherited agent (not editable from child org)
+  useEffect(() => {
+    if (!isLoading && isInherited) {
+      router.push("/my-agents");
+    }
+  }, [isLoading, isInherited, router]);
+
   if (isUserLoading || isLoading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -242,7 +254,7 @@ export default function EditAgent() {
     );
   }
 
-  if (!user) {
+  if (!user || isInherited) {
     return null;
   }
 
@@ -336,6 +348,67 @@ export default function EditAgent() {
                     disabled={isSaving}
                     uploadAction={uploadImage}
                   />
+                </div>
+
+                {/* Visibility Scope */}
+                <div className="space-y-3">
+                  <Label>Visibility</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Control which organizations can see and use this agent.
+                  </p>
+                  <div className="space-y-2">
+                    <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
+                      <input
+                        type="radio"
+                        name="visibilityScopeRadio"
+                        value="organization_only"
+                        checked={visibilityScope === "organization_only"}
+                        onChange={(e) => setVisibilityScope(e.target.value)}
+                        className="mt-0.5"
+                        disabled={isSaving}
+                      />
+                      <div>
+                        <div className="font-medium text-sm">This organization only</div>
+                        <div className="text-xs text-muted-foreground">
+                          Only visible at the current organization.
+                        </div>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
+                      <input
+                        type="radio"
+                        name="visibilityScopeRadio"
+                        value="organization_and_descendants"
+                        checked={visibilityScope === "organization_and_descendants"}
+                        onChange={(e) => setVisibilityScope(e.target.value)}
+                        className="mt-0.5"
+                        disabled={isSaving}
+                      />
+                      <div>
+                        <div className="font-medium text-sm">This organization and sub-organizations</div>
+                        <div className="text-xs text-muted-foreground">
+                          Visible here and at all sub-organizations below.
+                        </div>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
+                      <input
+                        type="radio"
+                        name="visibilityScopeRadio"
+                        value="descendants_only"
+                        checked={visibilityScope === "descendants_only"}
+                        onChange={(e) => setVisibilityScope(e.target.value)}
+                        className="mt-0.5"
+                        disabled={isSaving}
+                      />
+                      <div>
+                        <div className="font-medium text-sm">Sub-organizations only</div>
+                        <div className="text-xs text-muted-foreground">
+                          Only visible at sub-organizations, not at this organization.
+                        </div>
+                      </div>
+                    </label>
+                  </div>
                 </div>
 
                 {/* Action Buttons */}

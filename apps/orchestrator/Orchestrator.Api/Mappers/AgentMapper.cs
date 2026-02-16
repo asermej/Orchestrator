@@ -12,9 +12,11 @@ public static class AgentMapper
     /// Maps an Agent domain object to an AgentResource for API responses.
     /// </summary>
     /// <param name="agent">The domain Agent object to map</param>
+    /// <param name="isInherited">Whether this agent is inherited from a parent organization</param>
+    /// <param name="ownerOrganizationName">The name of the organization that owns this agent</param>
     /// <returns>An AgentResource object suitable for API responses</returns>
     /// <exception cref="ArgumentNullException">Thrown when agent is null</exception>
-    public static AgentResource ToResource(Agent agent)
+    public static AgentResource ToResource(Agent agent, bool isInherited = false, string? ownerOrganizationName = null)
     {
         ArgumentNullException.ThrowIfNull(agent);
 
@@ -35,7 +37,9 @@ public static class AgentMapper
             VoiceType = agent.VoiceType,
             VoiceName = agent.VoiceName,
             CreatedAt = agent.CreatedAt,
-            UpdatedAt = agent.UpdatedAt
+            UpdatedAt = agent.UpdatedAt,
+            IsInherited = isInherited,
+            OwnerOrganizationName = ownerOrganizationName
         };
     }
 
@@ -43,13 +47,23 @@ public static class AgentMapper
     /// Maps a collection of Agent domain objects to AgentResource objects.
     /// </summary>
     /// <param name="agents">The collection of domain Agent objects to map</param>
+    /// <param name="isInherited">Whether these agents are inherited from parent organizations</param>
+    /// <param name="orgNameLookup">Optional lookup for organization names by ID</param>
     /// <returns>A collection of AgentResource objects suitable for API responses</returns>
     /// <exception cref="ArgumentNullException">Thrown when agents is null</exception>
-    public static IEnumerable<AgentResource> ToResource(IEnumerable<Agent> agents)
+    public static IEnumerable<AgentResource> ToResource(IEnumerable<Agent> agents, bool isInherited = false, IDictionary<Guid, string>? orgNameLookup = null)
     {
         ArgumentNullException.ThrowIfNull(agents);
 
-        return agents.Select(ToResource);
+        return agents.Select(a =>
+        {
+            string? ownerOrgName = null;
+            if (orgNameLookup != null && a.OrganizationId.HasValue)
+            {
+                orgNameLookup.TryGetValue(a.OrganizationId.Value, out ownerOrgName);
+            }
+            return ToResource(a, isInherited, ownerOrgName);
+        });
     }
 
     /// <summary>
@@ -67,6 +81,7 @@ public static class AgentMapper
         {
             GroupId = groupId,
             OrganizationId = createResource.OrganizationId,
+            VisibilityScope = createResource.VisibilityScope ?? AgentVisibilityScope.OrganizationOnly,
             DisplayName = createResource.DisplayName,
             ProfileImageUrl = createResource.ProfileImageUrl,
             SystemPrompt = createResource.SystemPrompt,
@@ -97,7 +112,7 @@ public static class AgentMapper
             Id = existingAgent.Id,
             GroupId = existingAgent.GroupId,
             OrganizationId = existingAgent.OrganizationId,
-            VisibilityScope = existingAgent.VisibilityScope,
+            VisibilityScope = updateResource.VisibilityScope ?? existingAgent.VisibilityScope,
             DisplayName = updateResource.DisplayName ?? existingAgent.DisplayName,
             ProfileImageUrl = updateResource.ProfileImageUrl ?? existingAgent.ProfileImageUrl,
             SystemPrompt = updateResource.SystemPrompt ?? existingAgent.SystemPrompt,

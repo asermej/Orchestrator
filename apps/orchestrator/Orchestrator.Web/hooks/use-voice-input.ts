@@ -42,6 +42,8 @@ export function useVoiceInput({
   const recognitionRef = useRef<any>(null);
   const onStoppedRef = useRef<(() => void) | null>(null);
   const hasTranscriptRef = useRef(false);
+  const isStoppedRef = useRef(false);
+  const stopGuardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioBlobRef = useRef<Blob | null>(null);
@@ -62,6 +64,9 @@ export function useVoiceInput({
 
       // Handle speech recognition results
       recognitionRef.current.onresult = (event: any) => {
+        // Discard any results that arrive after stop was requested
+        if (isStoppedRef.current) return;
+
         let transcript = "";
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const result = event.results[i];
@@ -161,6 +166,11 @@ export function useVoiceInput({
     try {
       setError(null);
       hasTranscriptRef.current = false; // Reset transcript tracking when starting new recording
+      isStoppedRef.current = false; // Allow transcript updates for this new session
+      if (stopGuardTimerRef.current) {
+        clearTimeout(stopGuardTimerRef.current);
+        stopGuardTimerRef.current = null;
+      }
       audioBlobRef.current = null;
       audioChunksRef.current = [];
       recognitionRef.current.start();
@@ -217,7 +227,7 @@ export function useVoiceInput({
       onStoppedRef.current = onStopped;
     }
 
-    // Stop MediaRecorder
+    // Stop MediaRecorder (stream tracks are released in its onstop callback)
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       try {
         mediaRecorderRef.current.stop();
@@ -227,6 +237,8 @@ export function useVoiceInput({
       mediaRecorderRef.current = null;
     }
 
+    // Tell SpeechRecognition to stop — it will process its remaining buffer
+    // and deliver final results via onresult before firing onend.
     try {
       recognitionRef.current.stop();
       setIsRecording(false);
@@ -237,6 +249,18 @@ export function useVoiceInput({
       onStoppedRef.current = null;
       callback?.();
     }
+
+    // Safety net: after a grace period, hard-block any further transcript
+    // updates. This prevents speech spoken well after the stop button
+    // (e.g. on the review page) from leaking into the transcript, while
+    // still giving SpeechRecognition enough time to flush its final buffer.
+    if (stopGuardTimerRef.current) {
+      clearTimeout(stopGuardTimerRef.current);
+    }
+    stopGuardTimerRef.current = setTimeout(() => {
+      isStoppedRef.current = true;
+      stopGuardTimerRef.current = null;
+    }, 1500);
   }, []);
 
   const toggleRecording = useCallback(() => {
@@ -251,9 +275,12 @@ export function useVoiceInput({
     return audioBlobRef.current;
   }, []);
 
-  // Cleanup MediaRecorder on unmount
+  // Cleanup MediaRecorder and timers on unmount
   useEffect(() => {
     return () => {
+      if (stopGuardTimerRef.current) {
+        clearTimeout(stopGuardTimerRef.current);
+      }
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
         try { mediaRecorderRef.current.stop(); } catch (e) { /* ignore */ }
       }

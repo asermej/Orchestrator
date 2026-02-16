@@ -1,6 +1,6 @@
 "use server";
 
-import { apiGet, apiPut, apiDelete } from "@/lib/api-client-server";
+import { apiGet, apiPut, apiDelete, apiPost } from "@/lib/api-client-server";
 
 export interface AgentItem {
   id: string;
@@ -17,10 +17,10 @@ export interface AgentItem {
   voiceProvider?: string | null;
   voiceType?: string | null;
   voiceName?: string | null;
-  voiceCreatedAt?: string | null;
-  voiceCreatedByUserId?: string | null;
   createdAt: string;
   updatedAt?: string | null;
+  isInherited?: boolean;
+  ownerOrganizationName?: string | null;
 }
 
 interface PaginatedResponse {
@@ -31,23 +31,25 @@ interface PaginatedResponse {
 }
 
 /**
- * Fetch agents created by the current user
+ * Fetch agents with optional source filtering (local/inherited).
  */
 export async function fetchMyAgents(
   pageNumber: number = 1,
   pageSize: number = 12,
-  searchTerm?: string
+  searchTerm?: string,
+  source?: "local" | "inherited"
 ): Promise<PaginatedResponse> {
-  // Build query parameters
   const params = new URLSearchParams({
     PageNumber: pageNumber.toString(),
     PageSize: pageSize.toString(),
-    CreatedByMe: "true", // Filter by current user
   });
 
-  // Add search filters if provided
   if (searchTerm && searchTerm.trim() !== "") {
     params.append("DisplayName", searchTerm.trim());
+  }
+
+  if (source) {
+    params.append("Source", source);
   }
 
   const data = await apiGet<PaginatedResponse>(`/Agent?${params.toString()}`);
@@ -72,10 +74,11 @@ export async function updateAgent(
     profileImageUrl?: string | null;
     systemPrompt?: string | null;
     interviewGuidelines?: string | null;
+    visibilityScope?: string;
   }
 ): Promise<AgentItem> {
   const updatedAgent = await apiPut<AgentItem>(`/Agent/${id}`, data);
-  return updatedAgent;
+  return updatedAgent as AgentItem;
 }
 
 /**
@@ -83,4 +86,12 @@ export async function updateAgent(
  */
 export async function deleteAgent(id: string): Promise<void> {
   await apiDelete(`/Agent/${id}`);
+}
+
+/**
+ * Clone an inherited agent into the currently selected organization.
+ */
+export async function cloneAgent(id: string): Promise<AgentItem> {
+  const clonedAgent = await apiPost<AgentItem>(`/Agent/${id}/clone`);
+  return clonedAgent as AgentItem;
 }

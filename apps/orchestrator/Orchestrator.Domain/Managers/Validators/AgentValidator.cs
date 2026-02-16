@@ -19,11 +19,23 @@ internal static class AgentValidator
             errors.Add("GroupId is required.");
         }
 
+        // OrganizationId is required for new agents
+        if (!agent.OrganizationId.HasValue || agent.OrganizationId.Value == Guid.Empty)
+        {
+            errors.Add("OrganizationId is required. Please select an organization.");
+        }
+
         // DisplayName is required
         var displayNameError = ValidatorString.Validate("DisplayName", agent.DisplayName);
         if (displayNameError != null)
         {
             errors.Add(displayNameError);
+        }
+
+        // VisibilityScope must be a valid value
+        if (!AgentVisibilityScope.IsValid(agent.VisibilityScope))
+        {
+            errors.Add($"VisibilityScope must be one of: {string.Join(", ", AgentVisibilityScope.AllValues)}.");
         }
 
         // ProfileImageUrl is optional - only validate format when value is not empty

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- ================================================================== -->
+    <!-- UPDATE AGENT VISIBILITY_SCOPE VALUES AND ADD CHECK CONSTRAINT       -->
+    <!-- ================================================================== -->
+    <!-- This migration:                                                     -->
+    <!--   1. Migrates existing 'owner_only' values to 'organization_only'   -->
+    <!--   2. Updates the column default to 'organization_only'              -->
+    <!--   3. Adds a CHECK constraint for allowed visibility_scope values    -->
+    <!-- ================================================================== -->
+
+    <!-- Step 1: Migrate existing 'owner_only' values to 'organization_only' -->
+    <changeSet id="20260216180000-migrate-visibility-scope-values" author="system">
+        <sql>
+            UPDATE agents
+            SET visibility_scope = 'organization_only'
+            WHERE visibility_scope = 'owner_only';
+        </sql>
+    </changeSet>
+
+    <!-- Step 2: Update the column default -->
+    <changeSet id="20260216180000-update-visibility-scope-default" author="system">
+        <dropDefaultValue tableName="agents" columnName="visibility_scope"/>
+        <addDefaultValue tableName="agents" columnName="visibility_scope" defaultValue="organization_only"/>
+    </changeSet>
+
+    <!-- Step 3: Add CHECK constraint for allowed values -->
+    <changeSet id="20260216180000-add-visibility-scope-check-constraint" author="system">
+        <sql>
+            ALTER TABLE agents
+            ADD CONSTRAINT chk_agents_visibility_scope
+            CHECK (visibility_scope IN ('organization_only', 'organization_and_descendants', 'descendants_only'));
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

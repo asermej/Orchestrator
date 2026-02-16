@@ -21,6 +21,16 @@ public sealed partial class DomainFacade
         return await AgentManager.SearchAgents(groupId, displayName, createdBy, sortBy, pageNumber, pageSize, organizationIds).ConfigureAwait(false);
     }
 
+    public async Task<PaginatedResult<Agent>> SearchLocalAgents(Guid groupId, Guid organizationId, string? displayName, string? sortBy, int pageNumber, int pageSize)
+    {
+        return await AgentManager.SearchLocalAgents(groupId, organizationId, displayName, sortBy, pageNumber, pageSize).ConfigureAwait(false);
+    }
+
+    public async Task<PaginatedResult<Agent>> SearchInheritedAgents(Guid groupId, IReadOnlyList<Guid> ancestorOrgIds, string? displayName, string? sortBy, int pageNumber, int pageSize)
+    {
+        return await AgentManager.SearchInheritedAgents(groupId, ancestorOrgIds, displayName, sortBy, pageNumber, pageSize).ConfigureAwait(false);
+    }
+
     public async Task<Agent> UpdateAgent(Agent agent)
     {
         return await AgentManager.UpdateAgent(agent).ConfigureAwait(false);
@@ -29,5 +39,10 @@ public sealed partial class DomainFacade
     public async Task<bool> DeleteAgent(Guid id)
     {
         return await AgentManager.DeleteAgent(id).ConfigureAwait(false);
+    }
+
+    public async Task<Agent> CloneAgent(Guid agentId, Guid targetOrganizationId, Guid targetGroupId)
+    {
+        return await AgentManager.CloneAgent(agentId, targetOrganizationId, targetGroupId).ConfigureAwait(false);
     }
 }

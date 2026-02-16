@@ -28,4 +28,14 @@ internal sealed partial class DataFacade
     {
         return AgentDataManager.Search(groupId, displayName, createdBy, sortBy, pageNumber, pageSize, organizationIds);
     }
+
+    public Task<PaginatedResult<Agent>> SearchLocalAgents(Guid groupId, Guid organizationId, string? displayName, string? sortBy, int pageNumber, int pageSize)
+    {
+        return AgentDataManager.SearchLocal(groupId, organizationId, displayName, sortBy, pageNumber, pageSize);
+    }
+
+    public Task<PaginatedResult<Agent>> SearchInheritedAgents(Guid groupId, IReadOnlyList<Guid> ancestorOrgIds, string? displayName, string? sortBy, int pageNumber, int pageSize)
+    {
+        return AgentDataManager.SearchInherited(groupId, ancestorOrgIds, displayName, sortBy, pageNumber, pageSize);
+    }
 }

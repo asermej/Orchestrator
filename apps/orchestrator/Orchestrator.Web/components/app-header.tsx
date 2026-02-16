@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, ChevronDown, MapPin } from "lucide-react";
-import { selectOrganization, clearOrganization } from "@/lib/group-context-actions";
+import { selectOrganization } from "@/lib/group-context-actions";
 
 interface GroupInfo {
   id: string;
@@ -90,6 +90,16 @@ export function AppHeader({
   const tree = buildOrgTree(organizations);
   const flatOrgs = flattenTree(tree);
 
+  // Auto-select the first organization when none is selected (matches ATS behavior
+  // where a location is always selected — there is no "All locations" option).
+  const autoSelectDone = useRef(false);
+  useEffect(() => {
+    if (!selectedOrgId && flatOrgs.length > 0 && !autoSelectDone.current) {
+      autoSelectDone.current = true;
+      selectOrganization(flatOrgs[0].id);
+    }
+  }, [selectedOrgId, flatOrgs]);
+
   const selectedOrg = selectedOrgId
     ? organizations.find((o) => o.id === selectedOrgId)
     : null;
@@ -99,18 +109,16 @@ export function AppHeader({
       (selectedOrg.city || selectedOrg.state
         ? ` — ${[selectedOrg.city, selectedOrg.state].filter(Boolean).join(", ")}`
         : "")
-    : organizations.length > 0
-      ? "All locations"
+    : flatOrgs.length > 0
+      ? flatOrgs[0].name +
+        (flatOrgs[0].city || flatOrgs[0].state
+          ? ` — ${[flatOrgs[0].city, flatOrgs[0].state].filter(Boolean).join(", ")}`
+          : "")
       : groupInfo?.name ?? "No group";
 
   const handleSelectOrg = async (orgId: string) => {
     setSwitcherOpen(false);
     await selectOrganization(orgId);
-  };
-
-  const handleClearOrg = async () => {
-    setSwitcherOpen(false);
-    await clearOrganization();
   };
 
   const backToHireologyUrl =
@@ -177,32 +185,8 @@ export function AppHeader({
                       Select a location
                     </span>
                   </div>
-                  {/* "All locations" option - match ATS row styling */}
-                  <button
-                    type="button"
-                    onClick={handleClearOrg}
-                    className={`w-full px-3 py-2 text-left text-xs flex items-center gap-2 transition-colors ${
-                      !selectedOrgId
-                        ? "bg-indigo-50 text-indigo-900"
-                        : "text-slate-700 hover:bg-slate-50"
-                    }`}
-                  >
-                    <span
-                      className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 flex items-center justify-center ${
-                        !selectedOrgId ? "border-indigo-500" : "border-slate-300"
-                      }`}
-                    >
-                      {!selectedOrgId && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                      )}
-                    </span>
-                    <span className={!selectedOrgId ? "font-medium" : ""}>
-                      All locations
-                    </span>
-                  </button>
                   {(flatOrgs.length > 0 || groupInfo) && (
                     <>
-                      <div className="border-t border-slate-100" />
                       {groupInfo && (
                         <div className="px-3 py-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                           {groupInfo.name}
