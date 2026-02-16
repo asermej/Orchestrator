@@ -20,7 +20,7 @@ internal sealed class InterviewConfigurationDataManager
     public async Task<InterviewConfiguration?> GetById(Guid id)
     {
         const string sql = @"
-            SELECT id, organization_id, agent_id, name, description, scoring_rubric, is_active,
+            SELECT id, group_id, organization_id, interview_guide_id, agent_id, name, description, scoring_rubric, is_active,
                    created_at, updated_at, created_by, updated_by, is_deleted, deleted_at, deleted_by
             FROM interview_configurations
             WHERE id = @id AND is_deleted = false";
@@ -32,7 +32,7 @@ internal sealed class InterviewConfigurationDataManager
     public async Task<InterviewConfiguration?> GetByIdWithQuestions(Guid id)
     {
         const string configSql = @"
-            SELECT id, organization_id, agent_id, name, description, scoring_rubric, is_active,
+            SELECT id, group_id, organization_id, interview_guide_id, agent_id, name, description, scoring_rubric, is_active,
                    created_at, updated_at, created_by, updated_by, is_deleted, deleted_at, deleted_by
             FROM interview_configurations
             WHERE id = @id AND is_deleted = false";
@@ -63,9 +63,9 @@ internal sealed class InterviewConfigurationDataManager
         }
 
         const string sql = @"
-            INSERT INTO interview_configurations (id, organization_id, agent_id, name, description, scoring_rubric, is_active, created_by)
-            VALUES (@Id, @OrganizationId, @AgentId, @Name, @Description, @ScoringRubric, @IsActive, @CreatedBy)
-            RETURNING id, organization_id, agent_id, name, description, scoring_rubric, is_active,
+            INSERT INTO interview_configurations (id, group_id, organization_id, interview_guide_id, agent_id, name, description, scoring_rubric, is_active, created_by)
+            VALUES (@Id, @GroupId, @OrganizationId, @InterviewGuideId, @AgentId, @Name, @Description, @ScoringRubric, @IsActive, @CreatedBy)
+            RETURNING id, group_id, organization_id, interview_guide_id, agent_id, name, description, scoring_rubric, is_active,
                       created_at, updated_at, created_by, updated_by, is_deleted, deleted_at, deleted_by";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
@@ -80,12 +80,13 @@ internal sealed class InterviewConfigurationDataManager
             SET
                 name = @Name,
                 description = @Description,
+                interview_guide_id = @InterviewGuideId,
                 scoring_rubric = @ScoringRubric,
                 is_active = @IsActive,
                 updated_at = CURRENT_TIMESTAMP,
                 updated_by = @UpdatedBy
             WHERE id = @Id AND is_deleted = false
-            RETURNING id, organization_id, agent_id, name, description, scoring_rubric, is_active,
+            RETURNING id, group_id, organization_id, interview_guide_id, agent_id, name, description, scoring_rubric, is_active,
                       created_at, updated_at, created_by, updated_by, is_deleted, deleted_at, deleted_by";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
@@ -110,21 +111,28 @@ internal sealed class InterviewConfigurationDataManager
     }
 
     public async Task<PaginatedResult<InterviewConfiguration>> Search(
-        Guid? organizationId, 
+        Guid? groupId, 
         Guid? agentId, 
         string? name, 
         bool? isActive,
         string? sortBy, 
         int pageNumber, 
-        int pageSize)
+        int pageSize,
+        IReadOnlyList<Guid>? organizationIds = null)
     {
         var whereClauses = new List<string>();
         var parameters = new DynamicParameters();
 
-        if (organizationId.HasValue)
+        if (groupId.HasValue)
         {
-            whereClauses.Add("organization_id = @OrganizationId");
-            parameters.Add("OrganizationId", organizationId.Value);
+            whereClauses.Add("group_id = @GroupId");
+            parameters.Add("GroupId", groupId.Value);
+        }
+
+        if (organizationIds != null)
+        {
+            whereClauses.Add("(organization_id IS NULL OR organization_id = ANY(@OrganizationIds))");
+            parameters.Add("OrganizationIds", organizationIds.ToArray());
         }
 
         if (agentId.HasValue)
@@ -163,11 +171,11 @@ internal sealed class InterviewConfigurationDataManager
 
         var offset = (pageNumber - 1) * pageSize;
         var querySql = $@"
-            SELECT ic.id, ic.organization_id, ic.agent_id, ic.name, ic.description, ic.scoring_rubric, ic.is_active,
+            SELECT ic.id, ic.group_id, ic.organization_id, ic.interview_guide_id, ic.agent_id, ic.name, ic.description, ic.scoring_rubric, ic.is_active,
                    ic.created_at, ic.updated_at, ic.created_by, ic.updated_by, ic.is_deleted, ic.deleted_at, ic.deleted_by,
                    (SELECT COUNT(*) FROM interview_configuration_questions icq WHERE icq.interview_configuration_id = ic.id) as question_count
             FROM interview_configurations ic
-            {whereSql.Replace("organization_id", "ic.organization_id").Replace("agent_id", "ic.agent_id").Replace("name", "ic.name").Replace("is_active", "ic.is_active").Replace("is_deleted", "ic.is_deleted")}
+            {whereSql.Replace("group_id", "ic.group_id").Replace("agent_id", "ic.agent_id").Replace("name", "ic.name").Replace("is_active", "ic.is_active").Replace("is_deleted", "ic.is_deleted")}
             ORDER BY {orderByClause.Replace("name", "ic.name").Replace("created_at", "ic.created_at")}
             LIMIT @PageSize OFFSET @Offset";
 

@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { getAccessToken } from '@/lib/auth0';
+import { getGroupId } from '@/lib/group-context';
 import { ApiError, ApiClientError } from '@/lib/api-types';
 
 // Ensure baseUrl always includes /api/v1
@@ -9,10 +10,12 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 const baseUrl = apiUrl.endsWith('/api/v1') ? apiUrl : `${apiUrl}/api/v1`;
 
 /**
- * Internal fetch helper with automatic authentication and error handling
+ * Internal fetch helper with automatic authentication and error handling.
+ * Automatically sends X-Group-Id header from the stored group context cookie.
  */
 async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const accessToken = await getAccessToken();
+  const groupId = await getGroupId();
   
   // Log token availability for debugging
   if (!accessToken) {
@@ -27,6 +30,7 @@ async function apiFetch(url: string, options: RequestInit = {}): Promise<Respons
       ...options.headers,
       'Content-Type': 'application/json',
       ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
+      ...(groupId && { 'X-Group-Id': groupId }),
     },
     cache: 'no-store',
   });
@@ -114,6 +118,7 @@ export async function apiDelete(url: string): Promise<void> {
  */
 export async function apiPostFormData<T>(url: string, formData: FormData): Promise<T | void> {
   const accessToken = await getAccessToken();
+  const groupId = await getGroupId();
   
   const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
   
@@ -121,6 +126,7 @@ export async function apiPostFormData<T>(url: string, formData: FormData): Promi
     method: 'POST',
     headers: {
       ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
+      ...(groupId && { 'X-Group-Id': groupId }),
     },
     body: formData,
     cache: 'no-store',

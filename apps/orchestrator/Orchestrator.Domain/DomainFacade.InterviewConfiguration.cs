@@ -34,15 +34,16 @@ public sealed partial class DomainFacade
     /// Searches for InterviewConfigurations
     /// </summary>
     public async Task<PaginatedResult<InterviewConfiguration>> SearchInterviewConfigurations(
-        Guid? organizationId, 
+        Guid? groupId, 
         Guid? agentId, 
         string? name, 
         bool? isActive,
         string? sortBy, 
         int pageNumber, 
-        int pageSize)
+        int pageSize,
+        IReadOnlyList<Guid>? organizationIds = null)
     {
-        return await InterviewConfigurationManager.SearchConfigurations(organizationId, agentId, name, isActive, sortBy, pageNumber, pageSize).ConfigureAwait(false);
+        return await InterviewConfigurationManager.SearchConfigurations(groupId, agentId, name, isActive, sortBy, pageNumber, pageSize, organizationIds).ConfigureAwait(false);
     }
 
     /// <summary>

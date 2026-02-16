@@ -20,8 +20,8 @@ public sealed partial class DomainFacade : IDisposable
     private AudioCacheManager AudioCacheManager => _audioCacheManager ??= new AudioCacheManager(_serviceLocator);
     
     // New ATS Platform managers
-    private OrganizationManager? _organizationManager;
-    private OrganizationManager OrganizationManager => _organizationManager ??= new OrganizationManager(_serviceLocator);
+    private GroupManager? _groupManager;
+    private GroupManager GroupManager => _groupManager ??= new GroupManager(_serviceLocator);
     private ApplicantManager? _applicantManager;
     private ApplicantManager ApplicantManager => _applicantManager ??= new ApplicantManager(_serviceLocator);
     private JobManager? _jobManager;
@@ -30,6 +30,8 @@ public sealed partial class DomainFacade : IDisposable
     private InterviewManager InterviewManager => _interviewManager ??= new InterviewManager(_serviceLocator);
     private InterviewConfigurationManager? _interviewConfigurationManager;
     private InterviewConfigurationManager InterviewConfigurationManager => _interviewConfigurationManager ??= new InterviewConfigurationManager(_serviceLocator);
+    private InterviewGuideManager? _interviewGuideManager;
+    private InterviewGuideManager InterviewGuideManager => _interviewGuideManager ??= new InterviewGuideManager(_serviceLocator);
     private InterviewInviteManager? _interviewInviteManager;
     private InterviewInviteManager InterviewInviteManager => _interviewInviteManager ??= new InterviewInviteManager(_serviceLocator);
     private CandidateSessionManager? _candidateSessionManager;
@@ -66,11 +68,12 @@ public sealed partial class DomainFacade : IDisposable
             _imageManager?.Dispose();
             _gatewayFacade?.Dispose();
             _audioCacheManager?.Dispose();
-            _organizationManager?.Dispose();
+            _groupManager?.Dispose();
             _applicantManager?.Dispose();
             _jobManager?.Dispose();
             _interviewManager?.Dispose();
             _interviewConfigurationManager?.Dispose();
+            _interviewGuideManager?.Dispose();
             _interviewInviteManager?.Dispose();
             _candidateSessionManager?.Dispose();
             _webhookManager?.Dispose();

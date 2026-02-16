@@ -87,7 +87,7 @@ public class CandidateSessionMiddleware
             var jti = principal.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
             var interviewIdClaim = principal.FindFirst("interview_id")?.Value;
             var inviteIdClaim = principal.FindFirst("invite_id")?.Value;
-            var orgIdClaim = principal.FindFirst("org_id")?.Value;
+            var groupIdClaim = principal.FindFirst("group_id")?.Value;
 
             if (string.IsNullOrEmpty(jti) || string.IsNullOrEmpty(interviewIdClaim))
             {
@@ -104,9 +104,9 @@ public class CandidateSessionMiddleware
             context.Items["InviteId"] = session.InviteId;
             context.Items["CandidateSessionId"] = session.Id;
 
-            if (Guid.TryParse(orgIdClaim, out var orgId))
+            if (Guid.TryParse(groupIdClaim, out var groupId))
             {
-                context.Items["OrganizationId"] = orgId;
+                context.Items["GroupId"] = groupId;
             }
 
             await _next(context);

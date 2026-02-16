@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260215170001-backfill-orchestrator-api-key" author="system"
+               context="development">
+        <comment>
+            Backfill the orchestrator_api_key for existing groups that were created before
+            per-group API key support. Uses the legacy global API key value.
+        </comment>
+        <sql>
+            UPDATE groups
+            SET orchestrator_api_key = 'hireology-ats-key',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE orchestrator_api_key IS NULL
+              AND name = 'Hireology';
+        </sql>
+    </changeSet>
+</databaseChangeLog>

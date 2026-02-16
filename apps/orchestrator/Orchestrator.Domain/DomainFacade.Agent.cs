@@ -16,9 +16,9 @@ public sealed partial class DomainFacade
         return await AgentManager.GetAgentById(id).ConfigureAwait(false);
     }
 
-    public async Task<PaginatedResult<Agent>> SearchAgents(Guid? organizationId, string? displayName, string? createdBy, string? sortBy, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Agent>> SearchAgents(Guid? groupId, string? displayName, string? createdBy, string? sortBy, int pageNumber, int pageSize, IReadOnlyList<Guid>? organizationIds = null)
     {
-        return await AgentManager.SearchAgents(organizationId, displayName, createdBy, sortBy, pageNumber, pageSize).ConfigureAwait(false);
+        return await AgentManager.SearchAgents(groupId, displayName, createdBy, sortBy, pageNumber, pageSize, organizationIds).ConfigureAwait(false);
     }
 
     public async Task<Agent> UpdateAgent(Agent agent)

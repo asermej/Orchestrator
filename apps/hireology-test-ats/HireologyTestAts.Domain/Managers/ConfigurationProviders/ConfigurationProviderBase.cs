@@ -22,6 +22,50 @@ public abstract class ConfigurationProviderBase
         return RetrieveConfigurationSettingValue("HireologyAts:ApiKey") ?? string.Empty;
     }
 
+    public string GetOrchestratorBootstrapSecret()
+    {
+        return RetrieveConfigurationSettingValue("HireologyAts:BootstrapSecret") ?? string.Empty;
+    }
+
+    // --- Gateway Configuration Methods ---
+
+    public string GetGatewayBaseUrl(string integrationName)
+    {
+        // Currently only "Orchestrator" is supported
+        if (string.Equals(integrationName, "Orchestrator", StringComparison.OrdinalIgnoreCase))
+        {
+            return GetOrchestratorBaseUrl();
+        }
+
+        var value = RetrieveConfigurationSettingValue($"Gateways:{integrationName}:BaseUrl");
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ConfigurationSettingMissingException(
+                $"Gateway base URL for '{integrationName}' is not configured");
+        }
+        return value.TrimEnd('/');
+    }
+
+    public string GetGatewayApiKey(string integrationName)
+    {
+        if (string.Equals(integrationName, "Orchestrator", StringComparison.OrdinalIgnoreCase))
+        {
+            return GetOrchestratorApiKey();
+        }
+
+        return RetrieveConfigurationSettingValue($"Gateways:{integrationName}:ApiKey") ?? string.Empty;
+    }
+
+    public int GetGatewayTimeout(string integrationName, int defaultTimeout = 30)
+    {
+        var value = RetrieveConfigurationSettingValue($"Gateways:{integrationName}:Timeout");
+        if (!string.IsNullOrWhiteSpace(value) && int.TryParse(value, out var timeout))
+        {
+            return timeout;
+        }
+        return defaultTimeout;
+    }
+
     private string RetrieveConfigurationSettingValueThrowIfMissing(string key)
     {
         var valueAsRetrieved = RetrieveConfigurationSettingValue(key);

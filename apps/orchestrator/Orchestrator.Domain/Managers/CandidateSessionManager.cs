@@ -167,7 +167,7 @@ internal sealed class CandidateSessionManager : IDisposable
             new Claim("sub", $"candidate:{invite.Id}"),
             new Claim("interview_id", invite.InterviewId.ToString()),
             new Claim("invite_id", invite.Id.ToString()),
-            new Claim("org_id", invite.OrganizationId.ToString()),
+            new Claim("group_id", invite.GroupId.ToString()),
             new Claim(JwtRegisteredClaimNames.Jti, session.Jti),
         };
 

@@ -86,7 +86,7 @@ public static class CandidateMapper
         {
             Id = invite.Id,
             InterviewId = invite.InterviewId,
-            OrganizationId = invite.OrganizationId,
+            GroupId = invite.GroupId,
             ShortCode = invite.ShortCode,
             Status = invite.Status,
             ExpiresAt = invite.ExpiresAt,

@@ -63,7 +63,7 @@ public static class TestDataCleanup
 
             // 4. Organizations (depend on groups)
             TryExecute(connection,
-                "DELETE FROM organizations WHERE name LIKE 'TestOrg_%'");
+                "DELETE FROM organizations WHERE name LIKE 'TestOrg_%' OR group_id IN (SELECT id FROM groups WHERE name LIKE 'TestGroup_%')");
 
             // 5. Groups (root)
             TryExecute(connection,

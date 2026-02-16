@@ -16,9 +16,19 @@ public class InterviewConfigurationResource
     public Guid Id { get; set; }
 
     /// <summary>
-    /// The organization this configuration belongs to
+    /// The group this configuration belongs to
     /// </summary>
-    public Guid OrganizationId { get; set; }
+    public Guid GroupId { get; set; }
+
+    /// <summary>
+    /// The ATS organization this configuration is scoped to (null = group-wide)
+    /// </summary>
+    public Guid? OrganizationId { get; set; }
+
+    /// <summary>
+    /// The interview guide used by this configuration
+    /// </summary>
+    public Guid InterviewGuideId { get; set; }
 
     /// <summary>
     /// The agent that conducts interviews using this configuration
@@ -54,6 +64,11 @@ public class InterviewConfigurationResource
     /// The number of questions in this configuration (for list views)
     /// </summary>
     public int QuestionCount { get; set; }
+
+    /// <summary>
+    /// The interview guide resource (populated when requested)
+    /// </summary>
+    public InterviewGuideResource? InterviewGuide { get; set; }
 
     /// <summary>
     /// The agent resource (populated when requested)
@@ -133,10 +148,21 @@ public class InterviewConfigurationQuestionResource
 public class CreateInterviewConfigurationResource
 {
     /// <summary>
-    /// The organization this configuration belongs to
+    /// The group this configuration belongs to
     /// </summary>
-    [Required(ErrorMessage = "OrganizationId is required")]
-    public Guid OrganizationId { get; set; }
+    [Required(ErrorMessage = "GroupId is required")]
+    public Guid GroupId { get; set; }
+
+    /// <summary>
+    /// The ATS organization this configuration is scoped to (null = group-wide)
+    /// </summary>
+    public Guid? OrganizationId { get; set; }
+
+    /// <summary>
+    /// The interview guide to use for this configuration
+    /// </summary>
+    [Required(ErrorMessage = "InterviewGuideId is required")]
+    public Guid InterviewGuideId { get; set; }
 
     /// <summary>
     /// The agent that conducts interviews using this configuration
@@ -209,6 +235,11 @@ public class CreateInterviewConfigurationQuestionResource
 public class UpdateInterviewConfigurationResource
 {
     /// <summary>
+    /// The interview guide to use
+    /// </summary>
+    public Guid? InterviewGuideId { get; set; }
+
+    /// <summary>
     /// The name of the configuration
     /// </summary>
     public string? Name { get; set; }
@@ -258,9 +289,9 @@ public class AtsInterviewConfigurationResource
 public class SearchInterviewConfigurationRequest : PaginatedRequest
 {
     /// <summary>
-    /// Filter by organization ID
+    /// Filter by group ID
     /// </summary>
-    public Guid? OrganizationId { get; set; }
+    public Guid? GroupId { get; set; }
 
     /// <summary>
     /// Filter by agent ID

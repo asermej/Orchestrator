@@ -17,14 +17,14 @@ internal sealed class InterviewInviteManager : IDisposable
     }
 
     /// <summary>
-    /// Creates an invite for an interview. Resolves the organization via the job.
+    /// Creates an invite for an interview. Resolves the group via the job.
     /// </summary>
-    public async Task<InterviewInvite> CreateInvite(Guid interviewId, Guid organizationId, int maxUses = 3, int expiryDays = 7)
+    public async Task<InterviewInvite> CreateInvite(Guid interviewId, Guid groupId, int maxUses = 3, int expiryDays = 7)
     {
         var invite = new InterviewInvite
         {
             InterviewId = interviewId,
-            OrganizationId = organizationId,
+            GroupId = groupId,
             ShortCode = GenerateShortCode(),
             Status = InviteStatus.Active,
             ExpiresAt = DateTime.UtcNow.AddDays(expiryDays),

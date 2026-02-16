@@ -11,6 +11,7 @@ public static class JobMapper
         return new JobResource
         {
             Id = job.Id,
+            GroupId = job.GroupId,
             OrganizationId = job.OrganizationId,
             ExternalJobId = job.ExternalJobId,
             Title = job.Title,
@@ -28,12 +29,13 @@ public static class JobMapper
         return jobs.Select(ToResource);
     }
 
-    public static Job ToDomain(CreateJobResource resource, Guid organizationId)
+    public static Job ToDomain(CreateJobResource resource, Guid groupId)
     {
         ArgumentNullException.ThrowIfNull(resource);
         return new Job
         {
-            OrganizationId = organizationId,
+            GroupId = groupId,
+            OrganizationId = resource.OrganizationId,
             ExternalJobId = resource.ExternalJobId,
             Title = resource.Title,
             Description = resource.Description,
@@ -48,6 +50,7 @@ public static class JobMapper
         return new Job
         {
             Id = existing.Id,
+            GroupId = existing.GroupId,
             OrganizationId = existing.OrganizationId,
             ExternalJobId = existing.ExternalJobId,
             Title = resource.Title ?? existing.Title,

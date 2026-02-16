@@ -13,7 +13,7 @@ namespace Orchestrator.AcceptanceTests.Domain;
 public class DomainFacadeTestsJob
 {
     private DomainFacade _domainFacade = null!;
-    private Guid _testOrganizationId;
+    private Guid _testGroupId;
 
     private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max];
 
@@ -24,13 +24,13 @@ public class DomainFacadeTestsJob
         var serviceLocator = new ServiceLocatorForAcceptanceTesting();
         _domainFacade = new DomainFacade(serviceLocator);
 
-        var org = await _domainFacade.CreateOrganization(new Organization
+        var group = await _domainFacade.CreateGroup(new Group
         {
             Name = Truncate($"TestOrg_Job_{Guid.NewGuid():N}", 50),
             ApiKey = "",
             IsActive = true
         });
-        _testOrganizationId = org.Id;
+        _testGroupId = group.Id;
     }
 
     [TestCleanup]
@@ -54,7 +54,7 @@ public class DomainFacadeTestsJob
     {
         var job = new Job
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             ExternalJobId = Truncate($"ext_{Guid.NewGuid():N}", 50),
             Title = Truncate($"TestJob{suffix}_{Guid.NewGuid():N}", 80),
             Status = "active",
@@ -71,7 +71,7 @@ public class DomainFacadeTestsJob
     {
         var job = new Job
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             ExternalJobId = Truncate($"ext_{Guid.NewGuid():N}", 50),
             Title = Truncate($"Job_{Guid.NewGuid():N}", 80),
             Status = "active"
@@ -81,7 +81,7 @@ public class DomainFacadeTestsJob
 
         Assert.IsNotNull(result);
         Assert.AreNotEqual(Guid.Empty, result.Id);
-        Assert.AreEqual(job.OrganizationId, result.OrganizationId);
+        Assert.AreEqual(job.GroupId, result.GroupId);
         Assert.AreEqual(job.ExternalJobId, result.ExternalJobId);
         Assert.AreEqual(job.Title, result.Title);
     }
@@ -91,7 +91,7 @@ public class DomainFacadeTestsJob
     {
         var job = new Job
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             ExternalJobId = "",
             Title = "",
             Status = "active"
@@ -125,7 +125,7 @@ public class DomainFacadeTestsJob
     {
         var created = await CreateTestJobAsync();
 
-        var result = await _domainFacade.GetJobByExternalId(_testOrganizationId, created.ExternalJobId);
+        var result = await _domainFacade.GetJobByExternalId(_testGroupId, created.ExternalJobId);
 
         Assert.IsNotNull(result);
         Assert.AreEqual(created.Id, result.Id);
@@ -134,7 +134,7 @@ public class DomainFacadeTestsJob
     [TestMethod]
     public async Task GetJobByExternalId_NonExisting_ReturnsNull()
     {
-        var result = await _domainFacade.GetJobByExternalId(_testOrganizationId, "nonexistent_ext_id_12345");
+        var result = await _domainFacade.GetJobByExternalId(_testGroupId, "nonexistent_ext_id_12345");
         Assert.IsNull(result);
     }
 
@@ -144,7 +144,7 @@ public class DomainFacadeTestsJob
         var externalId = Truncate($"getorcreate_{Guid.NewGuid():N}", 50);
         var title = Truncate($"GetOrCreate_{Guid.NewGuid():N}", 80);
 
-        var result = await _domainFacade.GetOrCreateJob(_testOrganizationId, externalId, title, null, null);
+        var result = await _domainFacade.GetOrCreateJob(_testGroupId, externalId, title, null, null);
 
         Assert.IsNotNull(result);
         Assert.AreNotEqual(Guid.Empty, result.Id);
@@ -159,7 +159,7 @@ public class DomainFacadeTestsJob
         var externalId = created.ExternalJobId;
         var title = created.Title;
 
-        var result = await _domainFacade.GetOrCreateJob(_testOrganizationId, externalId, "Different Title", null, null);
+        var result = await _domainFacade.GetOrCreateJob(_testGroupId, externalId, "Different Title", null, null);
 
         Assert.IsNotNull(result);
         Assert.AreEqual(created.Id, result.Id, "Should return existing job, not create duplicate");
@@ -172,7 +172,7 @@ public class DomainFacadeTestsJob
         var job1 = await CreateTestJobAsync("1");
         var job2 = await CreateTestJobAsync("2");
 
-        var result = await _domainFacade.SearchJobs(_testOrganizationId, null, null, 1, 10);
+        var result = await _domainFacade.SearchJobs(_testGroupId, null, null, 1, 10);
 
         Assert.IsNotNull(result);
         Assert.IsTrue(result.TotalCount >= 2, $"Should find at least 2 jobs, found {result.TotalCount}");
@@ -182,7 +182,7 @@ public class DomainFacadeTestsJob
     [TestMethod]
     public async Task SearchJobs_NoResults_ReturnsEmptyList()
     {
-        var result = await _domainFacade.SearchJobs(_testOrganizationId, "NonExistentTitleXYZ123", null, 1, 10);
+        var result = await _domainFacade.SearchJobs(_testGroupId, "NonExistentTitleXYZ123", null, 1, 10);
 
         Assert.IsNotNull(result);
         Assert.AreEqual(0, result.TotalCount);
@@ -245,7 +245,7 @@ public class DomainFacadeTestsJob
         var updated = await _domainFacade.UpdateJob(retrieved);
         Assert.IsNotNull(updated);
 
-        var searchResult = await _domainFacade.SearchJobs(_testOrganizationId, updated.Title, null, 1, 10);
+        var searchResult = await _domainFacade.SearchJobs(_testGroupId, updated.Title, null, 1, 10);
         Assert.IsNotNull(searchResult);
         Assert.IsTrue(searchResult.TotalCount > 0);
 

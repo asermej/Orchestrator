@@ -2,7 +2,17 @@ import { getAccessToken } from '@/lib/auth0';
 import { ApiError, ApiClientError } from '@/lib/api-types';
 
 /**
- * API client with automatic authentication and error handling
+ * Reads the orchestrator_group_id cookie from document.cookie (client-side).
+ */
+function getGroupIdFromCookie(): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(/(?:^|;\s*)orchestrator_group_id=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+/**
+ * API client with automatic authentication and error handling.
+ * Sends X-Group-Id header from the stored group context cookie.
  */
 export class ApiClient {
   private baseUrl: string;
@@ -16,6 +26,7 @@ export class ApiClient {
    */
   async fetch(url: string, options: RequestInit = {}): Promise<Response> {
     const accessToken = await getAccessToken();
+    const groupId = getGroupIdFromCookie();
     
     const fullUrl = url.startsWith('http') ? url : `${this.baseUrl}${url}`;
     
@@ -25,6 +36,7 @@ export class ApiClient {
         ...options.headers,
         'Content-Type': 'application/json',
         ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
+        ...(groupId && { 'X-Group-Id': groupId }),
       },
     });
     

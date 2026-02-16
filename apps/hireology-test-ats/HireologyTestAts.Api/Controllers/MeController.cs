@@ -84,6 +84,58 @@ public class MeController : ControllerBase
     }
 
     /// <summary>
+    /// Update the current user's profile (name, email).
+    /// </summary>
+    [HttpPut]
+    [ProducesResponseType(typeof(MeResponse), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    public async Task<ActionResult<MeResponse>> UpdateMe([FromBody] UpdateMeResource resource)
+    {
+        var auth0Sub = GetAuth0Sub();
+        if (string.IsNullOrEmpty(auth0Sub)) return Unauthorized();
+
+        var (email, name) = GetEmailAndName();
+
+        var user = await _domainFacade.GetOrCreateUser(auth0Sub, email, name);
+
+        var updates = new User
+        {
+            Email = resource.Email,
+            Name = resource.Name
+        };
+        user = await _domainFacade.UpdateUser(user.Id, updates);
+
+        // Rebuild the full MeResponse so the frontend can update in-place
+        IReadOnlyList<Group> groups;
+        IReadOnlyList<Organization> organizations;
+        if (user.IsSuperadmin)
+        {
+            groups = await _domainFacade.GetGroups(excludeTestData: true);
+            organizations = await _domainFacade.GetOrganizations(excludeTestData: true);
+        }
+        else
+        {
+            groups = await _domainFacade.GetAccessibleGroups(user.Id);
+            organizations = await _domainFacade.GetAccessibleOrganizations(user.Id);
+        }
+
+        var selectedOrganizationId = await _domainFacade.GetSelectedOrganizationId(user.Id);
+        var adminGroupIds = await _domainFacade.GetGroupAdminGroupIds(user.Id);
+
+        return Ok(new MeResponse
+        {
+            User = UserMapper.ToResource(user),
+            IsSuperadmin = user.IsSuperadmin,
+            IsGroupAdmin = adminGroupIds.Count > 0 || user.IsSuperadmin,
+            AdminGroupIds = adminGroupIds,
+            AccessibleGroups = GroupMapper.ToResource(groups),
+            AccessibleOrganizations = OrganizationMapper.ToResource(organizations),
+            CurrentContext = new MeContextResponse { SelectedOrganizationId = selectedOrganizationId }
+        });
+    }
+
+    /// <summary>
     /// Set current context (selected organization). User must have access to the organization.
     /// </summary>
     [HttpPut("context")]

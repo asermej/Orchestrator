@@ -25,14 +25,14 @@ internal sealed class JobManager : IDisposable
         return await DataFacade.GetJobById(id).ConfigureAwait(false);
     }
 
-    public async Task<Job?> GetJobByExternalId(Guid organizationId, string externalJobId)
+    public async Task<Job?> GetJobByExternalId(Guid groupId, string externalJobId)
     {
-        return await DataFacade.GetJobByExternalId(organizationId, externalJobId).ConfigureAwait(false);
+        return await DataFacade.GetJobByExternalId(groupId, externalJobId).ConfigureAwait(false);
     }
 
-    public async Task<Job> GetOrCreateJob(Guid organizationId, string externalJobId, string title, string? description, string? location)
+    public async Task<Job> GetOrCreateJob(Guid groupId, string externalJobId, string title, string? description, string? location)
     {
-        var existing = await DataFacade.GetJobByExternalId(organizationId, externalJobId).ConfigureAwait(false);
+        var existing = await DataFacade.GetJobByExternalId(groupId, externalJobId).ConfigureAwait(false);
         if (existing != null)
         {
             return existing;
@@ -40,7 +40,7 @@ internal sealed class JobManager : IDisposable
 
         var job = new Job
         {
-            OrganizationId = organizationId,
+            GroupId = groupId,
             ExternalJobId = externalJobId,
             Title = title,
             Description = description,
@@ -51,9 +51,9 @@ internal sealed class JobManager : IDisposable
         return await DataFacade.AddJob(job).ConfigureAwait(false);
     }
 
-    public async Task<PaginatedResult<Job>> SearchJobs(Guid? organizationId, string? title, string? status, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Job>> SearchJobs(Guid? groupId, string? title, string? status, int pageNumber, int pageSize, IReadOnlyList<Guid>? organizationIds = null)
     {
-        return await DataFacade.SearchJobs(organizationId, title, status, pageNumber, pageSize).ConfigureAwait(false);
+        return await DataFacade.SearchJobs(groupId, title, status, pageNumber, pageSize, organizationIds).ConfigureAwait(false);
     }
 
     public async Task<Job> UpdateJob(Job job)

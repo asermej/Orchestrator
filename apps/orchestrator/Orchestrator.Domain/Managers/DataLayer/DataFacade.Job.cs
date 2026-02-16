@@ -14,9 +14,9 @@ internal sealed partial class DataFacade
         return await JobDataManager.GetById(id);
     }
 
-    public async Task<Job?> GetJobByExternalId(Guid organizationId, string externalJobId)
+    public async Task<Job?> GetJobByExternalId(Guid groupId, string externalJobId)
     {
-        return await JobDataManager.GetByExternalId(organizationId, externalJobId);
+        return await JobDataManager.GetByExternalId(groupId, externalJobId);
     }
 
     public Task<Job> UpdateJob(Job job)
@@ -29,8 +29,8 @@ internal sealed partial class DataFacade
         return JobDataManager.Delete(id);
     }
 
-    public Task<PaginatedResult<Job>> SearchJobs(Guid? organizationId, string? title, string? status, int pageNumber, int pageSize)
+    public Task<PaginatedResult<Job>> SearchJobs(Guid? groupId, string? title, string? status, int pageNumber, int pageSize, IReadOnlyList<Guid>? organizationIds = null)
     {
-        return JobDataManager.Search(organizationId, title, status, pageNumber, pageSize);
+        return JobDataManager.Search(groupId, title, status, pageNumber, pageSize, organizationIds);
     }
 }

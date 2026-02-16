@@ -13,9 +13,9 @@ internal static class ApplicantValidator
     {
         var errors = new List<string>();
 
-        if (applicant.OrganizationId == Guid.Empty)
+        if (applicant.GroupId == Guid.Empty)
         {
-            errors.Add("OrganizationId is required.");
+            errors.Add("GroupId is required.");
         }
 
         var externalIdError = ValidatorString.Validate("ExternalApplicantId", applicant.ExternalApplicantId);

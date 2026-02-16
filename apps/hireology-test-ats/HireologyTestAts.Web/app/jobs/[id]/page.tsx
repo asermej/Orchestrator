@@ -372,9 +372,7 @@ export default function JobDetailPage() {
             currentIndex={selectedIndex}
             onNavigate={(id) => setSelectedApplicantId(id)}
             onClose={() => setSelectedApplicantId(null)}
-            onSendInterview={(a) => {
-              setSendModalApplicant(a);
-            }}
+            onInterviewSent={handleInterviewSent}
             onRefreshInvite={handleRefreshInvite}
           />
         );

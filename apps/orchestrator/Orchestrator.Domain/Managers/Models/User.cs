@@ -25,4 +25,7 @@ public class User : Entity
 
     [Column("profile_image_url")]
     public string? ProfileImageUrl { get; set; }
+
+    [Column("external_user_id")]
+    public Guid? ExternalUserId { get; set; }
 } 

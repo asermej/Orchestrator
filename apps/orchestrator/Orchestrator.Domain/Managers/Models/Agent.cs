@@ -8,8 +8,11 @@ namespace Orchestrator.Domain;
 [Table("agents")]
 public class Agent : Entity
 {
+    [Column("group_id")]
+    public Guid GroupId { get; set; }
+
     [Column("organization_id")]
-    public Guid OrganizationId { get; set; }
+    public Guid? OrganizationId { get; set; }
 
     [Column("display_name")]
     public string DisplayName { get; set; } = string.Empty;
@@ -40,4 +43,7 @@ public class Agent : Entity
 
     [Column("voice_name")]
     public string? VoiceName { get; set; }
+
+    [Column("visibility_scope")]
+    public string VisibilityScope { get; set; } = "owner_only";
 }

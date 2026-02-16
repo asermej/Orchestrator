@@ -24,8 +24,8 @@ internal sealed partial class DataFacade
         return AgentDataManager.Delete(id);
     }
 
-    public Task<PaginatedResult<Agent>> SearchAgents(Guid? organizationId, string? displayName, string? createdBy, string? sortBy, int pageNumber, int pageSize)
+    public Task<PaginatedResult<Agent>> SearchAgents(Guid? groupId, string? displayName, string? createdBy, string? sortBy, int pageNumber, int pageSize, IReadOnlyList<Guid>? organizationIds = null)
     {
-        return AgentDataManager.Search(organizationId, displayName, createdBy, sortBy, pageNumber, pageSize);
+        return AgentDataManager.Search(groupId, displayName, createdBy, sortBy, pageNumber, pageSize, organizationIds);
     }
 }

@@ -8,8 +8,11 @@ namespace Orchestrator.Domain;
 [Table("applicants")]
 public class Applicant : Entity
 {
+    [Column("group_id")]
+    public Guid GroupId { get; set; }
+
     [Column("organization_id")]
-    public Guid OrganizationId { get; set; }
+    public Guid? OrganizationId { get; set; }
 
     [Column("external_applicant_id")]
     public string ExternalApplicantId { get; set; } = string.Empty;

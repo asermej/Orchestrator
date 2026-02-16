@@ -25,14 +25,14 @@ internal sealed class ApplicantManager : IDisposable
         return await DataFacade.GetApplicantById(id).ConfigureAwait(false);
     }
 
-    public async Task<Applicant?> GetApplicantByExternalId(Guid organizationId, string externalApplicantId)
+    public async Task<Applicant?> GetApplicantByExternalId(Guid groupId, string externalApplicantId)
     {
-        return await DataFacade.GetApplicantByExternalId(organizationId, externalApplicantId).ConfigureAwait(false);
+        return await DataFacade.GetApplicantByExternalId(groupId, externalApplicantId).ConfigureAwait(false);
     }
 
-    public async Task<Applicant> GetOrCreateApplicant(Guid organizationId, string externalApplicantId, string? firstName, string? lastName, string? email, string? phone)
+    public async Task<Applicant> GetOrCreateApplicant(Guid groupId, string externalApplicantId, string? firstName, string? lastName, string? email, string? phone)
     {
-        var existing = await DataFacade.GetApplicantByExternalId(organizationId, externalApplicantId).ConfigureAwait(false);
+        var existing = await DataFacade.GetApplicantByExternalId(groupId, externalApplicantId).ConfigureAwait(false);
         if (existing != null)
         {
             return existing;
@@ -40,7 +40,7 @@ internal sealed class ApplicantManager : IDisposable
 
         var applicant = new Applicant
         {
-            OrganizationId = organizationId,
+            GroupId = groupId,
             ExternalApplicantId = externalApplicantId,
             FirstName = firstName,
             LastName = lastName,
@@ -52,9 +52,9 @@ internal sealed class ApplicantManager : IDisposable
         return await DataFacade.AddApplicant(applicant).ConfigureAwait(false);
     }
 
-    public async Task<PaginatedResult<Applicant>> SearchApplicants(Guid? organizationId, string? email, string? name, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Applicant>> SearchApplicants(Guid? groupId, string? email, string? name, int pageNumber, int pageSize, IReadOnlyList<Guid>? organizationIds = null)
     {
-        return await DataFacade.SearchApplicants(organizationId, email, name, pageNumber, pageSize).ConfigureAwait(false);
+        return await DataFacade.SearchApplicants(groupId, email, name, pageNumber, pageSize, organizationIds).ConfigureAwait(false);
     }
 
     public async Task<Applicant> UpdateApplicant(Applicant applicant)

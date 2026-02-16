@@ -11,6 +11,7 @@ public static class ApplicantMapper
         return new ApplicantResource
         {
             Id = applicant.Id,
+            GroupId = applicant.GroupId,
             OrganizationId = applicant.OrganizationId,
             ExternalApplicantId = applicant.ExternalApplicantId,
             FirstName = applicant.FirstName,
@@ -28,12 +29,13 @@ public static class ApplicantMapper
         return applicants.Select(ToResource);
     }
 
-    public static Applicant ToDomain(CreateApplicantResource resource, Guid organizationId)
+    public static Applicant ToDomain(CreateApplicantResource resource, Guid groupId)
     {
         ArgumentNullException.ThrowIfNull(resource);
         return new Applicant
         {
-            OrganizationId = organizationId,
+            GroupId = groupId,
+            OrganizationId = resource.OrganizationId,
             ExternalApplicantId = resource.ExternalApplicantId,
             FirstName = resource.FirstName,
             LastName = resource.LastName,
@@ -49,6 +51,7 @@ public static class ApplicantMapper
         return new Applicant
         {
             Id = existing.Id,
+            GroupId = existing.GroupId,
             OrganizationId = existing.OrganizationId,
             ExternalApplicantId = existing.ExternalApplicantId,
             FirstName = resource.FirstName ?? existing.FirstName,

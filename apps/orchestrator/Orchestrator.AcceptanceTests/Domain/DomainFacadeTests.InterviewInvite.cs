@@ -7,14 +7,14 @@ namespace Orchestrator.AcceptanceTests.Domain;
 
 /// <summary>
 /// Tests for InterviewInvite and CandidateSession operations using real DomainFacade.
-/// Depends on Organization, Agent, Job, Applicant, Interview.
+/// Depends on Group, Agent, Job, Applicant, Interview.
 /// Cleanup: centralized SQL cleanup in TestInitialize/TestCleanup via TestDataCleanup.
 /// </summary>
 [TestClass]
 public class DomainFacadeTestsInterviewInvite
 {
     private DomainFacade _domainFacade = null!;
-    private Guid _testOrganizationId;
+    private Guid _testGroupId;
     private Guid _testAgentId;
     private Guid _testJobId;
     private Guid _testApplicantId;
@@ -30,17 +30,17 @@ public class DomainFacadeTestsInterviewInvite
         _domainFacade = new DomainFacade(serviceLocator);
 
         // Create prerequisite entities
-        var org = await _domainFacade.CreateOrganization(new Organization
+        var group = await _domainFacade.CreateGroup(new Group
         {
             Name = Truncate($"TestOrg_Invite_{Guid.NewGuid():N}", 50),
             ApiKey = "",
             IsActive = true
         });
-        _testOrganizationId = org.Id;
+        _testGroupId = group.Id;
 
         var agent = await _domainFacade.CreateAgent(new Agent
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             DisplayName = Truncate($"TestAgent_Invite_{Guid.NewGuid():N}", 80),
             ProfileImageUrl = null
         });
@@ -48,7 +48,7 @@ public class DomainFacadeTestsInterviewInvite
 
         var job = await _domainFacade.CreateJob(new Job
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             ExternalJobId = Truncate($"ext_job_{Guid.NewGuid():N}", 50),
             Title = Truncate($"TestJob_Invite_{Guid.NewGuid():N}", 80),
             Status = "active"
@@ -57,7 +57,7 @@ public class DomainFacadeTestsInterviewInvite
 
         var applicant = await _domainFacade.CreateApplicant(new Applicant
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             ExternalApplicantId = Truncate($"ext_app_{Guid.NewGuid():N}", 50),
             FirstName = "Invite",
             LastName = "Test",
@@ -101,13 +101,13 @@ public class DomainFacadeTestsInterviewInvite
     {
         // Act
         var invite = await _domainFacade.CreateInterviewInvite(
-            _testInterviewId, _testOrganizationId, maxUses: 3, expiryDays: 7);
+            _testInterviewId, _testGroupId, maxUses: 3, expiryDays: 7);
 
         // Assert
         Assert.IsNotNull(invite, "Invite should be created");
         Assert.AreNotEqual(Guid.Empty, invite.Id);
         Assert.AreEqual(_testInterviewId, invite.InterviewId);
-        Assert.AreEqual(_testOrganizationId, invite.OrganizationId);
+        Assert.AreEqual(_testGroupId, invite.GroupId);
         Assert.IsFalse(string.IsNullOrEmpty(invite.ShortCode), "ShortCode should not be empty");
         Assert.AreEqual(12, invite.ShortCode.Length, "ShortCode should be 12 characters");
         Assert.AreEqual(InviteStatus.Active, invite.Status);
@@ -121,7 +121,7 @@ public class DomainFacadeTestsInterviewInvite
     {
         // Act & Assert
         await Assert.ThrowsExceptionAsync<InviteValidationException>(() =>
-            _domainFacade.CreateInterviewInvite(Guid.Empty, _testOrganizationId),
+            _domainFacade.CreateInterviewInvite(Guid.Empty, _testGroupId),
             "Should throw validation exception for empty interview ID");
     }
 
@@ -132,7 +132,7 @@ public class DomainFacadeTestsInterviewInvite
     {
         // Arrange
         var created = await _domainFacade.CreateInterviewInvite(
-            _testInterviewId, _testOrganizationId);
+            _testInterviewId, _testGroupId);
 
         // Act
         var result = await _domainFacade.GetInterviewInviteById(created.Id);
@@ -147,7 +147,7 @@ public class DomainFacadeTestsInterviewInvite
     {
         // Arrange
         var created = await _domainFacade.CreateInterviewInvite(
-            _testInterviewId, _testOrganizationId);
+            _testInterviewId, _testGroupId);
 
         // Act
         var result = await _domainFacade.GetInterviewInviteByShortCode(created.ShortCode);
@@ -172,7 +172,7 @@ public class DomainFacadeTestsInterviewInvite
     {
         // Arrange
         var created = await _domainFacade.CreateInterviewInvite(
-            _testInterviewId, _testOrganizationId);
+            _testInterviewId, _testGroupId);
 
         // Act
         var result = await _domainFacade.GetInterviewInviteByInterviewId(_testInterviewId);
@@ -189,7 +189,7 @@ public class DomainFacadeTestsInterviewInvite
     {
         // Arrange
         var invite = await _domainFacade.CreateInterviewInvite(
-            _testInterviewId, _testOrganizationId);
+            _testInterviewId, _testGroupId);
 
         // Act
         var revoked = await _domainFacade.RevokeInterviewInvite(invite.Id, "test-admin");
@@ -217,7 +217,7 @@ public class DomainFacadeTestsInterviewInvite
     {
         // Arrange
         var invite = await _domainFacade.CreateInterviewInvite(
-            _testInterviewId, _testOrganizationId);
+            _testInterviewId, _testGroupId);
 
         // Act
         var consumed = await _domainFacade.ConsumeInterviewInvite(invite.Id);
@@ -234,7 +234,7 @@ public class DomainFacadeTestsInterviewInvite
     {
         // Arrange
         var invite = await _domainFacade.CreateInterviewInvite(
-            _testInterviewId, _testOrganizationId);
+            _testInterviewId, _testGroupId);
 
         // Act
         var result = await _domainFacade.DeleteInterviewInvite(invite.Id);
@@ -252,7 +252,7 @@ public class DomainFacadeTestsInterviewInvite
     {
         // Arrange
         var invite = await _domainFacade.CreateInterviewInvite(
-            _testInterviewId, _testOrganizationId);
+            _testInterviewId, _testGroupId);
 
         // Act
         var result = await _domainFacade.RedeemInterviewInvite(
@@ -287,7 +287,7 @@ public class DomainFacadeTestsInterviewInvite
     {
         // Arrange
         var invite = await _domainFacade.CreateInterviewInvite(
-            _testInterviewId, _testOrganizationId);
+            _testInterviewId, _testGroupId);
         await _domainFacade.RevokeInterviewInvite(invite.Id);
 
         // Act & Assert
@@ -301,7 +301,7 @@ public class DomainFacadeTestsInterviewInvite
     {
         // Arrange - create invite with max 1 use
         var invite = await _domainFacade.CreateInterviewInvite(
-            _testInterviewId, _testOrganizationId, maxUses: 1);
+            _testInterviewId, _testGroupId, maxUses: 1);
 
         // First redemption should succeed
         await _domainFacade.RedeemInterviewInvite(invite.ShortCode, null, null);
@@ -317,7 +317,7 @@ public class DomainFacadeTestsInterviewInvite
     {
         // Arrange - create invite with max 3 uses
         var invite = await _domainFacade.CreateInterviewInvite(
-            _testInterviewId, _testOrganizationId, maxUses: 3);
+            _testInterviewId, _testGroupId, maxUses: 3);
 
         // Act - redeem twice
         var result1 = await _domainFacade.RedeemInterviewInvite(invite.ShortCode, "1.1.1.1", null);
@@ -341,7 +341,7 @@ public class DomainFacadeTestsInterviewInvite
     {
         // Arrange
         var invite = await _domainFacade.CreateInterviewInvite(
-            _testInterviewId, _testOrganizationId);
+            _testInterviewId, _testGroupId);
         var redeemResult = await _domainFacade.RedeemInterviewInvite(invite.ShortCode, null, null);
 
         // Act
@@ -369,7 +369,7 @@ public class DomainFacadeTestsInterviewInvite
     {
         // 1. Create invite
         var invite = await _domainFacade.CreateInterviewInvite(
-            _testInterviewId, _testOrganizationId);
+            _testInterviewId, _testGroupId);
         Assert.AreEqual(InviteStatus.Active, invite.Status);
 
         // 2. Redeem invite (candidate clicks link)

@@ -13,7 +13,7 @@ namespace Orchestrator.AcceptanceTests.Domain;
 public class DomainFacadeTestsAgent
 {
     private DomainFacade _domainFacade = null!;
-    private Guid _testOrganizationId;
+    private Guid _testGroupId;
 
     [TestInitialize]
     public async Task TestInitialize()
@@ -22,12 +22,12 @@ public class DomainFacadeTestsAgent
         var serviceLocator = new ServiceLocatorForAcceptanceTesting();
         _domainFacade = new DomainFacade(serviceLocator);
 
-        // Create a test organization for agent tests
-        var testOrg = await _domainFacade.CreateOrganization(new Organization
+        // Create a test group for agent tests
+        var testGroup = await _domainFacade.CreateGroup(new Group
         {
             Name = $"TestOrg_{Guid.NewGuid():N}"
         });
-        _testOrganizationId = testOrg.Id;
+        _testGroupId = testGroup.Id;
     }
 
     [TestCleanup]
@@ -54,7 +54,7 @@ public class DomainFacadeTestsAgent
     {
         var agent = new Agent
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             DisplayName = $"TestDisplay{suffix}_{Guid.NewGuid():N}",
             ProfileImageUrl = null
         };
@@ -70,7 +70,7 @@ public class DomainFacadeTestsAgent
         // Arrange
         var agent = new Agent
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             DisplayName = $"JohnDoe_{Guid.NewGuid():N}",
             ProfileImageUrl = "https://example.com/image.jpg"
         };
@@ -91,7 +91,7 @@ public class DomainFacadeTestsAgent
         // Arrange - Only display name is required
         var agent = new Agent
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             DisplayName = $"Yoda_{Guid.NewGuid():N}",
             ProfileImageUrl = null
         };
@@ -111,7 +111,7 @@ public class DomainFacadeTestsAgent
         // Arrange - Agent with empty required DisplayName
         var agent = new Agent
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             DisplayName = "", // Required field empty
             ProfileImageUrl = null
         };
@@ -131,7 +131,7 @@ public class DomainFacadeTestsAgent
         // Create second agent with same display name
         var secondAgent = new Agent
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             DisplayName = firstAgent.DisplayName, // Same display name
             ProfileImageUrl = null
         };
@@ -148,7 +148,7 @@ public class DomainFacadeTestsAgent
         // Arrange - Agent with invalid URL format
         var agent = new Agent
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             DisplayName = $"TestDisplay_{Guid.NewGuid():N}",
             ProfileImageUrl = "not-a-valid-url" // Invalid URL format
         };
@@ -195,14 +195,14 @@ public class DomainFacadeTestsAgent
         
         var agent1 = new Agent
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             DisplayName = $"{uniquePrefix}_1"
         };
         var created1 = await _domainFacade.CreateAgent(agent1);
         
         var agent2 = new Agent
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             DisplayName = $"{uniquePrefix}_2"
         };
         var created2 = await _domainFacade.CreateAgent(agent2);
@@ -317,7 +317,7 @@ public class DomainFacadeTestsAgent
         var uniquePrefix = $"Lifecycle_{Guid.NewGuid():N}";
         var agent = new Agent
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             DisplayName = uniquePrefix
         };
         var created = await _domainFacade.CreateAgent(agent);

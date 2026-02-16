@@ -7,23 +7,26 @@ public sealed partial class DomainFacade : IDisposable
     private bool _disposed;
     private readonly ServiceLocatorBase _serviceLocator;
 
+    private GatewayFacade? _gatewayFacade;
+    private GatewayFacade GatewayFacade => _gatewayFacade ??= new GatewayFacade(_serviceLocator);
+
     private GroupManager? _groupManager;
-    private GroupManager GroupManager => _groupManager ??= new GroupManager(_serviceLocator);
+    private GroupManager GroupManager => _groupManager ??= new GroupManager(_serviceLocator, GatewayFacade);
 
     private OrganizationManager? _organizationManager;
     private OrganizationManager OrganizationManager => _organizationManager ??= new OrganizationManager(_serviceLocator);
 
     private JobManager? _jobManager;
-    private JobManager JobManager => _jobManager ??= new JobManager(_serviceLocator);
+    private JobManager JobManager => _jobManager ??= new JobManager(_serviceLocator, GatewayFacade);
 
     private UserManager? _userManager;
-    private UserManager UserManager => _userManager ??= new UserManager(_serviceLocator);
+    private UserManager UserManager => _userManager ??= new UserManager(_serviceLocator, GatewayFacade);
 
     private ApplicantManager? _applicantManager;
     private ApplicantManager ApplicantManager => _applicantManager ??= new ApplicantManager(_serviceLocator);
 
     private InterviewRequestManager? _interviewRequestManager;
-    private InterviewRequestManager InterviewRequestManager => _interviewRequestManager ??= new InterviewRequestManager(_serviceLocator);
+    private InterviewRequestManager InterviewRequestManager => _interviewRequestManager ??= new InterviewRequestManager(_serviceLocator, GatewayFacade);
 
     public DomainFacade() : this(new ServiceLocator()) { }
 
@@ -36,6 +39,7 @@ public sealed partial class DomainFacade : IDisposable
     {
         if (disposing && !_disposed)
         {
+            _gatewayFacade?.Dispose();
             _groupManager?.Dispose();
             _organizationManager?.Dispose();
             _jobManager?.Dispose();

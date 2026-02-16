@@ -5,6 +5,7 @@ using Orchestrator.Domain;
 using Orchestrator.Api.ResourcesModels;
 using Orchestrator.Api.Mappers;
 using Orchestrator.Api.Common;
+using Orchestrator.Api.Middleware;
 
 namespace Orchestrator.Api.Controllers;
 
@@ -28,6 +29,9 @@ public class AgentController : ControllerBase
         _cache = cache;
     }
 
+    private UserContext? GetUserContext()
+        => HttpContext.Items.TryGetValue("UserContext", out var ctx) ? ctx as UserContext : null;
+
     /// <summary>
     /// Creates a new agent
     /// </summary>
@@ -40,10 +44,10 @@ public class AgentController : ControllerBase
     [ProducesResponseType(400)]
     public async Task<ActionResult<AgentResource>> Create([FromBody] CreateAgentResource resource)
     {
-        // Resolve organization ID - use provided or get/create default
-        var organizationId = resource.OrganizationId ?? await GetOrCreateDefaultOrganizationAsync();
+        // Resolve group ID - use provided or get/create default
+        var groupId = resource.GroupId ?? await GetOrCreateDefaultGroupAsync();
         
-        var agent = AgentMapper.ToDomain(resource, organizationId);
+        var agent = AgentMapper.ToDomain(resource, groupId);
         var createdAgent = await _domainFacade.CreateAgent(agent);
 
         var response = AgentMapper.ToResource(createdAgent);
@@ -52,26 +56,26 @@ public class AgentController : ControllerBase
     }
 
     /// <summary>
-    /// Gets or creates a default organization for agents when none is specified
+    /// Gets or creates a default group for agents when none is specified
     /// </summary>
-    private async Task<Guid> GetOrCreateDefaultOrganizationAsync()
+    private async Task<Guid> GetOrCreateDefaultGroupAsync()
     {
-        const string defaultOrgName = "Default Organization";
+        const string defaultGroupName = "Default Group";
         
-        // Search for existing default organization
-        var existingOrgs = await _domainFacade.SearchOrganizations(defaultOrgName, true, 1, 1);
-        if (existingOrgs.Items.Any())
+        // Search for existing default group
+        var existingGroups = await _domainFacade.SearchGroups(defaultGroupName, true, 1, 1);
+        if (existingGroups.Items.Any())
         {
-            return existingOrgs.Items.First().Id;
+            return existingGroups.Items.First().Id;
         }
         
-        // Create default organization if it doesn't exist
-        var defaultOrg = new Organization
+        // Create default group if it doesn't exist
+        var defaultGroup = new Group
         {
-            Name = defaultOrgName,
+            Name = defaultGroupName,
             IsActive = true
         };
-        var created = await _domainFacade.CreateOrganization(defaultOrg);
+        var created = await _domainFacade.CreateGroup(defaultGroup);
         return created.Id;
     }
 
@@ -108,13 +112,21 @@ public class AgentController : ControllerBase
     [ProducesResponseType(typeof(PaginatedResponse<AgentResource>), 200)]
     public async Task<ActionResult<PaginatedResponse<AgentResource>>> Search([FromQuery] SearchAgentRequest request)
     {
+        // Apply organization filtering from user context if available
+        var userContext = GetUserContext();
+        var groupId = request.GroupId ?? userContext?.GroupId;
+        var orgFilter = (userContext is { IsResolved: true, IsSuperadmin: false, IsGroupAdmin: false })
+            ? userContext.AccessibleOrganizationIds
+            : null;
+
         var result = await _domainFacade.SearchAgents(
-            request.OrganizationId,
+            groupId,
             request.DisplayName,
             request.CreatedBy,
             request.SortBy,
             request.PageNumber, 
-            request.PageSize);
+            request.PageSize,
+            orgFilter);
 
         var response = new PaginatedResponse<AgentResource>
         {

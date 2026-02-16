@@ -14,9 +14,9 @@ internal sealed partial class DataFacade
         return await ApplicantDataManager.GetById(id);
     }
 
-    public async Task<Applicant?> GetApplicantByExternalId(Guid organizationId, string externalApplicantId)
+    public async Task<Applicant?> GetApplicantByExternalId(Guid groupId, string externalApplicantId)
     {
-        return await ApplicantDataManager.GetByExternalId(organizationId, externalApplicantId);
+        return await ApplicantDataManager.GetByExternalId(groupId, externalApplicantId);
     }
 
     public Task<Applicant> UpdateApplicant(Applicant applicant)
@@ -29,8 +29,8 @@ internal sealed partial class DataFacade
         return ApplicantDataManager.Delete(id);
     }
 
-    public Task<PaginatedResult<Applicant>> SearchApplicants(Guid? organizationId, string? email, string? name, int pageNumber, int pageSize)
+    public Task<PaginatedResult<Applicant>> SearchApplicants(Guid? groupId, string? email, string? name, int pageNumber, int pageSize, IReadOnlyList<Guid>? organizationIds = null)
     {
-        return ApplicantDataManager.Search(organizationId, email, name, pageNumber, pageSize);
+        return ApplicantDataManager.Search(groupId, email, name, pageNumber, pageSize, organizationIds);
     }
 }

@@ -20,3 +20,9 @@ public class SetContextResource
 {
     public Guid? SelectedOrganizationId { get; set; }
 }
+
+public class UpdateMeResource
+{
+    public string? Name { get; set; }
+    public string? Email { get; set; }
+}

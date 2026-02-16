@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using HireologyTestAts.Api.Auth;
@@ -21,7 +22,9 @@ public class GroupsController : ControllerBase
     }
 
     [HttpGet]
+    [SuperadminRequired]
     [ProducesResponseType(typeof(IReadOnlyList<GroupResource>), 200)]
+    [ProducesResponseType(403)]
     public async Task<ActionResult<IReadOnlyList<GroupResource>>> List()
     {
         var groups = await _domainFacade.GetGroups(excludeTestData: true);
@@ -30,9 +33,25 @@ public class GroupsController : ControllerBase
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(GroupResource), 200)]
+    [ProducesResponseType(403)]
     [ProducesResponseType(404)]
     public async Task<ActionResult<GroupResource>> GetById(Guid id)
     {
+        var auth0Sub = User?.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User?.FindFirstValue("sub");
+        if (string.IsNullOrEmpty(auth0Sub)) return Unauthorized();
+
+        var isSuperadmin = await _domainFacade.IsSuperadminByAuth0Sub(auth0Sub);
+        if (!isSuperadmin)
+        {
+            var email = User?.FindFirstValue(ClaimTypes.Email) ?? User?.FindFirstValue("email");
+            var name = User?.FindFirstValue(ClaimTypes.Name) ?? User?.FindFirstValue("name");
+            var user = await _domainFacade.GetOrCreateUser(auth0Sub, email, name);
+            var isGroupAdmin = await _domainFacade.IsGroupAdmin(user.Id, id);
+            if (!isGroupAdmin)
+                return StatusCode(403, new { Message = "Superadmin or group admin privileges required" });
+        }
+
         var group = await _domainFacade.GetGroupById(id);
         return Ok(GroupMapper.ToResource(group));
     }

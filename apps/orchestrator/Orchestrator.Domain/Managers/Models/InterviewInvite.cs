@@ -12,8 +12,8 @@ public class InterviewInvite : Entity
     [Column("interview_id")]
     public Guid InterviewId { get; set; }
 
-    [Column("organization_id")]
-    public Guid OrganizationId { get; set; }
+    [Column("group_id")]
+    public Guid GroupId { get; set; }
 
     [Column("short_code")]
     public string ShortCode { get; set; } = string.Empty;

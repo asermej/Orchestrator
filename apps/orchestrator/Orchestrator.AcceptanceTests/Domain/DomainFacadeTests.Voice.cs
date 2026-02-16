@@ -43,15 +43,15 @@ public class DomainFacadeTestsVoice
 
     private async Task<Agent> CreateTestAgentAsync()
     {
-        // Create a test organization first
-        var testOrg = await _domainFacade.CreateOrganization(new Organization
+        // Create a test group first
+        var testGroup = await _domainFacade.CreateGroup(new Group
         {
             Name = $"TestOrg_{Guid.NewGuid():N}"
         });
 
         var agent = new Agent
         {
-            OrganizationId = testOrg.Id,
+            GroupId = testGroup.Id,
             DisplayName = $"TestVoice_{Guid.NewGuid():N}",
             ProfileImageUrl = null
         };

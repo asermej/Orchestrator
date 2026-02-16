@@ -8,8 +8,11 @@ namespace Orchestrator.Domain;
 [Table("jobs")]
 public class Job : Entity
 {
+    [Column("group_id")]
+    public Guid GroupId { get; set; }
+
     [Column("organization_id")]
-    public Guid OrganizationId { get; set; }
+    public Guid? OrganizationId { get; set; }
 
     [Column("external_job_id")]
     public string ExternalJobId { get; set; } = string.Empty;

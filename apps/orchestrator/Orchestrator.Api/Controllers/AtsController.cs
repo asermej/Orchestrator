@@ -21,36 +21,102 @@ public class AtsController : ControllerBase
         _domainFacade = domainFacade;
     }
 
-    private Guid GetOrganizationId()
+    private Guid GetGroupId()
     {
-        if (HttpContext.Items.TryGetValue("OrganizationId", out var orgId) && orgId is Guid id)
+        if (HttpContext.Items.TryGetValue("GroupId", out var groupId) && groupId is Guid id)
         {
             return id;
         }
-        throw new UnauthorizedAccessException("Organization not found in context");
+        throw new UnauthorizedAccessException("Group not found in context");
+    }
+
+    // Group Sync Endpoints
+
+    /// <summary>
+    /// Creates or updates a group by its external (ATS) group ID.
+    /// Authenticated via X-API-Key (existing group) or X-Bootstrap-Secret (first-time setup).
+    /// Returns the Orchestrator group including the API key the ATS should store.
+    /// </summary>
+    [HttpPost("groups")]
+    [ProducesResponseType(typeof(SyncGroupResponseResource), 200)]
+    [ProducesResponseType(typeof(SyncGroupResponseResource), 201)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    public async Task<ActionResult<SyncGroupResponseResource>> SyncGroup([FromBody] SyncGroupResource resource)
+    {
+        if (resource.ExternalGroupId == Guid.Empty)
+        {
+            return BadRequest(new { error = "ExternalGroupId is required" });
+        }
+
+        if (string.IsNullOrWhiteSpace(resource.Name))
+        {
+            return BadRequest(new { error = "Name is required" });
+        }
+
+        var existingGroup = await _domainFacade.GetGroupByExternalGroupId(resource.ExternalGroupId);
+        var group = await _domainFacade.UpsertGroupByExternalId(
+            resource.ExternalGroupId, resource.Name.Trim(), resource.AtsBaseUrl);
+
+        var response = new SyncGroupResponseResource
+        {
+            Id = group.Id,
+            Name = group.Name,
+            ApiKey = group.ApiKey,
+            ExternalGroupId = group.ExternalGroupId!.Value,
+            IsNew = existingGroup == null
+        };
+
+        if (existingGroup == null)
+        {
+            return Created($"/api/v1/ats/groups/{group.Id}", response);
+        }
+        return Ok(response);
     }
 
     // Settings Endpoints
 
     /// <summary>
-    /// Updates the webhook URL for the authenticated organization
+    /// Gets the current webhook URL for the authenticated group
+    /// </summary>
+    [HttpGet("settings/webhook")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    public async Task<ActionResult> GetWebhookUrl()
+    {
+        var groupId = GetGroupId();
+        var group = await _domainFacade.GetGroupById(groupId);
+        if (group == null)
+        {
+            return NotFound("Group not found");
+        }
+
+        return Ok(new
+        {
+            webhookUrl = group.WebhookUrl,
+            configured = !string.IsNullOrEmpty(group.WebhookUrl)
+        });
+    }
+
+    /// <summary>
+    /// Updates the webhook URL for the authenticated group
     /// </summary>
     [HttpPut("settings/webhook")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     public async Task<ActionResult> UpdateWebhookUrl([FromBody] UpdateWebhookResource resource)
     {
-        var organizationId = GetOrganizationId();
-        var organization = await _domainFacade.GetOrganizationById(organizationId);
-        if (organization == null)
+        var groupId = GetGroupId();
+        var group = await _domainFacade.GetGroupById(groupId);
+        if (group == null)
         {
-            return NotFound("Organization not found");
+            return NotFound("Group not found");
         }
 
-        organization.WebhookUrl = resource.WebhookUrl;
-        await _domainFacade.UpdateOrganization(organization);
+        group.WebhookUrl = resource.WebhookUrl;
+        await _domainFacade.UpdateGroup(group);
 
-        return Ok(new { webhookUrl = organization.WebhookUrl });
+        return Ok(new { webhookUrl = group.WebhookUrl });
     }
 
     // Job Endpoints
@@ -64,10 +130,10 @@ public class AtsController : ControllerBase
     [ProducesResponseType(401)]
     public async Task<ActionResult<JobResource>> CreateOrUpdateJob([FromBody] CreateJobResource resource)
     {
-        var organizationId = GetOrganizationId();
+        var groupId = GetGroupId();
 
         // Check if job already exists
-        var existing = await _domainFacade.GetJobByExternalId(organizationId, resource.ExternalJobId);
+        var existing = await _domainFacade.GetJobByExternalId(groupId, resource.ExternalJobId);
         if (existing != null)
         {
             // Update existing job
@@ -78,12 +144,14 @@ public class AtsController : ControllerBase
                 Location = resource.Location
             };
             var updatedJob = JobMapper.ToDomain(update, existing);
+            if (resource.OrganizationId.HasValue)
+                updatedJob.OrganizationId = resource.OrganizationId;
             var updated = await _domainFacade.UpdateJob(updatedJob);
             return Ok(JobMapper.ToResource(updated));
         }
 
         // Create new job
-        var job = JobMapper.ToDomain(resource, organizationId);
+        var job = JobMapper.ToDomain(resource, groupId);
         var created = await _domainFacade.CreateJob(job);
         return Created($"/api/v1/ats/jobs/{created.ExternalJobId}", JobMapper.ToResource(created));
     }
@@ -97,8 +165,8 @@ public class AtsController : ControllerBase
     [ProducesResponseType(401)]
     public async Task<ActionResult<JobResource>> GetJob(string externalJobId)
     {
-        var organizationId = GetOrganizationId();
-        var job = await _domainFacade.GetJobByExternalId(organizationId, externalJobId);
+        var groupId = GetGroupId();
+        var job = await _domainFacade.GetJobByExternalId(groupId, externalJobId);
         if (job == null)
         {
             return NotFound($"Job with external ID {externalJobId} not found");
@@ -114,9 +182,9 @@ public class AtsController : ControllerBase
     [ProducesResponseType(401)]
     public async Task<ActionResult<PaginatedResponse<JobResource>>> SearchJobs([FromQuery] SearchJobRequest request)
     {
-        var organizationId = GetOrganizationId();
+        var groupId = GetGroupId();
         var result = await _domainFacade.SearchJobs(
-            organizationId,
+            groupId,
             request.Title,
             request.Status,
             request.PageNumber,
@@ -140,8 +208,8 @@ public class AtsController : ControllerBase
     [ProducesResponseType(401)]
     public async Task<ActionResult> DeleteJob(string externalJobId)
     {
-        var organizationId = GetOrganizationId();
-        var job = await _domainFacade.GetJobByExternalId(organizationId, externalJobId);
+        var groupId = GetGroupId();
+        var job = await _domainFacade.GetJobByExternalId(groupId, externalJobId);
         if (job == null)
         {
             return NotFound($"Job with external ID {externalJobId} not found");
@@ -161,10 +229,10 @@ public class AtsController : ControllerBase
     [ProducesResponseType(401)]
     public async Task<ActionResult<ApplicantResource>> CreateOrUpdateApplicant([FromBody] CreateApplicantResource resource)
     {
-        var organizationId = GetOrganizationId();
+        var groupId = GetGroupId();
 
         // Check if applicant already exists
-        var existing = await _domainFacade.GetApplicantByExternalId(organizationId, resource.ExternalApplicantId);
+        var existing = await _domainFacade.GetApplicantByExternalId(groupId, resource.ExternalApplicantId);
         if (existing != null)
         {
             // Update existing applicant
@@ -176,12 +244,14 @@ public class AtsController : ControllerBase
                 Phone = resource.Phone
             };
             var updatedApplicant = ApplicantMapper.ToDomain(update, existing);
+            if (resource.OrganizationId.HasValue)
+                updatedApplicant.OrganizationId = resource.OrganizationId;
             var updated = await _domainFacade.UpdateApplicant(updatedApplicant);
             return Ok(ApplicantMapper.ToResource(updated));
         }
 
         // Create new applicant
-        var applicant = ApplicantMapper.ToDomain(resource, organizationId);
+        var applicant = ApplicantMapper.ToDomain(resource, groupId);
         var created = await _domainFacade.CreateApplicant(applicant);
         return Created($"/api/v1/ats/applicants/{created.ExternalApplicantId}", ApplicantMapper.ToResource(created));
     }
@@ -195,8 +265,8 @@ public class AtsController : ControllerBase
     [ProducesResponseType(401)]
     public async Task<ActionResult<ApplicantResource>> GetApplicant(string externalApplicantId)
     {
-        var organizationId = GetOrganizationId();
-        var applicant = await _domainFacade.GetApplicantByExternalId(organizationId, externalApplicantId);
+        var groupId = GetGroupId();
+        var applicant = await _domainFacade.GetApplicantByExternalId(groupId, externalApplicantId);
         if (applicant == null)
         {
             return NotFound($"Applicant with external ID {externalApplicantId} not found");
@@ -212,9 +282,9 @@ public class AtsController : ControllerBase
     [ProducesResponseType(401)]
     public async Task<ActionResult<PaginatedResponse<ApplicantResource>>> SearchApplicants([FromQuery] SearchApplicantRequest request)
     {
-        var organizationId = GetOrganizationId();
+        var groupId = GetGroupId();
         var result = await _domainFacade.SearchApplicants(
-            organizationId,
+            groupId,
             request.Email,
             request.Name,
             request.PageNumber,
@@ -232,16 +302,16 @@ public class AtsController : ControllerBase
     // Agent Endpoints
 
     /// <summary>
-    /// Lists agents available for the authenticated organization
+    /// Lists agents available for the authenticated group
     /// </summary>
     [HttpGet("agents")]
     [ProducesResponseType(typeof(IEnumerable<AtsAgentResource>), 200)]
     [ProducesResponseType(401)]
     public async Task<ActionResult<IEnumerable<AtsAgentResource>>> ListAgents()
     {
-        var organizationId = GetOrganizationId();
+        var groupId = GetGroupId();
         var result = await _domainFacade.SearchAgents(
-            organizationId, null, null, null, 1, 100);
+            groupId, null, null, null, 1, 100);
 
         var resources = result.Items.Select(a => new AtsAgentResource
         {
@@ -256,7 +326,7 @@ public class AtsController : ControllerBase
     // Interview Configuration Endpoints
 
     /// <summary>
-    /// Lists interview configurations available for the authenticated organization.
+    /// Lists interview configurations available for the authenticated group.
     /// Each configuration defines the agent, questions, and scoring rubric for an interview.
     /// </summary>
     [HttpGet("configurations")]
@@ -264,9 +334,9 @@ public class AtsController : ControllerBase
     [ProducesResponseType(401)]
     public async Task<ActionResult<IEnumerable<AtsInterviewConfigurationResource>>> ListConfigurations()
     {
-        var organizationId = GetOrganizationId();
+        var groupId = GetGroupId();
         var result = await _domainFacade.SearchInterviewConfigurations(
-            organizationId, null, null, true, null, 1, 100);
+            groupId, null, null, true, null, 1, 100);
 
         // Fetch agent names for display
         var agentIds = result.Items.Select(c => c.AgentId).Distinct().ToList();
@@ -304,10 +374,10 @@ public class AtsController : ControllerBase
     [ProducesResponseType(401)]
     public async Task<ActionResult<InterviewResource>> CreateInterview([FromBody] CreateInterviewWithApplicantResource resource)
     {
-        var organizationId = GetOrganizationId();
+        var groupId = GetGroupId();
 
         // Get or create job
-        var job = await _domainFacade.GetJobByExternalId(organizationId, resource.ExternalJobId);
+        var job = await _domainFacade.GetJobByExternalId(groupId, resource.ExternalJobId);
         if (job == null)
         {
             return BadRequest($"Job with external ID {resource.ExternalJobId} not found. Create the job first.");
@@ -315,7 +385,7 @@ public class AtsController : ControllerBase
 
         // Get or create applicant
         var applicant = await _domainFacade.GetOrCreateApplicant(
-            organizationId,
+            groupId,
             resource.ExternalApplicantId,
             resource.ApplicantFirstName,
             resource.ApplicantLastName,
@@ -330,18 +400,18 @@ public class AtsController : ControllerBase
         {
             // Use the configuration to determine agent and questions
             var config = await _domainFacade.GetInterviewConfigurationById(interviewConfigurationId.Value);
-            if (config == null || config.OrganizationId != organizationId)
+            if (config == null || config.GroupId != groupId)
             {
-                return BadRequest($"Interview configuration with ID {interviewConfigurationId} not found or does not belong to this organization.");
+                return BadRequest($"Interview configuration with ID {interviewConfigurationId} not found or does not belong to this group.");
             }
             agentId = config.AgentId;
         }
 
-        // Validate agent exists and belongs to organization
+        // Validate agent exists and belongs to group
         var agent = await _domainFacade.GetAgentById(agentId);
-        if (agent == null || agent.OrganizationId != organizationId)
+        if (agent == null || agent.GroupId != groupId)
         {
-            return BadRequest($"Agent with ID {agentId} not found or does not belong to this organization.");
+            return BadRequest($"Agent with ID {agentId} not found or does not belong to this group.");
         }
 
         // Create interview
@@ -359,7 +429,7 @@ public class AtsController : ControllerBase
 
         // Auto-create an invite for the interview so the ATS gets an invite URL
         var invite = await _domainFacade.CreateInterviewInvite(
-            created.Id, organizationId, maxUses: 3, expiryDays: 7);
+            created.Id, groupId, maxUses: 3, expiryDays: 7);
 
         // Return with interview URL and invite info
         var response = InterviewMapper.ToResource(created);
@@ -421,7 +491,7 @@ public class AtsController : ControllerBase
     [ProducesResponseType(401)]
     public async Task<ActionResult> RefreshInvite(Guid id)
     {
-        var organizationId = GetOrganizationId();
+        var groupId = GetGroupId();
         var interview = await _domainFacade.GetInterviewById(id);
         if (interview == null)
         {
@@ -436,7 +506,7 @@ public class AtsController : ControllerBase
         }
 
         // Create a fresh invite
-        var newInvite = await _domainFacade.CreateInterviewInvite(id, organizationId, maxUses: 3, expiryDays: 7);
+        var newInvite = await _domainFacade.CreateInterviewInvite(id, groupId, maxUses: 3, expiryDays: 7);
 
         var inviteResource = CandidateMapper.ToInviteResource(newInvite);
         var inviteUrl = $"http://localhost:3000/i/{newInvite.ShortCode}";

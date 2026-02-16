@@ -67,15 +67,16 @@ internal sealed class InterviewConfigurationManager : IDisposable
     /// Searches for InterviewConfigurations
     /// </summary>
     public async Task<PaginatedResult<InterviewConfiguration>> SearchConfigurations(
-        Guid? organizationId, 
+        Guid? groupId, 
         Guid? agentId, 
         string? name, 
         bool? isActive,
         string? sortBy, 
         int pageNumber, 
-        int pageSize)
+        int pageSize,
+        IReadOnlyList<Guid>? organizationIds = null)
     {
-        return await DataFacade.SearchInterviewConfigurations(organizationId, agentId, name, isActive, sortBy, pageNumber, pageSize).ConfigureAwait(false);
+        return await DataFacade.SearchInterviewConfigurations(groupId, agentId, name, isActive, sortBy, pageNumber, pageSize, organizationIds).ConfigureAwait(false);
     }
 
     /// <summary>

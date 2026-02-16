@@ -116,6 +116,17 @@ public class InterviewRequestController : ControllerBase
     }
 
     /// <summary>
+    /// Gets the current webhook configuration status from Orchestrator
+    /// </summary>
+    [HttpGet("settings/webhook-status")]
+    [ProducesResponseType(200)]
+    public async Task<ActionResult> GetWebhookStatus()
+    {
+        var (configured, webhookUrl) = await _domainFacade.GetWebhookStatus();
+        return Ok(new { configured, webhookUrl });
+    }
+
+    /// <summary>
     /// Configures the webhook URL in Orchestrator so interview results are sent back to this ATS
     /// </summary>
     [HttpPost("settings/configure-webhook")]

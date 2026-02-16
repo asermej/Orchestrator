@@ -91,7 +91,7 @@ public class InterviewInviteResource
 {
     public Guid Id { get; set; }
     public Guid InterviewId { get; set; }
-    public Guid OrganizationId { get; set; }
+    public Guid GroupId { get; set; }
     public string ShortCode { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public DateTime ExpiresAt { get; set; }

@@ -7,15 +7,16 @@ namespace Orchestrator.AcceptanceTests.Domain;
 
 /// <summary>
 /// Tests for InterviewConfiguration operations using real DomainFacade.
-/// Depends on Organization and Agent.
+/// Depends on Group and Agent.
 /// Cleanup: centralized SQL cleanup in TestInitialize/TestCleanup via TestDataCleanup.
 /// </summary>
 [TestClass]
 public class DomainFacadeTestsInterviewConfiguration
 {
     private DomainFacade _domainFacade = null!;
-    private Guid _testOrganizationId;
+    private Guid _testGroupId;
     private Guid _testAgentId;
+    private Guid _testInterviewGuideId;
 
     private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max];
 
@@ -26,21 +27,29 @@ public class DomainFacadeTestsInterviewConfiguration
         var serviceLocator = new ServiceLocatorForAcceptanceTesting();
         _domainFacade = new DomainFacade(serviceLocator);
 
-        var org = await _domainFacade.CreateOrganization(new Organization
+        var group = await _domainFacade.CreateGroup(new Group
         {
             Name = Truncate($"TestOrg_IC_{Guid.NewGuid():N}", 50),
             ApiKey = "",
             IsActive = true
         });
-        _testOrganizationId = org.Id;
+        _testGroupId = group.Id;
 
         var agent = await _domainFacade.CreateAgent(new Agent
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             DisplayName = Truncate($"TestAgent_IC_{Guid.NewGuid():N}", 80),
             ProfileImageUrl = null
         });
         _testAgentId = agent.Id;
+
+        var guide = await _domainFacade.CreateInterviewGuide(new InterviewGuide
+        {
+            GroupId = _testGroupId,
+            Name = Truncate($"TestGuide_IC_{Guid.NewGuid():N}", 80),
+            IsActive = true
+        });
+        _testInterviewGuideId = guide.Id;
     }
 
     [TestCleanup]
@@ -64,7 +73,8 @@ public class DomainFacadeTestsInterviewConfiguration
     {
         var config = new InterviewConfiguration
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
+            InterviewGuideId = _testInterviewGuideId,
             AgentId = _testAgentId,
             Name = Truncate($"TestConfig{suffix}_{Guid.NewGuid():N}", 80),
             Description = null,
@@ -81,7 +91,8 @@ public class DomainFacadeTestsInterviewConfiguration
     {
         var config = new InterviewConfiguration
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
+            InterviewGuideId = _testInterviewGuideId,
             AgentId = _testAgentId,
             Name = Truncate($"Config_{Guid.NewGuid():N}", 80),
             IsActive = true
@@ -100,7 +111,8 @@ public class DomainFacadeTestsInterviewConfiguration
     {
         var config = new InterviewConfiguration
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
+            InterviewGuideId = _testInterviewGuideId,
             AgentId = _testAgentId,
             Name = "", // Required
             IsActive = true
@@ -158,7 +170,7 @@ public class DomainFacadeTestsInterviewConfiguration
         var c1 = await CreateTestInterviewConfigurationAsync("1");
         var c2 = await CreateTestInterviewConfigurationAsync("2");
 
-        var result = await _domainFacade.SearchInterviewConfigurations(_testOrganizationId, _testAgentId, null, null, null, 1, 10);
+        var result = await _domainFacade.SearchInterviewConfigurations(_testGroupId, _testAgentId, null, null, null, 1, 10);
 
         Assert.IsNotNull(result);
         Assert.IsTrue(result.TotalCount >= 2, $"Should find at least 2 configs, found {result.TotalCount}");
@@ -168,7 +180,7 @@ public class DomainFacadeTestsInterviewConfiguration
     [TestMethod]
     public async Task SearchInterviewConfigurations_NoResults_ReturnsEmptyList()
     {
-        var result = await _domainFacade.SearchInterviewConfigurations(_testOrganizationId, _testAgentId, "NonExistentNameXYZ123", null, null, 1, 10);
+        var result = await _domainFacade.SearchInterviewConfigurations(_testGroupId, _testAgentId, "NonExistentNameXYZ123", null, null, 1, 10);
 
         Assert.IsNotNull(result);
         Assert.AreEqual(0, result.TotalCount);
@@ -325,7 +337,7 @@ public class DomainFacadeTestsInterviewConfiguration
         var updated = await _domainFacade.UpdateInterviewConfiguration(retrieved);
         Assert.IsNotNull(updated);
 
-        var searchResult = await _domainFacade.SearchInterviewConfigurations(_testOrganizationId, _testAgentId, updated.Name, null, null, 1, 10);
+        var searchResult = await _domainFacade.SearchInterviewConfigurations(_testGroupId, _testAgentId, updated.Name, null, null, 1, 10);
         Assert.IsNotNull(searchResult);
         Assert.IsTrue(searchResult.TotalCount > 0);
 

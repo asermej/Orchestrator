@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Step 1: Add interview_guide_id column (nullable initially for migration) -->
+    <changeSet id="20260215162701-add-interview-guide-id-column" author="system">
+        <addColumn tableName="interview_configurations">
+            <column name="interview_guide_id" type="uuid">
+                <constraints nullable="true" foreignKeyName="fk_interview_configurations_guide" references="interview_guides(id)"/>
+            </column>
+        </addColumn>
+
+        <createIndex tableName="interview_configurations" indexName="idx_interview_configurations_interview_guide_id">
+            <column name="interview_guide_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Step 2: Data migration - create interview_guides from existing interview_configurations -->
+    <changeSet id="20260215162701-migrate-interview-configurations-to-guides" author="system">
+        <sql splitStatements="false"><![CDATA[
+DO $migrate_guides$
+DECLARE
+    cfg RECORD;
+    new_guide_id uuid;
+    q_rec RECORD;
+BEGIN
+    FOR cfg IN
+        SELECT id, organization_id, name, description, scoring_rubric, is_active,
+               created_at, updated_at, created_by, updated_by
+        FROM interview_configurations
+        WHERE is_deleted = false
+    LOOP
+        new_guide_id := gen_random_uuid();
+        INSERT INTO interview_guides (
+            id, organization_id, name, description,
+            opening_template, closing_template, scoring_rubric,
+            is_active, created_at, updated_at, created_by, updated_by,
+            is_deleted
+        ) VALUES (
+            new_guide_id,
+            cfg.organization_id,
+            cfg.name || ' Guide',
+            cfg.description,
+            'Hello {{applicantName}}! I''m {{agentName}}, and I''ll be conducting your interview today. Let''s get started with our first question.',
+            'Thank you for completing this interview, {{applicantName}}! We appreciate your time and will be in touch soon with next steps. Have a great day!',
+            cfg.scoring_rubric,
+            cfg.is_active,
+            cfg.created_at,
+            cfg.updated_at,
+            cfg.created_by,
+            cfg.updated_by,
+            false
+        );
+
+        FOR q_rec IN
+            SELECT icq.id, icq.question, icq.display_order, icq.scoring_weight, icq.scoring_guidance,
+                   icq.follow_ups_enabled, icq.max_follow_ups, icq.created_at, icq.updated_at
+            FROM interview_configuration_questions icq
+            WHERE icq.interview_configuration_id = cfg.id
+        LOOP
+            INSERT INTO interview_guide_questions (
+                id, interview_guide_id, question, display_order,
+                scoring_weight, scoring_guidance, follow_ups_enabled, max_follow_ups,
+                created_at, updated_at
+            ) VALUES (
+                gen_random_uuid(),
+                new_guide_id,
+                q_rec.question,
+                q_rec.display_order,
+                q_rec.scoring_weight,
+                q_rec.scoring_guidance,
+                q_rec.follow_ups_enabled,
+                q_rec.max_follow_ups,
+                q_rec.created_at,
+                q_rec.updated_at
+            );
+        END LOOP;
+
+        UPDATE interview_configurations
+        SET interview_guide_id = new_guide_id
+        WHERE id = cfg.id;
+    END LOOP;
+END $migrate_guides$;
+        ]]></sql>
+    </changeSet>
+
+    <!-- Step 3: After migration, make interview_guide_id NOT NULL -->
+    <changeSet id="20260215162701-make-interview-guide-id-not-null" author="system">
+        <addNotNullConstraint tableName="interview_configurations" columnName="interview_guide_id" columnDataType="uuid"/>
+    </changeSet>
+
+</databaseChangeLog>

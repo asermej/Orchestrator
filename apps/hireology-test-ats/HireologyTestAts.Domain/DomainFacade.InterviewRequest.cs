@@ -46,18 +46,39 @@ public sealed partial class DomainFacade
         return await InterviewRequestManager.RefreshInvite(interviewRequestId).ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyList<OrchestratorAgent>> GetAgents()
+    /// <summary>
+    /// Gets available agents from Orchestrator for a specific group.
+    /// Pass the group's OrchestratorApiKey; falls back to global config if null.
+    /// </summary>
+    public async Task<IReadOnlyList<OrchestratorAgent>> GetAgents(string? groupApiKey = null)
     {
-        return await InterviewRequestManager.GetAgents().ConfigureAwait(false);
+        return await InterviewRequestManager.GetAgents(groupApiKey).ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyList<OrchestratorInterviewConfiguration>> GetInterviewConfigurations()
+    /// <summary>
+    /// Gets available interview configurations from Orchestrator for a specific group.
+    /// Pass the group's OrchestratorApiKey; falls back to global config if null.
+    /// </summary>
+    public async Task<IReadOnlyList<OrchestratorInterviewConfiguration>> GetInterviewConfigurations(string? groupApiKey = null)
     {
-        return await InterviewRequestManager.GetConfigurations().ConfigureAwait(false);
+        return await InterviewRequestManager.GetConfigurations(groupApiKey).ConfigureAwait(false);
     }
 
-    public async Task<bool> ConfigureWebhookUrl(string webhookUrl)
+    /// <summary>
+    /// Gets the current webhook status from Orchestrator for a specific group.
+    /// Pass the group's OrchestratorApiKey; falls back to global config if null.
+    /// </summary>
+    public async Task<(bool Configured, string? WebhookUrl)> GetWebhookStatus(string? groupApiKey = null)
     {
-        return await InterviewRequestManager.ConfigureWebhookUrl(webhookUrl).ConfigureAwait(false);
+        return await InterviewRequestManager.GetWebhookStatus(groupApiKey).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Configures the webhook URL in Orchestrator for a specific group.
+    /// Pass the group's OrchestratorApiKey; falls back to global config if null.
+    /// </summary>
+    public async Task<bool> ConfigureWebhookUrl(string webhookUrl, string? groupApiKey = null)
+    {
+        return await InterviewRequestManager.ConfigureWebhookUrl(webhookUrl, groupApiKey).ConfigureAwait(false);
     }
 }

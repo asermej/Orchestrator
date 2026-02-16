@@ -3,14 +3,20 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Orchestrator.Domain;
 
 /// <summary>
-/// Represents an Interview Configuration that defines how interviews are conducted
-/// Includes the agent, questions, and scoring rubric
+/// Represents an Interview Configuration that combines an InterviewGuide with an Agent.
+/// The guide contains questions, scoring rubric, and opening/closing templates.
 /// </summary>
 [Table("interview_configurations")]
 public class InterviewConfiguration : Entity
 {
+    [Column("group_id")]
+    public Guid GroupId { get; set; }
+
     [Column("organization_id")]
-    public Guid OrganizationId { get; set; }
+    public Guid? OrganizationId { get; set; }
+
+    [Column("interview_guide_id")]
+    public Guid InterviewGuideId { get; set; }
 
     [Column("agent_id")]
     public Guid AgentId { get; set; }
@@ -26,6 +32,10 @@ public class InterviewConfiguration : Entity
 
     [Column("is_active")]
     public bool IsActive { get; set; } = true;
+
+    // Navigation property for the interview guide (not mapped to DB, populated by manager)
+    [NotMapped]
+    public InterviewGuide? InterviewGuide { get; set; }
 
     // Navigation property (not mapped to DB, populated by manager)
     [NotMapped]

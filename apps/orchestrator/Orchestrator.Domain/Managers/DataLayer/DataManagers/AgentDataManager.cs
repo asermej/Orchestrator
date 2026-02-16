@@ -19,10 +19,10 @@ internal sealed class AgentDataManager
     public async Task<Agent?> GetById(Guid id)
     {
         const string sql = @"
-            SELECT id, organization_id, display_name, profile_image_url,
+            SELECT id, group_id, organization_id, display_name, profile_image_url,
                    system_prompt, interview_guidelines,
                    elevenlabs_voice_id, voice_stability, voice_similarity_boost,
-                   voice_provider, voice_type, voice_name,
+                   voice_provider, voice_type, voice_name, visibility_scope,
                    created_at, updated_at, created_by, is_deleted
             FROM agents
             WHERE id = @id AND is_deleted = false";
@@ -38,18 +38,18 @@ internal sealed class AgentDataManager
         }
 
         const string sql = @"
-            INSERT INTO agents (id, organization_id, display_name, profile_image_url,
+            INSERT INTO agents (id, group_id, organization_id, display_name, profile_image_url,
                 system_prompt, interview_guidelines,
                 elevenlabs_voice_id, voice_stability, voice_similarity_boost,
-                voice_provider, voice_type, voice_name, created_by)
-            VALUES (@Id, @OrganizationId, @DisplayName, @ProfileImageUrl,
+                voice_provider, voice_type, voice_name, visibility_scope, created_by)
+            VALUES (@Id, @GroupId, @OrganizationId, @DisplayName, @ProfileImageUrl,
                 @SystemPrompt, @InterviewGuidelines,
                 @ElevenlabsVoiceId, @VoiceStability, @VoiceSimilarityBoost,
-                @VoiceProvider, @VoiceType, @VoiceName, @CreatedBy)
-            RETURNING id, organization_id, display_name, profile_image_url,
+                @VoiceProvider, @VoiceType, @VoiceName, @VisibilityScope, @CreatedBy)
+            RETURNING id, group_id, organization_id, display_name, profile_image_url,
                 system_prompt, interview_guidelines,
                 elevenlabs_voice_id, voice_stability, voice_similarity_boost,
-                voice_provider, voice_type, voice_name,
+                voice_provider, voice_type, voice_name, visibility_scope,
                 created_at, updated_at, created_by, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
@@ -63,6 +63,7 @@ internal sealed class AgentDataManager
             UPDATE agents
             SET
                 display_name = @DisplayName,
+                organization_id = @OrganizationId,
                 profile_image_url = @ProfileImageUrl,
                 system_prompt = @SystemPrompt,
                 interview_guidelines = @InterviewGuidelines,
@@ -72,13 +73,14 @@ internal sealed class AgentDataManager
                 voice_provider = @VoiceProvider,
                 voice_type = @VoiceType,
                 voice_name = @VoiceName,
+                visibility_scope = @VisibilityScope,
                 updated_at = CURRENT_TIMESTAMP,
                 updated_by = @UpdatedBy
             WHERE id = @Id AND is_deleted = false
-            RETURNING id, organization_id, display_name, profile_image_url,
+            RETURNING id, group_id, organization_id, display_name, profile_image_url,
                 system_prompt, interview_guidelines,
                 elevenlabs_voice_id, voice_stability, voice_similarity_boost,
-                voice_provider, voice_type, voice_name,
+                voice_provider, voice_type, voice_name, visibility_scope,
                 created_at, updated_at, created_by, updated_by, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
@@ -102,15 +104,21 @@ internal sealed class AgentDataManager
         return rowsAffected > 0;
     }
 
-    public async Task<PaginatedResult<Agent>> Search(Guid? organizationId, string? displayName, string? createdBy, string? sortBy, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Agent>> Search(Guid? groupId, string? displayName, string? createdBy, string? sortBy, int pageNumber, int pageSize, IReadOnlyList<Guid>? organizationIds = null)
     {
         var whereClauses = new List<string>();
         var parameters = new DynamicParameters();
 
-        if (organizationId.HasValue)
+        if (groupId.HasValue)
         {
-            whereClauses.Add("organization_id = @OrganizationId");
-            parameters.Add("OrganizationId", organizationId.Value);
+            whereClauses.Add("group_id = @GroupId");
+            parameters.Add("GroupId", groupId.Value);
+        }
+
+        if (organizationIds != null)
+        {
+            whereClauses.Add("(organization_id IS NULL OR organization_id = ANY(@OrganizationIds))");
+            parameters.Add("OrganizationIds", organizationIds.ToArray());
         }
 
         if (!string.IsNullOrWhiteSpace(displayName))
@@ -129,12 +137,11 @@ internal sealed class AgentDataManager
 
         var whereSql = $"WHERE {string.Join(" AND ", whereClauses)}";
 
-        // Determine ORDER BY clause based on sortBy parameter
         var orderByClause = sortBy?.ToLowerInvariant() switch
         {
             "alphabetical" => "display_name ASC",
             "recent" => "created_at DESC",
-            _ => "created_at DESC" // Default to most recent
+            _ => "created_at DESC"
         };
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
@@ -144,10 +151,10 @@ internal sealed class AgentDataManager
 
         var offset = (pageNumber - 1) * pageSize;
         var querySql = $@"
-            SELECT id, organization_id, display_name, profile_image_url,
+            SELECT id, group_id, organization_id, display_name, profile_image_url,
                    system_prompt, interview_guidelines,
                    elevenlabs_voice_id, voice_stability, voice_similarity_boost,
-                   voice_provider, voice_type, voice_name,
+                   voice_provider, voice_type, voice_name, visibility_scope,
                    created_at, updated_at, created_by, is_deleted
             FROM agents
             {whereSql}

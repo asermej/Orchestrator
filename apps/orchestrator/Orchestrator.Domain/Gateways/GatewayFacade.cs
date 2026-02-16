@@ -22,6 +22,7 @@ internal sealed partial class GatewayFacade : IDisposable
         {
             _openAIManager?.Dispose();
             _elevenLabsManager?.Dispose();
+            _atsGatewayManager?.Dispose();
             _disposed = true;
         }
     }

@@ -8,8 +8,8 @@ namespace Orchestrator.Domain;
 [Table("webhook_configs")]
 public class WebhookConfig : Entity
 {
-    [Column("organization_id")]
-    public Guid OrganizationId { get; set; }
+    [Column("group_id")]
+    public Guid GroupId { get; set; }
 
     [Column("name")]
     public string Name { get; set; } = string.Empty;

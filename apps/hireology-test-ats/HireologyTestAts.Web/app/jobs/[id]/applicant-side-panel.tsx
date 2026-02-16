@@ -1,8 +1,18 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { testAtsApi } from "@/lib/test-ats-api";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
+
+interface InterviewConfiguration {
+  id: string;
+  name: string;
+  description?: string | null;
+  agentId: string;
+  agentDisplayName?: string | null;
+  questionCount: number;
+}
 
 interface InterviewResponseData {
   id: string;
@@ -73,7 +83,7 @@ interface Props {
   currentIndex: number;
   onNavigate: (applicantId: string) => void;
   onClose: () => void;
-  onSendInterview: (applicant: ApplicantItem) => void;
+  onInterviewSent: (request: InterviewRequestItem) => void;
   onRefreshInvite: (ir: InterviewRequestItem) => void;
 }
 
@@ -437,6 +447,235 @@ function NotSentContent({ onLaunch }: { onLaunch: () => void }) {
   );
 }
 
+function SendSchedulingLinkContent({
+  applicant,
+  onBack,
+  onSent,
+}: {
+  applicant: ApplicantItem;
+  onBack: () => void;
+  onSent: (request: InterviewRequestItem) => void;
+}) {
+  const [configurations, setConfigurations] = useState<InterviewConfiguration[]>([]);
+  const [selectedConfigId, setSelectedConfigId] = useState<string>("");
+  const [loadingConfigs, setLoadingConfigs] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadConfigurations() {
+      try {
+        const data = await testAtsApi.get<InterviewConfiguration[]>("/api/v1/configurations");
+        if (!cancelled) {
+          setConfigurations(data);
+          if (data.length > 0) {
+            setSelectedConfigId(data[0].id);
+          }
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load interview configurations");
+        }
+      } finally {
+        if (!cancelled) setLoadingConfigs(false);
+      }
+    }
+    loadConfigurations();
+    return () => { cancelled = true; };
+  }, []);
+
+  const selectedConfig = configurations.find((c) => c.id === selectedConfigId);
+
+  const handleSend = async () => {
+    if (!selectedConfigId) return;
+    setSending(true);
+    setError(null);
+    try {
+      const data = await testAtsApi.post<InterviewRequestItem>(
+        `/api/v1/applicants/${applicant.id}/interview`,
+        { interviewConfigurationId: selectedConfigId }
+      );
+      onSent(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to send interview request");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      <h3 className="text-base font-semibold text-slate-900 mb-5">Send Scheduling Link</h3>
+
+      <div className="flex-1">
+          {/* Interview Configuration selector (functional) */}
+          {loadingConfigs ? (
+            <div className="text-sm text-slate-500 mb-4">Loading interview configurations...</div>
+          ) : configurations.length === 0 ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-amber-800 text-sm">
+              No interview configurations found. Please create an interview configuration in the
+              Orchestrator first (with an agent and questions).
+            </div>
+          ) : (
+            <div className="mb-5">
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                Interview Configuration
+              </label>
+              <select
+                value={selectedConfigId}
+                onChange={(e) => setSelectedConfigId(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+              >
+                {configurations.map((config) => (
+                  <option key={config.id} value={config.id}>
+                    {config.name}
+                    {config.agentDisplayName ? ` (${config.agentDisplayName})` : ""}
+                    {` \u2014 ${config.questionCount} questions`}
+                  </option>
+                ))}
+              </select>
+
+              {/* Selected configuration detail */}
+              {selectedConfig && (
+                <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 space-y-1">
+                  {selectedConfig.description && <p>{selectedConfig.description}</p>}
+                  <div className="flex items-center gap-3">
+                    {selectedConfig.agentDisplayName && (
+                      <span>
+                        <span className="font-medium text-slate-700">Agent:</span>{" "}
+                        {selectedConfig.agentDisplayName}
+                      </span>
+                    )}
+                    <span>
+                      <span className="font-medium text-slate-700">Questions:</span>{" "}
+                      {selectedConfig.questionCount}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Placeholder: AI Interviewer */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">AI Interviewer</label>
+            <select
+              disabled
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-400 bg-slate-50 cursor-not-allowed"
+            >
+              <option>Select AI interviewer</option>
+            </select>
+          </div>
+
+          {/* Placeholder: Template */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Template</label>
+            <select
+              disabled
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-400 bg-slate-50 cursor-not-allowed"
+            >
+              <option>Select message template</option>
+            </select>
+          </div>
+
+          {/* Placeholder: Subject */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Subject</label>
+            <input
+              type="text"
+              disabled
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-400 bg-slate-50 cursor-not-allowed"
+            />
+          </div>
+
+          {/* Placeholder: Rich text editor */}
+          <div className="mb-4">
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              {/* Toolbar */}
+              <div className="flex items-center gap-1 px-3 py-2 border-b border-slate-200 bg-slate-50">
+                {["B", "I", "U", "B"].map((label, i) => (
+                  <button
+                    key={i}
+                    disabled
+                    className="w-7 h-7 flex items-center justify-center text-xs font-bold text-slate-400 rounded hover:bg-slate-100 cursor-not-allowed"
+                  >
+                    {label}
+                  </button>
+                ))}
+                <div className="w-px h-5 bg-slate-200 mx-1" />
+                {[
+                  "M9 5l7 7-7 7",
+                  "M4 6h16M4 12h16M4 18h16",
+                  "M4 6h16M4 12h10M4 18h16",
+                  "M4 6h16M4 12h16M4 18h7",
+                ].map((d, i) => (
+                  <button
+                    key={i}
+                    disabled
+                    className="w-7 h-7 flex items-center justify-center text-slate-400 rounded hover:bg-slate-100 cursor-not-allowed"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={d} />
+                    </svg>
+                  </button>
+                ))}
+                <div className="w-px h-5 bg-slate-200 mx-1" />
+                <button
+                  disabled
+                  className="w-7 h-7 flex items-center justify-center text-xs font-bold text-slate-400 rounded hover:bg-slate-100 cursor-not-allowed"
+                >
+                  T
+                </button>
+              </div>
+              {/* Body */}
+              <div className="px-3 py-6 min-h-[120px]">
+                <span className="text-sm text-slate-400">Placeholder</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Placeholder: Attachments */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Attachment(s)</label>
+            <button
+              disabled
+              className="px-4 py-1.5 text-sm font-medium text-teal-600 border border-teal-300 rounded-lg cursor-not-allowed opacity-60"
+            >
+              Browse files...
+            </button>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-red-700 text-sm">
+              {error}
+            </div>
+          )}
+        </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between pt-4 border-t border-slate-200 mt-auto">
+          <button
+            onClick={onBack}
+            className="text-sm text-teal-600 hover:text-teal-800 font-medium flex items-center gap-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back
+          </button>
+          <button
+            onClick={handleSend}
+            disabled={sending || !selectedConfigId || configurations.length === 0}
+            className="px-5 py-2 text-sm font-medium text-white bg-teal-700 rounded-lg hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {sending ? "Sending..." : "Send Interview Request"}
+          </button>
+        </div>
+    </div>
+  );
+}
+
 function InterviewDetailsContent({
   ir,
   isCompleted,
@@ -449,6 +688,7 @@ function InterviewDetailsContent({
   const [responses, setResponses] = useState<InterviewResponseData[]>([]);
   const [questionScores, setQuestionScores] = useState<Map<number, QuestionScoreData>>(new Map());
   const [loadingResponses, setLoadingResponses] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
 
   // Fetch real interview responses and result (with question scores) in parallel
   useEffect(() => {
@@ -550,6 +790,39 @@ function InterviewDetailsContent({
           <a href="#" className="text-xs text-teal-600 underline">30 min prior via email and text</a>
         </div>
       </div>
+
+      {/* Invite URL — always visible when available */}
+      {ir.inviteUrl && !isCompleted && (
+        <div className="border border-slate-200 rounded-lg p-4 mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+            <span className="text-sm font-medium text-slate-900">Candidate Interview Link</span>
+          </div>
+          <p className="text-xs text-slate-500 mb-2">
+            Share this URL with the candidate to start the interview:
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              readOnly
+              value={ir.inviteUrl}
+              className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded px-3 py-2 text-slate-700 font-mono"
+            />
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(ir.inviteUrl!);
+                setUrlCopied(true);
+                setTimeout(() => setUrlCopied(false), 2000);
+              }}
+              className="px-3 py-2 bg-teal-600 text-white text-xs font-medium rounded hover:bg-teal-700 transition-colors whitespace-nowrap"
+            >
+              {urlCopied ? "Copied!" : "Copy URL"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Completed: Summary + Score */}
       {isCompleted && ir.score != null && (
@@ -655,15 +928,21 @@ export function ApplicantSidePanel({
   currentIndex,
   onNavigate,
   onClose,
-  onSendInterview,
+  onInterviewSent,
   onRefreshInvite,
 }: Props) {
   const [visible, setVisible] = useState(false);
+  const [centerView, setCenterView] = useState<"default" | "send-form">("default");
 
   // Animate in on mount
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true));
   }, []);
+
+  // Reset view when switching applicants
+  useEffect(() => {
+    setCenterView("default");
+  }, [applicant.id]);
 
   const handleClose = () => {
     setVisible(false);
@@ -855,8 +1134,17 @@ export function ApplicantSidePanel({
 
           {/* Center: Interview content */}
           <div className="flex-1 overflow-y-auto p-6">
-            {!ir ? (
-              <NotSentContent onLaunch={() => onSendInterview(applicant)} />
+            {centerView === "send-form" ? (
+              <SendSchedulingLinkContent
+                applicant={applicant}
+                onBack={() => setCenterView("default")}
+                onSent={(request) => {
+                  onInterviewSent(request);
+                  setCenterView("default");
+                }}
+              />
+            ) : !ir ? (
+              <NotSentContent onLaunch={() => setCenterView("send-form")} />
             ) : (
               <InterviewDetailsContent
                 ir={ir}

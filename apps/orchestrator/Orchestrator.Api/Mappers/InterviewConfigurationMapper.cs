@@ -20,7 +20,9 @@ public static class InterviewConfigurationMapper
         return new InterviewConfigurationResource
         {
             Id = config.Id,
+            GroupId = config.GroupId,
             OrganizationId = config.OrganizationId,
+            InterviewGuideId = config.InterviewGuideId,
             AgentId = config.AgentId,
             Name = config.Name,
             Description = config.Description,
@@ -28,6 +30,7 @@ public static class InterviewConfigurationMapper
             IsActive = config.IsActive,
             Questions = questions,
             QuestionCount = config.QuestionCount > 0 ? config.QuestionCount : questions.Count,
+            InterviewGuide = config.InterviewGuide != null ? InterviewGuideMapper.ToResource(config.InterviewGuide) : null,
             Agent = config.Agent != null ? AgentMapper.ToResource(config.Agent) : null,
             CreatedAt = config.CreatedAt,
             UpdatedAt = config.UpdatedAt,
@@ -75,7 +78,9 @@ public static class InterviewConfigurationMapper
 
         var config = new InterviewConfiguration
         {
+            GroupId = createResource.GroupId,
             OrganizationId = createResource.OrganizationId,
+            InterviewGuideId = createResource.InterviewGuideId,
             AgentId = createResource.AgentId,
             Name = createResource.Name,
             Description = createResource.Description,
@@ -109,7 +114,9 @@ public static class InterviewConfigurationMapper
         return new InterviewConfiguration
         {
             Id = existingConfig.Id,
+            GroupId = existingConfig.GroupId,
             OrganizationId = existingConfig.OrganizationId,
+            InterviewGuideId = updateResource.InterviewGuideId ?? existingConfig.InterviewGuideId,
             AgentId = existingConfig.AgentId,
             Name = updateResource.Name ?? existingConfig.Name,
             Description = updateResource.Description ?? existingConfig.Description,

@@ -3,16 +3,14 @@ namespace HireologyTestAts.Domain;
 internal sealed class UserManager : IDisposable
 {
     private readonly DataFacade _dataFacade;
-    private readonly OrchestratorGateway _orchestratorGateway;
+    private readonly GatewayFacade _gatewayFacade;
     private bool _disposed;
 
-    public UserManager(ServiceLocatorBase serviceLocator)
+    public UserManager(ServiceLocatorBase serviceLocator, GatewayFacade gatewayFacade)
     {
         var configProvider = serviceLocator.CreateConfigurationProvider();
         _dataFacade = new DataFacade(configProvider.GetDbConnectionString());
-        _orchestratorGateway = new OrchestratorGateway(
-            configProvider.GetOrchestratorBaseUrl(),
-            configProvider.GetOrchestratorApiKey());
+        _gatewayFacade = gatewayFacade ?? throw new ArgumentNullException(nameof(gatewayFacade));
     }
 
     public async Task<IReadOnlyList<User>> GetUsers(int pageNumber, int pageSize)
@@ -80,7 +78,8 @@ internal sealed class UserManager : IDisposable
 
         try
         {
-            await _orchestratorGateway.ProvisionUserAsync(auth0Sub, email, name).ConfigureAwait(false);
+            // User provisioning is group-agnostic; pass null to use global fallback key
+            await _gatewayFacade.ProvisionUser(auth0Sub, email, name, null).ConfigureAwait(false);
         }
         catch
         {
@@ -303,7 +302,7 @@ internal sealed class UserManager : IDisposable
     {
         if (!_disposed)
         {
-            _orchestratorGateway.Dispose();
+            // GatewayFacade is owned by DomainFacade, not disposed here
             _disposed = true;
         }
     }

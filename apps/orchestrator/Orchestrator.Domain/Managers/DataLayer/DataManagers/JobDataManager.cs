@@ -19,21 +19,21 @@ internal sealed class JobDataManager
     public async Task<Job?> GetById(Guid id)
     {
         const string sql = @"
-            SELECT id, organization_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted
+            SELECT id, group_id, organization_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted
             FROM jobs
             WHERE id = @id AND is_deleted = false";
         using var connection = new NpgsqlConnection(_dbConnectionString);
         return await connection.QueryFirstOrDefaultAsync<Job>(sql, new { id });
     }
 
-    public async Task<Job?> GetByExternalId(Guid organizationId, string externalJobId)
+    public async Task<Job?> GetByExternalId(Guid groupId, string externalJobId)
     {
         const string sql = @"
-            SELECT id, organization_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted
+            SELECT id, group_id, organization_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted
             FROM jobs
-            WHERE organization_id = @OrganizationId AND external_job_id = @ExternalJobId AND is_deleted = false";
+            WHERE group_id = @GroupId AND external_job_id = @ExternalJobId AND is_deleted = false";
         using var connection = new NpgsqlConnection(_dbConnectionString);
-        return await connection.QueryFirstOrDefaultAsync<Job>(sql, new { OrganizationId = organizationId, ExternalJobId = externalJobId });
+        return await connection.QueryFirstOrDefaultAsync<Job>(sql, new { GroupId = groupId, ExternalJobId = externalJobId });
     }
 
     public async Task<Job> Add(Job job)
@@ -44,9 +44,9 @@ internal sealed class JobDataManager
         }
 
         const string sql = @"
-            INSERT INTO jobs (id, organization_id, external_job_id, title, description, status, location, created_by)
-            VALUES (@Id, @OrganizationId, @ExternalJobId, @Title, @Description, @Status, @Location, @CreatedBy)
-            RETURNING id, organization_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted";
+            INSERT INTO jobs (id, group_id, organization_id, external_job_id, title, description, status, location, created_by)
+            VALUES (@Id, @GroupId, @OrganizationId, @ExternalJobId, @Title, @Description, @Status, @Location, @CreatedBy)
+            RETURNING id, group_id, organization_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var newItem = await connection.QueryFirstOrDefaultAsync<Job>(sql, job);
@@ -65,7 +65,7 @@ internal sealed class JobDataManager
                 updated_at = CURRENT_TIMESTAMP,
                 updated_by = @UpdatedBy
             WHERE id = @Id AND is_deleted = false
-            RETURNING id, organization_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted";
+            RETURNING id, group_id, organization_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var updatedItem = await connection.QueryFirstOrDefaultAsync<Job>(sql, job);
@@ -88,15 +88,21 @@ internal sealed class JobDataManager
         return rowsAffected > 0;
     }
 
-    public async Task<PaginatedResult<Job>> Search(Guid? organizationId, string? title, string? status, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Job>> Search(Guid? groupId, string? title, string? status, int pageNumber, int pageSize, IReadOnlyList<Guid>? organizationIds = null)
     {
         var whereClauses = new List<string>();
         var parameters = new DynamicParameters();
 
-        if (organizationId.HasValue)
+        if (groupId.HasValue)
         {
-            whereClauses.Add("organization_id = @OrganizationId");
-            parameters.Add("OrganizationId", organizationId.Value);
+            whereClauses.Add("group_id = @GroupId");
+            parameters.Add("GroupId", groupId.Value);
+        }
+
+        if (organizationIds != null)
+        {
+            whereClauses.Add("(organization_id IS NULL OR organization_id = ANY(@OrganizationIds))");
+            parameters.Add("OrganizationIds", organizationIds.ToArray());
         }
 
         if (!string.IsNullOrWhiteSpace(title))
@@ -121,7 +127,7 @@ internal sealed class JobDataManager
 
         var offset = (pageNumber - 1) * pageSize;
         var querySql = $@"
-            SELECT id, organization_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted
+            SELECT id, group_id, organization_id, external_job_id, title, description, status, location, created_at, updated_at, is_deleted
             FROM jobs
             {whereSql}
             ORDER BY created_at DESC

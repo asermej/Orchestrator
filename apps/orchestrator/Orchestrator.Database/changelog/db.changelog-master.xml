@@ -105,4 +105,12 @@
 
     <!-- Add per-question scores JSON to interview results -->
     <include file="changes/20260215120000-add-question-scores-to-interview-results.xml" relativeToChangelogFile="true"/>
+
+    <!-- Interview Guides: Reusable question sets with opening/closing templates -->
+    <include file="changes/20260215162700-create-interview-guides-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260215162701-add-interview-guide-id-to-interview-configurations.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260215162702-add-interview-guide-question-id-to-follow-up-templates.xml" relativeToChangelogFile="true"/>
+
+    <!-- Multi-Tenant: Rename organizations to groups + add ATS org scoping -->
+    <include file="changes/20260215180000-rename-organizations-to-groups.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog> 

@@ -7,14 +7,14 @@ namespace Orchestrator.AcceptanceTests.Domain;
 
 /// <summary>
 /// Tests for Interview operations using real DomainFacade.
-/// Depends on Organization, Agent, Job, Applicant.
+/// Depends on Group, Agent, Job, Applicant.
 /// Cleanup: centralized SQL cleanup in TestInitialize/TestCleanup via TestDataCleanup.
 /// </summary>
 [TestClass]
 public class DomainFacadeTestsInterview
 {
     private DomainFacade _domainFacade = null!;
-    private Guid _testOrganizationId;
+    private Guid _testGroupId;
     private Guid _testAgentId;
     private Guid _testJobId;
     private Guid _testApplicantId;
@@ -28,17 +28,17 @@ public class DomainFacadeTestsInterview
         var serviceLocator = new ServiceLocatorForAcceptanceTesting();
         _domainFacade = new DomainFacade(serviceLocator);
 
-        var org = await _domainFacade.CreateOrganization(new Organization
+        var group = await _domainFacade.CreateGroup(new Group
         {
             Name = Truncate($"TestOrg_Interview_{Guid.NewGuid():N}", 50),
             ApiKey = "",
             IsActive = true
         });
-        _testOrganizationId = org.Id;
+        _testGroupId = group.Id;
 
         var agent = await _domainFacade.CreateAgent(new Agent
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             DisplayName = Truncate($"TestAgent_Interview_{Guid.NewGuid():N}", 80),
             ProfileImageUrl = null
         });
@@ -46,7 +46,7 @@ public class DomainFacadeTestsInterview
 
         var job = new Job
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             ExternalJobId = Truncate($"ext_job_{Guid.NewGuid():N}", 50),
             Title = Truncate($"TestJob_Interview_{Guid.NewGuid():N}", 80),
             Status = "active"
@@ -56,7 +56,7 @@ public class DomainFacadeTestsInterview
 
         var applicant = new Applicant
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             ExternalApplicantId = Truncate($"ext_app_{Guid.NewGuid():N}", 50),
             FirstName = "Interview",
             LastName = "Test",

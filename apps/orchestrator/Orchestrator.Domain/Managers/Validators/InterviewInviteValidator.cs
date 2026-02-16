@@ -14,9 +14,9 @@ internal static class InterviewInviteValidator
             errors.Add("InterviewId is required.");
         }
 
-        if (invite.OrganizationId == Guid.Empty)
+        if (invite.GroupId == Guid.Empty)
         {
-            errors.Add("OrganizationId is required.");
+            errors.Add("GroupId is required.");
         }
 
         var shortCodeError = ValidatorString.Validate("ShortCode", invite.ShortCode);

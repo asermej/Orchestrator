@@ -9,10 +9,16 @@ internal static class InterviewConfigurationValidator
     {
         var errors = new List<string>();
 
-        // OrganizationId is required
-        if (config.OrganizationId == Guid.Empty)
+        // GroupId is required
+        if (config.GroupId == Guid.Empty)
         {
-            errors.Add("OrganizationId is required.");
+            errors.Add("GroupId is required.");
+        }
+
+        // InterviewGuideId is required
+        if (config.InterviewGuideId == Guid.Empty)
+        {
+            errors.Add("InterviewGuideId is required.");
         }
 
         // AgentId is required

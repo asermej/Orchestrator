@@ -20,7 +20,7 @@ internal sealed class OrganizationDataManager
                    created_at AS CreatedAt, updated_at AS UpdatedAt
             FROM organizations";
         var conditions = new List<string>();
-        if (excludeTestData) conditions.Add("name NOT LIKE 'TestOrg_%'");
+        if (excludeTestData) conditions.Add("name NOT LIKE 'TestOrg_%' AND group_id NOT IN (SELECT id FROM groups WHERE name LIKE 'TestGroup_%')");
         if (groupId.HasValue) conditions.Add("group_id = @GroupId");
         var sql = conditions.Count > 0
             ? sqlBase + " WHERE " + string.Join(" AND ", conditions) + " ORDER BY name"

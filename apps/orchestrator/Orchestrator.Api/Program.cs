@@ -221,6 +221,10 @@ app.UseCandidateSessionAuth();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Resolve the authenticated user's ATS group/org access context
+app.UseUserContext();
+
 app.MapControllers();
 
 app.Run();

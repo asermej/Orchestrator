@@ -9,9 +9,9 @@ internal static class JobValidator
     {
         var errors = new List<string>();
 
-        if (job.OrganizationId == Guid.Empty)
+        if (job.GroupId == Guid.Empty)
         {
-            errors.Add("OrganizationId is required.");
+            errors.Add("GroupId is required.");
         }
 
         var externalIdError = ValidatorString.Validate("ExternalJobId", job.ExternalJobId);

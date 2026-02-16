@@ -5,9 +5,9 @@ public sealed partial class DomainFacade
     /// <summary>
     /// Creates an invite for an interview with a short code for candidate access
     /// </summary>
-    public async Task<InterviewInvite> CreateInterviewInvite(Guid interviewId, Guid organizationId, int maxUses = 3, int expiryDays = 7)
+    public async Task<InterviewInvite> CreateInterviewInvite(Guid interviewId, Guid groupId, int maxUses = 3, int expiryDays = 7)
     {
-        return await InterviewInviteManager.CreateInvite(interviewId, organizationId, maxUses, expiryDays).ConfigureAwait(false);
+        return await InterviewInviteManager.CreateInvite(interviewId, groupId, maxUses, expiryDays).ConfigureAwait(false);
     }
 
     /// <summary>

@@ -26,11 +26,11 @@ internal sealed class AgentManager : IDisposable
     {
         AgentValidator.Validate(agent);
         
-        // Check for duplicate display name within the organization
-        var existingAgents = await DataFacade.SearchAgents(agent.OrganizationId, agent.DisplayName, null, null, 1, 1).ConfigureAwait(false);
+        // Check for duplicate display name within the group
+        var existingAgents = await DataFacade.SearchAgents(agent.GroupId, agent.DisplayName, null, null, 1, 1).ConfigureAwait(false);
         if (existingAgents.Items.Any())
         {
-            throw new AgentDuplicateDisplayNameException($"An agent with display name '{agent.DisplayName}' already exists in this organization.");
+            throw new AgentDuplicateDisplayNameException($"An agent with display name '{agent.DisplayName}' already exists in this group.");
         }
         
         return await DataFacade.AddAgent(agent).ConfigureAwait(false);
@@ -47,9 +47,9 @@ internal sealed class AgentManager : IDisposable
     /// <summary>
     /// Searches for Agents
     /// </summary>
-    public async Task<PaginatedResult<Agent>> SearchAgents(Guid? organizationId, string? displayName, string? createdBy, string? sortBy, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Agent>> SearchAgents(Guid? groupId, string? displayName, string? createdBy, string? sortBy, int pageNumber, int pageSize, IReadOnlyList<Guid>? organizationIds = null)
     {
-        return await DataFacade.SearchAgents(organizationId, displayName, createdBy, sortBy, pageNumber, pageSize).ConfigureAwait(false);
+        return await DataFacade.SearchAgents(groupId, displayName, createdBy, sortBy, pageNumber, pageSize, organizationIds).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -60,11 +60,11 @@ internal sealed class AgentManager : IDisposable
         AgentValidator.Validate(agent);
         
         // Check for duplicate display name (excluding the current agent)
-        var existingAgents = await DataFacade.SearchAgents(agent.OrganizationId, agent.DisplayName, null, null, 1, 1).ConfigureAwait(false);
+        var existingAgents = await DataFacade.SearchAgents(agent.GroupId, agent.DisplayName, null, null, 1, 1).ConfigureAwait(false);
         var duplicateAgent = existingAgents.Items.FirstOrDefault();
         if (duplicateAgent != null && duplicateAgent.Id != agent.Id)
         {
-            throw new AgentDuplicateDisplayNameException($"An agent with display name '{agent.DisplayName}' already exists in this organization.");
+            throw new AgentDuplicateDisplayNameException($"An agent with display name '{agent.DisplayName}' already exists in this group.");
         }
         
         return await DataFacade.UpdateAgent(agent).ConfigureAwait(false);

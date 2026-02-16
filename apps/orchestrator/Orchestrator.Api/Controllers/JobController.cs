@@ -4,11 +4,12 @@ using Orchestrator.Domain;
 using Orchestrator.Api.ResourcesModels;
 using Orchestrator.Api.Mappers;
 using Orchestrator.Api.Common;
+using Orchestrator.Api.Middleware;
 
 namespace Orchestrator.Api.Controllers;
 
 /// <summary>
-/// Controller for viewing jobs (synced from ATS). Uses JWT; lists jobs for the default organization.
+/// Controller for viewing jobs (synced from ATS). Uses JWT; lists jobs for the user's group context.
 /// </summary>
 [ApiController]
 [Route("api/v1/[controller]")]
@@ -23,25 +24,28 @@ public class JobController : ControllerBase
         _domainFacade = domainFacade;
     }
 
-    /// <summary>
-    /// Gets or creates a default organization for listing jobs when none is specified
-    /// </summary>
-    private async Task<Guid> GetOrCreateDefaultOrganizationAsync()
-    {
-        const string defaultOrgName = "Default Organization";
+    private UserContext? GetUserContext()
+        => HttpContext.Items.TryGetValue("UserContext", out var ctx) ? ctx as UserContext : null;
 
-        var existingOrgs = await _domainFacade.SearchOrganizations(defaultOrgName, true, 1, 1);
-        if (existingOrgs.Items.Any())
+    /// <summary>
+    /// Gets or creates a default group for listing jobs when none is specified
+    /// </summary>
+    private async Task<Guid> GetOrCreateDefaultGroupAsync()
+    {
+        const string defaultGroupName = "Default Group";
+
+        var existingGroups = await _domainFacade.SearchGroups(defaultGroupName, true, 1, 1);
+        if (existingGroups.Items.Any())
         {
-            return existingOrgs.Items.First().Id;
+            return existingGroups.Items.First().Id;
         }
 
-        var defaultOrg = new Organization
+        var defaultGroup = new Group
         {
-            Name = defaultOrgName,
+            Name = defaultGroupName,
             IsActive = true
         };
-        var created = await _domainFacade.CreateOrganization(defaultOrg);
+        var created = await _domainFacade.CreateGroup(defaultGroup);
         return created.Id;
     }
 
@@ -52,13 +56,19 @@ public class JobController : ControllerBase
     [ProducesResponseType(typeof(PaginatedResponse<JobResource>), 200)]
     public async Task<ActionResult<PaginatedResponse<JobResource>>> Search([FromQuery] SearchJobRequest request)
     {
-        var organizationId = await GetOrCreateDefaultOrganizationAsync();
+        var userContext = GetUserContext();
+        var groupId = userContext?.GroupId ?? await GetOrCreateDefaultGroupAsync();
+        var orgFilter = (userContext is { IsResolved: true, IsSuperadmin: false, IsGroupAdmin: false })
+            ? userContext.AccessibleOrganizationIds
+            : null;
+
         var result = await _domainFacade.SearchJobs(
-            organizationId,
+            groupId,
             request.Title,
             request.Status,
             request.PageNumber,
-            request.PageSize);
+            request.PageSize,
+            orgFilter);
 
         return Ok(new PaginatedResponse<JobResource>
         {

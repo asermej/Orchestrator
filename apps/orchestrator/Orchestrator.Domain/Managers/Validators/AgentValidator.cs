@@ -13,10 +13,10 @@ internal static class AgentValidator
     {
         var errors = new List<string>();
 
-        // OrganizationId is required
-        if (agent.OrganizationId == Guid.Empty)
+        // GroupId is required
+        if (agent.GroupId == Guid.Empty)
         {
-            errors.Add("OrganizationId is required.");
+            errors.Add("GroupId is required.");
         }
 
         // DisplayName is required

@@ -13,7 +13,7 @@ namespace Orchestrator.AcceptanceTests.Domain;
 public class DomainFacadeTestsApplicant
 {
     private DomainFacade _domainFacade = null!;
-    private Guid _testOrganizationId;
+    private Guid _testGroupId;
 
     private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max];
 
@@ -24,13 +24,13 @@ public class DomainFacadeTestsApplicant
         var serviceLocator = new ServiceLocatorForAcceptanceTesting();
         _domainFacade = new DomainFacade(serviceLocator);
 
-        var org = await _domainFacade.CreateOrganization(new Organization
+        var group = await _domainFacade.CreateGroup(new Group
         {
             Name = Truncate($"TestOrg_Applicant_{Guid.NewGuid():N}", 50),
             ApiKey = "",
             IsActive = true
         });
-        _testOrganizationId = org.Id;
+        _testGroupId = group.Id;
     }
 
     [TestCleanup]
@@ -55,7 +55,7 @@ public class DomainFacadeTestsApplicant
         var unique = Guid.NewGuid().ToString("N")[..8];
         var applicant = new Applicant
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             ExternalApplicantId = $"ext_{unique}",
             FirstName = $"First{suffix}",
             LastName = $"Last{suffix}",
@@ -73,7 +73,7 @@ public class DomainFacadeTestsApplicant
         var unique = Guid.NewGuid().ToString("N")[..8];
         var applicant = new Applicant
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             ExternalApplicantId = $"ext_{unique}",
             FirstName = "Jane",
             LastName = "Doe",
@@ -95,7 +95,7 @@ public class DomainFacadeTestsApplicant
     {
         var applicant = new Applicant
         {
-            OrganizationId = _testOrganizationId,
+            GroupId = _testGroupId,
             ExternalApplicantId = "", // Required
             FirstName = "X",
             LastName = "Y"
@@ -129,7 +129,7 @@ public class DomainFacadeTestsApplicant
     {
         var created = await CreateTestApplicantAsync();
 
-        var result = await _domainFacade.GetApplicantByExternalId(_testOrganizationId, created.ExternalApplicantId);
+        var result = await _domainFacade.GetApplicantByExternalId(_testGroupId, created.ExternalApplicantId);
 
         Assert.IsNotNull(result);
         Assert.AreEqual(created.Id, result.Id);
@@ -138,7 +138,7 @@ public class DomainFacadeTestsApplicant
     [TestMethod]
     public async Task GetApplicantByExternalId_NonExisting_ReturnsNull()
     {
-        var result = await _domainFacade.GetApplicantByExternalId(_testOrganizationId, "nonexistent_ext_12345");
+        var result = await _domainFacade.GetApplicantByExternalId(_testGroupId, "nonexistent_ext_12345");
         Assert.IsNull(result);
     }
 
@@ -149,7 +149,7 @@ public class DomainFacadeTestsApplicant
         var firstName = "New";
         var lastName = "Applicant";
 
-        var result = await _domainFacade.GetOrCreateApplicant(_testOrganizationId, externalId, firstName, lastName, "new@example.com", null);
+        var result = await _domainFacade.GetOrCreateApplicant(_testGroupId, externalId, firstName, lastName, "new@example.com", null);
 
         Assert.IsNotNull(result);
         Assert.AreNotEqual(Guid.Empty, result.Id);
@@ -162,7 +162,7 @@ public class DomainFacadeTestsApplicant
     {
         var created = await CreateTestApplicantAsync();
 
-        var result = await _domainFacade.GetOrCreateApplicant(_testOrganizationId, created.ExternalApplicantId, "Other", "Name", "other@example.com", null);
+        var result = await _domainFacade.GetOrCreateApplicant(_testGroupId, created.ExternalApplicantId, "Other", "Name", "other@example.com", null);
 
         Assert.IsNotNull(result);
         Assert.AreEqual(created.Id, result.Id, "Should return existing applicant, not create duplicate");
@@ -174,7 +174,7 @@ public class DomainFacadeTestsApplicant
         var applicant1 = await CreateTestApplicantAsync("1");
         var applicant2 = await CreateTestApplicantAsync("2");
 
-        var result = await _domainFacade.SearchApplicants(_testOrganizationId, null, null, 1, 10);
+        var result = await _domainFacade.SearchApplicants(_testGroupId, null, null, 1, 10);
 
         Assert.IsNotNull(result);
         Assert.IsTrue(result.TotalCount >= 2, $"Should find at least 2 applicants, found {result.TotalCount}");
@@ -184,7 +184,7 @@ public class DomainFacadeTestsApplicant
     [TestMethod]
     public async Task SearchApplicants_NoResults_ReturnsEmptyList()
     {
-        var result = await _domainFacade.SearchApplicants(_testOrganizationId, "nonexistent.email.xyz@example.com", null, 1, 10);
+        var result = await _domainFacade.SearchApplicants(_testGroupId, "nonexistent.email.xyz@example.com", null, 1, 10);
 
         Assert.IsNotNull(result);
         Assert.AreEqual(0, result.TotalCount);
@@ -249,7 +249,7 @@ public class DomainFacadeTestsApplicant
         var updated = await _domainFacade.UpdateApplicant(retrieved);
         Assert.IsNotNull(updated);
 
-        var searchResult = await _domainFacade.SearchApplicants(_testOrganizationId, null, "UpdatedLifecycle", 1, 10);
+        var searchResult = await _domainFacade.SearchApplicants(_testGroupId, null, "UpdatedLifecycle", 1, 10);
         Assert.IsNotNull(searchResult);
         Assert.IsTrue(searchResult.TotalCount > 0);
 

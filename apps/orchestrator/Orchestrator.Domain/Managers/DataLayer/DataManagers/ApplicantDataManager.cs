@@ -19,21 +19,21 @@ internal sealed class ApplicantDataManager
     public async Task<Applicant?> GetById(Guid id)
     {
         const string sql = @"
-            SELECT id, organization_id, external_applicant_id, first_name, last_name, email, phone, created_at, updated_at, is_deleted
+            SELECT id, group_id, organization_id, external_applicant_id, first_name, last_name, email, phone, created_at, updated_at, is_deleted
             FROM applicants
             WHERE id = @id AND is_deleted = false";
         using var connection = new NpgsqlConnection(_dbConnectionString);
         return await connection.QueryFirstOrDefaultAsync<Applicant>(sql, new { id });
     }
 
-    public async Task<Applicant?> GetByExternalId(Guid organizationId, string externalApplicantId)
+    public async Task<Applicant?> GetByExternalId(Guid groupId, string externalApplicantId)
     {
         const string sql = @"
-            SELECT id, organization_id, external_applicant_id, first_name, last_name, email, phone, created_at, updated_at, is_deleted
+            SELECT id, group_id, organization_id, external_applicant_id, first_name, last_name, email, phone, created_at, updated_at, is_deleted
             FROM applicants
-            WHERE organization_id = @OrganizationId AND external_applicant_id = @ExternalApplicantId AND is_deleted = false";
+            WHERE group_id = @GroupId AND external_applicant_id = @ExternalApplicantId AND is_deleted = false";
         using var connection = new NpgsqlConnection(_dbConnectionString);
-        return await connection.QueryFirstOrDefaultAsync<Applicant>(sql, new { OrganizationId = organizationId, ExternalApplicantId = externalApplicantId });
+        return await connection.QueryFirstOrDefaultAsync<Applicant>(sql, new { GroupId = groupId, ExternalApplicantId = externalApplicantId });
     }
 
     public async Task<Applicant> Add(Applicant applicant)
@@ -44,9 +44,9 @@ internal sealed class ApplicantDataManager
         }
 
         const string sql = @"
-            INSERT INTO applicants (id, organization_id, external_applicant_id, first_name, last_name, email, phone, created_by)
-            VALUES (@Id, @OrganizationId, @ExternalApplicantId, @FirstName, @LastName, @Email, @Phone, @CreatedBy)
-            RETURNING id, organization_id, external_applicant_id, first_name, last_name, email, phone, created_at, updated_at, is_deleted";
+            INSERT INTO applicants (id, group_id, organization_id, external_applicant_id, first_name, last_name, email, phone, created_by)
+            VALUES (@Id, @GroupId, @OrganizationId, @ExternalApplicantId, @FirstName, @LastName, @Email, @Phone, @CreatedBy)
+            RETURNING id, group_id, organization_id, external_applicant_id, first_name, last_name, email, phone, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var newItem = await connection.QueryFirstOrDefaultAsync<Applicant>(sql, applicant);
@@ -65,7 +65,7 @@ internal sealed class ApplicantDataManager
                 updated_at = CURRENT_TIMESTAMP,
                 updated_by = @UpdatedBy
             WHERE id = @Id AND is_deleted = false
-            RETURNING id, organization_id, external_applicant_id, first_name, last_name, email, phone, created_at, updated_at, is_deleted";
+            RETURNING id, group_id, organization_id, external_applicant_id, first_name, last_name, email, phone, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var updatedItem = await connection.QueryFirstOrDefaultAsync<Applicant>(sql, applicant);
@@ -88,15 +88,21 @@ internal sealed class ApplicantDataManager
         return rowsAffected > 0;
     }
 
-    public async Task<PaginatedResult<Applicant>> Search(Guid? organizationId, string? email, string? name, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Applicant>> Search(Guid? groupId, string? email, string? name, int pageNumber, int pageSize, IReadOnlyList<Guid>? organizationIds = null)
     {
         var whereClauses = new List<string>();
         var parameters = new DynamicParameters();
 
-        if (organizationId.HasValue)
+        if (groupId.HasValue)
         {
-            whereClauses.Add("organization_id = @OrganizationId");
-            parameters.Add("OrganizationId", organizationId.Value);
+            whereClauses.Add("group_id = @GroupId");
+            parameters.Add("GroupId", groupId.Value);
+        }
+
+        if (organizationIds != null)
+        {
+            whereClauses.Add("(organization_id IS NULL OR organization_id = ANY(@OrganizationIds))");
+            parameters.Add("OrganizationIds", organizationIds.ToArray());
         }
 
         if (!string.IsNullOrWhiteSpace(email))
@@ -121,7 +127,7 @@ internal sealed class ApplicantDataManager
 
         var offset = (pageNumber - 1) * pageSize;
         var querySql = $@"
-            SELECT id, organization_id, external_applicant_id, first_name, last_name, email, phone, created_at, updated_at, is_deleted
+            SELECT id, group_id, organization_id, external_applicant_id, first_name, last_name, email, phone, created_at, updated_at, is_deleted
             FROM applicants
             {whereSql}
             ORDER BY created_at DESC

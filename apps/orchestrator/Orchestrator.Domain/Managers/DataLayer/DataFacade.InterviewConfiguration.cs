@@ -30,15 +30,16 @@ internal sealed partial class DataFacade
     }
 
     public Task<PaginatedResult<InterviewConfiguration>> SearchInterviewConfigurations(
-        Guid? organizationId, 
+        Guid? groupId, 
         Guid? agentId, 
         string? name, 
         bool? isActive,
         string? sortBy, 
         int pageNumber, 
-        int pageSize)
+        int pageSize,
+        IReadOnlyList<Guid>? organizationIds = null)
     {
-        return InterviewConfigurationDataManager.Search(organizationId, agentId, name, isActive, sortBy, pageNumber, pageSize);
+        return InterviewConfigurationDataManager.Search(groupId, agentId, name, isActive, sortBy, pageNumber, pageSize, organizationIds);
     }
 
     // Question management

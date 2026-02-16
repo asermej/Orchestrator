@@ -21,25 +21,25 @@ public sealed partial class DomainFacade
     /// <summary>
     /// Gets a Job by external ID
     /// </summary>
-    public async Task<Job?> GetJobByExternalId(Guid organizationId, string externalJobId)
+    public async Task<Job?> GetJobByExternalId(Guid groupId, string externalJobId)
     {
-        return await JobManager.GetJobByExternalId(organizationId, externalJobId).ConfigureAwait(false);
+        return await JobManager.GetJobByExternalId(groupId, externalJobId).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Gets or creates a Job by external ID
     /// </summary>
-    public async Task<Job> GetOrCreateJob(Guid organizationId, string externalJobId, string title, string? description, string? location)
+    public async Task<Job> GetOrCreateJob(Guid groupId, string externalJobId, string title, string? description, string? location)
     {
-        return await JobManager.GetOrCreateJob(organizationId, externalJobId, title, description, location).ConfigureAwait(false);
+        return await JobManager.GetOrCreateJob(groupId, externalJobId, title, description, location).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Searches for Jobs
     /// </summary>
-    public async Task<PaginatedResult<Job>> SearchJobs(Guid? organizationId, string? title, string? status, int pageNumber, int pageSize)
+    public async Task<PaginatedResult<Job>> SearchJobs(Guid? groupId, string? title, string? status, int pageNumber, int pageSize, IReadOnlyList<Guid>? organizationIds = null)
     {
-        return await JobManager.SearchJobs(organizationId, title, status, pageNumber, pageSize).ConfigureAwait(false);
+        return await JobManager.SearchJobs(groupId, title, status, pageNumber, pageSize, organizationIds).ConfigureAwait(false);
     }
 
     /// <summary>

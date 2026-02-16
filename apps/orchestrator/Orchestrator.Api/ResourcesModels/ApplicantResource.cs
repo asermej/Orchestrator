@@ -9,7 +9,8 @@ namespace Orchestrator.Api.ResourcesModels;
 public class ApplicantResource
 {
     public Guid Id { get; set; }
-    public Guid OrganizationId { get; set; }
+    public Guid GroupId { get; set; }
+    public Guid? OrganizationId { get; set; }
     public string ExternalApplicantId { get; set; } = string.Empty;
     public string? FirstName { get; set; }
     public string? LastName { get; set; }
@@ -35,6 +36,8 @@ public class CreateApplicantResource
     public string? Email { get; set; }
 
     public string? Phone { get; set; }
+
+    public Guid? OrganizationId { get; set; }
 }
 
 /// <summary>
@@ -57,7 +60,7 @@ public class UpdateApplicantResource
 /// </summary>
 public class SearchApplicantRequest : PaginatedRequest
 {
-    public Guid? OrganizationId { get; set; }
+    public Guid? GroupId { get; set; }
     public string? Email { get; set; }
     public string? Name { get; set; }
 }

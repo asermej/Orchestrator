@@ -62,12 +62,16 @@ public class ManualCleanup
 
         var totalTestData = 0;
 
-        totalTestData += Check(connection, "organizations", "SELECT COUNT(*) FROM organizations WHERE name LIKE 'TestOrg_%'");
-        totalTestData += Check(connection, "agents (under test orgs)", "SELECT COUNT(*) FROM agents WHERE organization_id IN (SELECT id FROM organizations WHERE name LIKE 'TestOrg_%')");
-        totalTestData += Check(connection, "jobs (under test orgs)", "SELECT COUNT(*) FROM jobs WHERE organization_id IN (SELECT id FROM organizations WHERE name LIKE 'TestOrg_%')");
-        totalTestData += Check(connection, "applicants (under test orgs)", "SELECT COUNT(*) FROM applicants WHERE organization_id IN (SELECT id FROM organizations WHERE name LIKE 'TestOrg_%')");
-        totalTestData += Check(connection, "interviews (under test orgs)", "SELECT COUNT(*) FROM interviews WHERE job_id IN (SELECT id FROM jobs WHERE organization_id IN (SELECT id FROM organizations WHERE name LIKE 'TestOrg_%'))");
-        totalTestData += Check(connection, "interview_configurations (under test orgs)", "SELECT COUNT(*) FROM interview_configurations WHERE organization_id IN (SELECT id FROM organizations WHERE name LIKE 'TestOrg_%')");
+        // Check for both Orchestrator test groups (TestOrg_) and ATS-synced test groups (TestGroup_)
+        const string testGroupFilter = "name LIKE 'TestOrg_%' OR name LIKE 'TestGroup_%'";
+        const string testGroupSubquery = "SELECT id FROM groups WHERE " + testGroupFilter;
+
+        totalTestData += Check(connection, "groups (TestOrg_ + TestGroup_)", $"SELECT COUNT(*) FROM groups WHERE {testGroupFilter}");
+        totalTestData += Check(connection, "agents (under test groups)", $"SELECT COUNT(*) FROM agents WHERE group_id IN ({testGroupSubquery})");
+        totalTestData += Check(connection, "jobs (under test groups)", $"SELECT COUNT(*) FROM jobs WHERE group_id IN ({testGroupSubquery})");
+        totalTestData += Check(connection, "applicants (under test groups)", $"SELECT COUNT(*) FROM applicants WHERE group_id IN ({testGroupSubquery})");
+        totalTestData += Check(connection, "interviews (under test groups)", $"SELECT COUNT(*) FROM interviews WHERE job_id IN (SELECT id FROM jobs WHERE group_id IN ({testGroupSubquery}))");
+        totalTestData += Check(connection, "interview_configurations (under test groups)", $"SELECT COUNT(*) FROM interview_configurations WHERE group_id IN ({testGroupSubquery})");
         totalTestData += Check(connection, "users (@example.com)", "SELECT COUNT(*) FROM users WHERE email LIKE '%@example.com'");
 
         Console.WriteLine();

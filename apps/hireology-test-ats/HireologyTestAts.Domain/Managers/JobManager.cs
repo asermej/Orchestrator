@@ -3,16 +3,14 @@ namespace HireologyTestAts.Domain;
 internal sealed class JobManager : IDisposable
 {
     private readonly DataFacade _dataFacade;
-    private readonly OrchestratorGateway _orchestratorGateway;
+    private readonly GatewayFacade _gatewayFacade;
     private bool _disposed;
 
-    public JobManager(ServiceLocatorBase serviceLocator)
+    public JobManager(ServiceLocatorBase serviceLocator, GatewayFacade gatewayFacade)
     {
         var configProvider = serviceLocator.CreateConfigurationProvider();
         _dataFacade = new DataFacade(configProvider.GetDbConnectionString());
-        _orchestratorGateway = new OrchestratorGateway(
-            configProvider.GetOrchestratorBaseUrl(),
-            configProvider.GetOrchestratorApiKey());
+        _gatewayFacade = gatewayFacade ?? throw new ArgumentNullException(nameof(gatewayFacade));
     }
 
     public async Task<IReadOnlyList<Job>> GetJobs(int pageNumber, int pageSize, IReadOnlyList<Guid>? allowedOrganizationIds = null)
@@ -51,7 +49,8 @@ internal sealed class JobManager : IDisposable
 
         var created = await _dataFacade.CreateJob(job).ConfigureAwait(false);
 
-        await _orchestratorGateway.SyncJobAsync(created).ConfigureAwait(false);
+        var apiKey = await ResolveApiKeyForJob(created).ConfigureAwait(false);
+        await _gatewayFacade.SyncJob(created, apiKey).ConfigureAwait(false);
 
         return created;
     }
@@ -71,7 +70,8 @@ internal sealed class JobManager : IDisposable
         var updated = await _dataFacade.UpdateJob(existing).ConfigureAwait(false);
         if (updated == null) throw new JobNotFoundException();
 
-        await _orchestratorGateway.SyncJobAsync(updated).ConfigureAwait(false);
+        var apiKey = await ResolveApiKeyForJob(updated).ConfigureAwait(false);
+        await _gatewayFacade.SyncJob(updated, apiKey).ConfigureAwait(false);
 
         return updated;
     }
@@ -82,19 +82,30 @@ internal sealed class JobManager : IDisposable
         if (existing == null) throw new JobNotFoundException();
 
         var externalId = existing.ExternalJobId;
+        var apiKey = await ResolveApiKeyForJob(existing).ConfigureAwait(false);
+
         var deleted = await _dataFacade.DeleteJob(id).ConfigureAwait(false);
         if (!deleted) throw new JobNotFoundException();
 
-        await _orchestratorGateway.DeleteJobAsync(externalId).ConfigureAwait(false);
+        await _gatewayFacade.DeleteJob(externalId, apiKey).ConfigureAwait(false);
 
         return true;
+    }
+
+    private async Task<string?> ResolveApiKeyForJob(Job job)
+    {
+        if (job.OrganizationId.HasValue)
+        {
+            return await _dataFacade.GetOrchestratorApiKeyForOrganization(job.OrganizationId.Value)
+                .ConfigureAwait(false);
+        }
+        return null;
     }
 
     public void Dispose()
     {
         if (!_disposed)
         {
-            _orchestratorGateway.Dispose();
             _disposed = true;
         }
     }

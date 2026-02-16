@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { testAtsApi } from "@/lib/test-ats-api";
 
 interface GroupItem {
@@ -18,6 +19,7 @@ interface MeResponse {
 }
 
 export default function GroupAdminPage() {
+  const router = useRouter();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [groups, setGroups] = useState<GroupItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,14 +38,23 @@ export default function GroupAdminPage() {
           return;
         }
 
-        // If superadmin, show all groups; otherwise show only admin groups
-        const allGroups = await testAtsApi.get<GroupItem[]>("/api/v1/groups");
+        // Superadmins can list all groups; group admins fetch only their own
         if (meData.isSuperadmin) {
+          const allGroups = await testAtsApi.get<GroupItem[]>("/api/v1/groups");
           setGroups(allGroups);
         } else {
-          setGroups(
-            allGroups.filter((g) => meData.adminGroupIds.includes(g.id))
+          const groupPromises = meData.adminGroupIds.map((id) =>
+            testAtsApi.get<GroupItem>(`/api/v1/groups/${id}`)
           );
+          const adminGroups = await Promise.all(groupPromises);
+
+          // If the group admin has exactly one group, go straight to it
+          if (adminGroups.length === 1) {
+            router.replace(`/group-admin/${adminGroups[0].id}`);
+            return;
+          }
+
+          setGroups(adminGroups);
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load");
@@ -52,7 +63,7 @@ export default function GroupAdminPage() {
       }
     };
     load();
-  }, []);
+  }, [router]);
 
   if (loading) {
     return (

@@ -341,13 +341,7 @@ export default function GroupDetailPage() {
 
   return (
     <div>
-      <div className="flex items-center gap-4 mb-6">
-        <a
-          href="/group-admin"
-          className="text-slate-500 hover:text-slate-700"
-        >
-          &larr; Groups
-        </a>
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">
           {group?.name ?? "Group"}
         </h1>

@@ -29,4 +29,22 @@ internal sealed partial class DataFacade
     {
         return await GroupDataManager.DeleteAsync(id).ConfigureAwait(false);
     }
+
+    public async Task UpdateOrchestratorApiKey(Guid groupId, string apiKey)
+    {
+        await GroupDataManager.UpdateOrchestratorApiKey(groupId, apiKey).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Resolves the Orchestrator API key for a given organization by looking up its parent group.
+    /// Returns null if the organization or group is not found, or if no key is stored.
+    /// </summary>
+    public async Task<string?> GetOrchestratorApiKeyForOrganization(Guid organizationId)
+    {
+        var org = await OrganizationDataManager.GetByIdAsync(organizationId).ConfigureAwait(false);
+        if (org == null) return null;
+
+        var group = await GroupDataManager.GetByIdAsync(org.GroupId).ConfigureAwait(false);
+        return group?.OrchestratorApiKey;
+    }
 }

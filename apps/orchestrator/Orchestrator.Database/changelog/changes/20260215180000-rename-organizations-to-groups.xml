@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- ================================================================== -->
+    <!-- RENAME organizations TABLE TO groups + ADD MULTI-TENANT COLUMNS     -->
+    <!-- ================================================================== -->
+    <!-- This migration:                                                     -->
+    <!--   1. Renames 'organizations' table to 'groups'                      -->
+    <!--   2. Renames 'organization_id' FK columns to 'group_id'             -->
+    <!--   3. Adds new 'organization_id' columns (ATS org, no FK)            -->
+    <!--   4. Adds external_group_id, ats_base_url to groups                 -->
+    <!--   5. Adds visibility_scope to agents and interview_guides           -->
+    <!--   6. Adds external_user_id to users                                 -->
+    <!-- ================================================================== -->
+
+    <!-- Step 1: Drop all FK constraints referencing organizations(id) -->
+    <changeSet id="20260215180000-drop-fk-constraints" author="system">
+        <dropForeignKeyConstraint baseTableName="agents" constraintName="fk_personas_organization"/>
+        <dropForeignKeyConstraint baseTableName="applicants" constraintName="fk_applicants_organization"/>
+        <dropForeignKeyConstraint baseTableName="jobs" constraintName="fk_jobs_organization"/>
+        <dropForeignKeyConstraint baseTableName="interview_configurations" constraintName="fk_interview_configurations_organization"/>
+        <dropForeignKeyConstraint baseTableName="interview_invites" constraintName="fk_interview_invites_organization"/>
+        <dropForeignKeyConstraint baseTableName="interview_guides" constraintName="fk_interview_guides_organization"/>
+        <dropForeignKeyConstraint baseTableName="webhook_configs" constraintName="fk_webhook_configs_organization_id"/>
+    </changeSet>
+
+    <!-- Step 2: Drop unique constraints that include organization_id -->
+    <changeSet id="20260215180000-drop-unique-constraints" author="system">
+        <dropUniqueConstraint tableName="applicants" constraintName="uk_applicants_org_external_id"/>
+        <dropUniqueConstraint tableName="jobs" constraintName="uk_jobs_org_external_id"/>
+    </changeSet>
+
+    <!-- Step 3: Drop indexes on the organizations table -->
+    <changeSet id="20260215180000-drop-organizations-indexes" author="system">
+        <dropIndex tableName="organizations" indexName="idx_organizations_api_key"/>
+        <dropIndex tableName="organizations" indexName="idx_organizations_is_deleted"/>
+        <dropIndex tableName="organizations" indexName="idx_organizations_name"/>
+    </changeSet>
+
+    <!-- Step 4: Drop organization_id indexes on child tables -->
+    <changeSet id="20260215180000-drop-child-indexes" author="system">
+        <dropIndex tableName="agents" indexName="idx_agents_organization_id"/>
+        <dropIndex tableName="applicants" indexName="idx_applicants_organization_id"/>
+        <dropIndex tableName="applicants" indexName="idx_applicants_external_id"/>
+        <dropIndex tableName="jobs" indexName="idx_jobs_organization_id"/>
+        <dropIndex tableName="jobs" indexName="idx_jobs_external_id"/>
+        <dropIndex tableName="interview_configurations" indexName="idx_interview_configurations_organization_id"/>
+        <dropIndex tableName="interview_invites" indexName="idx_interview_invites_organization_id"/>
+        <dropIndex tableName="interview_guides" indexName="idx_interview_guides_organization_id"/>
+        <dropIndex tableName="webhook_configs" indexName="idx_webhook_configs_organization_id"/>
+    </changeSet>
+
+    <!-- Step 5: Rename organizations table to groups -->
+    <changeSet id="20260215180000-rename-table" author="system">
+        <renameTable oldTableName="organizations" newTableName="groups"/>
+    </changeSet>
+
+    <!-- Step 6: Add new columns to groups table -->
+    <changeSet id="20260215180000-add-groups-columns" author="system">
+        <addColumn tableName="groups">
+            <column name="external_group_id" type="uuid">
+                <constraints nullable="true"/>
+            </column>
+            <column name="ats_base_url" type="varchar(500)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <!-- Step 7: Rename organization_id to group_id on all child tables -->
+    <changeSet id="20260215180000-rename-org-id-agents" author="system">
+        <renameColumn tableName="agents" oldColumnName="organization_id" newColumnName="group_id" columnDataType="uuid"/>
+    </changeSet>
+
+    <changeSet id="20260215180000-rename-org-id-applicants" author="system">
+        <renameColumn tableName="applicants" oldColumnName="organization_id" newColumnName="group_id" columnDataType="uuid"/>
+    </changeSet>
+
+    <changeSet id="20260215180000-rename-org-id-jobs" author="system">
+        <renameColumn tableName="jobs" oldColumnName="organization_id" newColumnName="group_id" columnDataType="uuid"/>
+    </changeSet>
+
+    <changeSet id="20260215180000-rename-org-id-interview-configs" author="system">
+        <renameColumn tableName="interview_configurations" oldColumnName="organization_id" newColumnName="group_id" columnDataType="uuid"/>
+    </changeSet>
+
+    <changeSet id="20260215180000-rename-org-id-interview-invites" author="system">
+        <renameColumn tableName="interview_invites" oldColumnName="organization_id" newColumnName="group_id" columnDataType="uuid"/>
+    </changeSet>
+
+    <changeSet id="20260215180000-rename-org-id-interview-guides" author="system">
+        <renameColumn tableName="interview_guides" oldColumnName="organization_id" newColumnName="group_id" columnDataType="uuid"/>
+    </changeSet>
+
+    <changeSet id="20260215180000-rename-org-id-webhook-configs" author="system">
+        <renameColumn tableName="webhook_configs" oldColumnName="organization_id" newColumnName="group_id" columnDataType="uuid"/>
+    </changeSet>
+
+    <!-- Step 8: Add new organization_id columns (ATS org ID, no FK) -->
+    <!-- Nullable for now; existing data has no ATS org ID yet -->
+    <changeSet id="20260215180000-add-org-id-agents" author="system">
+        <addColumn tableName="agents">
+            <column name="organization_id" type="uuid">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20260215180000-add-org-id-interview-guides" author="system">
+        <addColumn tableName="interview_guides">
+            <column name="organization_id" type="uuid">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20260215180000-add-org-id-interview-configs" author="system">
+        <addColumn tableName="interview_configurations">
+            <column name="organization_id" type="uuid">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20260215180000-add-org-id-jobs" author="system">
+        <addColumn tableName="jobs">
+            <column name="organization_id" type="uuid">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20260215180000-add-org-id-applicants" author="system">
+        <addColumn tableName="applicants">
+            <column name="organization_id" type="uuid">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <!-- Step 9: Add visibility_scope to agents and interview_guides (future-proofing) -->
+    <changeSet id="20260215180000-add-visibility-scope" author="system">
+        <addColumn tableName="agents">
+            <column name="visibility_scope" type="varchar(50)" defaultValue="owner_only">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <addColumn tableName="interview_guides">
+            <column name="visibility_scope" type="varchar(50)" defaultValue="owner_only">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <!-- Step 10: Add external_user_id to users -->
+    <changeSet id="20260215180000-add-external-user-id" author="system">
+        <addColumn tableName="users">
+            <column name="external_user_id" type="uuid">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <!-- Step 11: Recreate indexes on groups table -->
+    <changeSet id="20260215180000-create-groups-indexes" author="system">
+        <createIndex tableName="groups" indexName="idx_groups_api_key">
+            <column name="api_key"/>
+        </createIndex>
+        <createIndex tableName="groups" indexName="idx_groups_is_deleted">
+            <column name="is_deleted"/>
+        </createIndex>
+        <createIndex tableName="groups" indexName="idx_groups_name">
+            <column name="name"/>
+        </createIndex>
+        <createIndex tableName="groups" indexName="idx_groups_external_group_id">
+            <column name="external_group_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Step 12: Recreate group_id indexes on child tables -->
+    <changeSet id="20260215180000-create-group-id-indexes" author="system">
+        <createIndex tableName="agents" indexName="idx_agents_group_id">
+            <column name="group_id"/>
+        </createIndex>
+        <createIndex tableName="applicants" indexName="idx_applicants_group_id">
+            <column name="group_id"/>
+        </createIndex>
+        <createIndex tableName="applicants" indexName="idx_applicants_group_external_id">
+            <column name="group_id"/>
+            <column name="external_applicant_id"/>
+        </createIndex>
+        <createIndex tableName="jobs" indexName="idx_jobs_group_id">
+            <column name="group_id"/>
+        </createIndex>
+        <createIndex tableName="jobs" indexName="idx_jobs_group_external_id">
+            <column name="group_id"/>
+            <column name="external_job_id"/>
+        </createIndex>
+        <createIndex tableName="interview_configurations" indexName="idx_interview_configurations_group_id">
+            <column name="group_id"/>
+        </createIndex>
+        <createIndex tableName="interview_invites" indexName="idx_interview_invites_group_id">
+            <column name="group_id"/>
+        </createIndex>
+        <createIndex tableName="interview_guides" indexName="idx_interview_guides_group_id">
+            <column name="group_id"/>
+        </createIndex>
+        <createIndex tableName="webhook_configs" indexName="idx_webhook_configs_group_id">
+            <column name="group_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Step 13: Create indexes on new organization_id columns -->
+    <changeSet id="20260215180000-create-org-id-indexes" author="system">
+        <createIndex tableName="agents" indexName="idx_agents_organization_id">
+            <column name="organization_id"/>
+        </createIndex>
+        <createIndex tableName="interview_guides" indexName="idx_interview_guides_organization_id">
+            <column name="organization_id"/>
+        </createIndex>
+        <createIndex tableName="interview_configurations" indexName="idx_interview_configurations_organization_id">
+            <column name="organization_id"/>
+        </createIndex>
+        <createIndex tableName="jobs" indexName="idx_jobs_organization_id">
+            <column name="organization_id"/>
+        </createIndex>
+        <createIndex tableName="applicants" indexName="idx_applicants_organization_id">
+            <column name="organization_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Step 14: Create index on external_user_id -->
+    <changeSet id="20260215180000-create-external-user-id-index" author="system">
+        <createIndex tableName="users" indexName="idx_users_external_user_id">
+            <column name="external_user_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Step 15: Recreate FK constraints (group_id -> groups(id)) -->
+    <changeSet id="20260215180000-create-fk-constraints" author="system">
+        <addForeignKeyConstraint
+            baseTableName="agents" baseColumnNames="group_id"
+            constraintName="fk_agents_group"
+            referencedTableName="groups" referencedColumnNames="id"/>
+        <addForeignKeyConstraint
+            baseTableName="applicants" baseColumnNames="group_id"
+            constraintName="fk_applicants_group"
+            referencedTableName="groups" referencedColumnNames="id"/>
+        <addForeignKeyConstraint
+            baseTableName="jobs" baseColumnNames="group_id"
+            constraintName="fk_jobs_group"
+            referencedTableName="groups" referencedColumnNames="id"/>
+        <addForeignKeyConstraint
+            baseTableName="interview_configurations" baseColumnNames="group_id"
+            constraintName="fk_interview_configurations_group"
+            referencedTableName="groups" referencedColumnNames="id"/>
+        <addForeignKeyConstraint
+            baseTableName="interview_invites" baseColumnNames="group_id"
+            constraintName="fk_interview_invites_group"
+            referencedTableName="groups" referencedColumnNames="id"/>
+        <addForeignKeyConstraint
+            baseTableName="interview_guides" baseColumnNames="group_id"
+            constraintName="fk_interview_guides_group"
+            referencedTableName="groups" referencedColumnNames="id"/>
+        <addForeignKeyConstraint
+            baseTableName="webhook_configs" baseColumnNames="group_id"
+            constraintName="fk_webhook_configs_group"
+            referencedTableName="groups" referencedColumnNames="id"/>
+    </changeSet>
+
+    <!-- Step 16: Recreate unique constraints with group_id -->
+    <changeSet id="20260215180000-create-unique-constraints" author="system">
+        <addUniqueConstraint tableName="applicants" columnNames="group_id, external_applicant_id" constraintName="uk_applicants_group_external_id"/>
+        <addUniqueConstraint tableName="jobs" columnNames="group_id, external_job_id" constraintName="uk_jobs_group_external_id"/>
+    </changeSet>
+
+</databaseChangeLog>

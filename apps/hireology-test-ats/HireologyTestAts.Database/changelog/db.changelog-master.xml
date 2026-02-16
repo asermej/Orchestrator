@@ -23,4 +23,6 @@
     <include file="changes/20260214120006-make-auth0sub-nullable.xml" relativeToChangelogFile="true"/>
     <include file="changes/20260214130000-create-applicants-table.xml" relativeToChangelogFile="true"/>
     <include file="changes/20260214140000-create-interview-requests-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260215170000-add-orchestrator-api-key-to-groups.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260215170001-backfill-orchestrator-api-key.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

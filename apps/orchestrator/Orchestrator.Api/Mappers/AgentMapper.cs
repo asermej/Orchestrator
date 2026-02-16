@@ -21,7 +21,9 @@ public static class AgentMapper
         return new AgentResource
         {
             Id = agent.Id,
+            GroupId = agent.GroupId,
             OrganizationId = agent.OrganizationId,
+            VisibilityScope = agent.VisibilityScope,
             DisplayName = agent.DisplayName,
             ProfileImageUrl = agent.ProfileImageUrl,
             SystemPrompt = agent.SystemPrompt,
@@ -54,16 +56,17 @@ public static class AgentMapper
     /// Maps a CreateAgentResource to an Agent domain object for creation.
     /// </summary>
     /// <param name="createResource">The CreateAgentResource from API request</param>
-    /// <param name="organizationId">The organization ID to use (resolved by controller if not in request)</param>
+    /// <param name="groupId">The group ID to use (resolved by controller if not in request)</param>
     /// <returns>An Agent domain object ready for creation</returns>
     /// <exception cref="ArgumentNullException">Thrown when createResource is null</exception>
-    public static Agent ToDomain(CreateAgentResource createResource, Guid organizationId)
+    public static Agent ToDomain(CreateAgentResource createResource, Guid groupId)
     {
         ArgumentNullException.ThrowIfNull(createResource);
 
         return new Agent
         {
-            OrganizationId = organizationId,
+            GroupId = groupId,
+            OrganizationId = createResource.OrganizationId,
             DisplayName = createResource.DisplayName,
             ProfileImageUrl = createResource.ProfileImageUrl,
             SystemPrompt = createResource.SystemPrompt,
@@ -92,7 +95,9 @@ public static class AgentMapper
         return new Agent
         {
             Id = existingAgent.Id,
+            GroupId = existingAgent.GroupId,
             OrganizationId = existingAgent.OrganizationId,
+            VisibilityScope = existingAgent.VisibilityScope,
             DisplayName = updateResource.DisplayName ?? existingAgent.DisplayName,
             ProfileImageUrl = updateResource.ProfileImageUrl ?? existingAgent.ProfileImageUrl,
             SystemPrompt = updateResource.SystemPrompt ?? existingAgent.SystemPrompt,

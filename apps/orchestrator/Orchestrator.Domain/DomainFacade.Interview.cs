@@ -84,7 +84,7 @@ public sealed partial class DomainFacade
     {
         try
         {
-            // Get the job to find the organization ID
+            // Get the job to find the group ID
             var job = await JobManager.GetJobById(interview.JobId).ConfigureAwait(false);
             if (job == null) return;
 
@@ -93,7 +93,7 @@ public sealed partial class DomainFacade
 
             // Send the webhook
             await WebhookManager.SendInterviewWebhookAsync(
-                job.OrganizationId,
+                job.GroupId,
                 WebhookEventTypes.InterviewCompleted,
                 interview,
                 result
@@ -200,7 +200,7 @@ public sealed partial class DomainFacade
         var testApplicantId = Guid.NewGuid().ToString("N");
         var testApplicant = new Applicant
         {
-            OrganizationId = config.OrganizationId,
+            GroupId = config.GroupId,
             ExternalApplicantId = $"test-{testApplicantId}",
             FirstName = testUserName ?? "Test",
             LastName = "User",
@@ -212,7 +212,7 @@ public sealed partial class DomainFacade
         var testJobId = Guid.NewGuid().ToString("N");
         var testJob = new Job
         {
-            OrganizationId = config.OrganizationId,
+            GroupId = config.GroupId,
             ExternalJobId = $"test-job-{testJobId}",
             Title = $"Test Interview - {config.Name}",
             Status = "active"

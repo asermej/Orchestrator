@@ -4,6 +4,7 @@ using Orchestrator.Domain;
 using Orchestrator.Api.ResourcesModels;
 using Orchestrator.Api.Mappers;
 using Orchestrator.Api.Common;
+using Orchestrator.Api.Middleware;
 
 namespace Orchestrator.Api.Controllers;
 
@@ -22,6 +23,9 @@ public class InterviewConfigurationController : ControllerBase
     {
         _domainFacade = domainFacade;
     }
+
+    private UserContext? GetUserContext()
+        => HttpContext.Items.TryGetValue("UserContext", out var ctx) ? ctx as UserContext : null;
 
     /// <summary>
     /// Creates a new interview configuration
@@ -72,9 +76,13 @@ public class InterviewConfigurationController : ControllerBase
             return NotFound($"Interview configuration with ID {id} not found");
         }
 
-        // Optionally load the agent
+        // Load the agent
         var agent = await _domainFacade.GetAgentById(config.AgentId);
         config.Agent = agent;
+
+        // Load the interview guide with questions
+        var guide = await _domainFacade.GetInterviewGuideByIdWithQuestions(config.InterviewGuideId);
+        config.InterviewGuide = guide;
 
         var response = InterviewConfigurationMapper.ToResource(config);
         
@@ -91,14 +99,21 @@ public class InterviewConfigurationController : ControllerBase
     [ProducesResponseType(typeof(PaginatedResponse<InterviewConfigurationResource>), 200)]
     public async Task<ActionResult<PaginatedResponse<InterviewConfigurationResource>>> Search([FromQuery] SearchInterviewConfigurationRequest request)
     {
+        var userContext = GetUserContext();
+        var groupId = request.GroupId ?? userContext?.GroupId;
+        var orgFilter = (userContext is { IsResolved: true, IsSuperadmin: false, IsGroupAdmin: false })
+            ? userContext.AccessibleOrganizationIds
+            : null;
+
         var result = await _domainFacade.SearchInterviewConfigurations(
-            request.OrganizationId,
+            groupId,
             request.AgentId,
             request.Name,
             request.IsActive,
             request.SortBy,
             request.PageNumber, 
-            request.PageSize);
+            request.PageSize,
+            orgFilter);
 
         var response = new PaginatedResponse<InterviewConfigurationResource>
         {

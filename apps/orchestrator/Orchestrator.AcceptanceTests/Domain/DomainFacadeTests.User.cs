@@ -8,7 +8,7 @@ namespace Orchestrator.AcceptanceTests.Domain;
 /// <summary>
 /// Tests for User operations using real DomainFacade.
 /// Cleanup: centralized SQL cleanup in TestInitialize/TestCleanup via TestDataCleanup.
-/// Users are identified by email pattern @example.com (no organization FK).
+/// Users are identified by email pattern @example.com (no group FK).
 /// </summary>
 [TestClass]
 public class DomainFacadeTestsUser

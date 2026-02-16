@@ -3,12 +3,14 @@ namespace HireologyTestAts.Domain;
 internal sealed class GroupManager : IDisposable
 {
     private readonly DataFacade _dataFacade;
+    private readonly GatewayFacade _gatewayFacade;
     private bool _disposed;
 
-    public GroupManager(ServiceLocatorBase serviceLocator)
+    public GroupManager(ServiceLocatorBase serviceLocator, GatewayFacade gatewayFacade)
     {
         var configProvider = serviceLocator.CreateConfigurationProvider();
         _dataFacade = new DataFacade(configProvider.GetDbConnectionString());
+        _gatewayFacade = gatewayFacade ?? throw new ArgumentNullException(nameof(gatewayFacade));
     }
 
     public async Task<IReadOnlyList<Group>> GetGroups(bool excludeTestData = false)
@@ -64,7 +66,24 @@ internal sealed class GroupManager : IDisposable
             await _dataFacade.AddGroupAccess(adminUser.Id, createdGroup.Id, isAdmin: true).ConfigureAwait(false);
         }
 
-        return updatedGroup ?? createdGroup;
+        var result = updatedGroup ?? createdGroup;
+
+        // Sync group to Orchestrator and save the returned API key
+        try
+        {
+            var syncResult = await _gatewayFacade.SyncGroup(result).ConfigureAwait(false);
+            if (!string.IsNullOrEmpty(syncResult.ApiKey))
+            {
+                await _dataFacade.UpdateOrchestratorApiKey(result.Id, syncResult.ApiKey).ConfigureAwait(false);
+                result.OrchestratorApiKey = syncResult.ApiKey;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning: Failed to sync group to Orchestrator: {ex.Message}");
+        }
+
+        return result;
     }
 
     public async Task<Group> UpdateGroup(Guid id, Group updates)
@@ -76,6 +95,22 @@ internal sealed class GroupManager : IDisposable
 
         var updated = await _dataFacade.UpdateGroup(existing).ConfigureAwait(false);
         if (updated == null) throw new GroupNotFoundException();
+
+        // Sync updated group to Orchestrator and save the returned API key
+        try
+        {
+            var syncResult = await _gatewayFacade.SyncGroup(updated).ConfigureAwait(false);
+            if (!string.IsNullOrEmpty(syncResult.ApiKey) && syncResult.ApiKey != updated.OrchestratorApiKey)
+            {
+                await _dataFacade.UpdateOrchestratorApiKey(updated.Id, syncResult.ApiKey).ConfigureAwait(false);
+                updated.OrchestratorApiKey = syncResult.ApiKey;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning: Failed to sync group update to Orchestrator: {ex.Message}");
+        }
+
         return updated;
     }
 

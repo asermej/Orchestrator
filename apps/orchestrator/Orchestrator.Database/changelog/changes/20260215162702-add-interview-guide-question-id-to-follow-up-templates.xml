@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Add interview_guide_question_id column to follow_up_templates -->
+    <changeSet id="20260215162702-add-interview-guide-question-id-column" author="system">
+        <addColumn tableName="follow_up_templates">
+            <column name="interview_guide_question_id" type="uuid">
+                <constraints nullable="true" foreignKeyName="fk_follow_up_templates_guide_question" references="interview_guide_questions(id)"/>
+            </column>
+        </addColumn>
+
+        <createIndex tableName="follow_up_templates" indexName="idx_follow_up_templates_guide_question_id">
+            <column name="interview_guide_question_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

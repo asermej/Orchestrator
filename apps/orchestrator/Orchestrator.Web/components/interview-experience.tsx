@@ -39,6 +39,8 @@ export interface InterviewExperienceProps {
   agentImageUrl?: string;
   applicantName?: string;
   jobTitle?: string;
+  openingTemplate?: string | null;
+  closingTemplate?: string | null;
   onSaveResponse: (questionId: string, questionText: string, transcript: string, order: number, isFollowUp?: boolean, followUpTemplateId?: string, audioUrl?: string, durationSeconds?: number) => Promise<FollowUpSelectionResponse | void>;
   onUploadAudio?: (blob: Blob) => Promise<string | null>;
   onComplete: () => Promise<void>;
@@ -50,6 +52,20 @@ export interface InterviewExperienceProps {
  * Shared interview experience component that handles the full voice interview flow.
  * Used by both the real interview page and the test interview page.
  */
+/**
+ * Substitutes template variables in a template string.
+ * Supported variables: {{applicantName}}, {{agentName}}, {{jobTitle}}
+ */
+function substituteTemplateVariables(
+  template: string,
+  vars: { applicantName?: string; agentName?: string; jobTitle?: string }
+): string {
+  return template
+    .replace(/\{\{applicantName\}\}/g, vars.applicantName || "there")
+    .replace(/\{\{agentName\}\}/g, vars.agentName || "your interviewer")
+    .replace(/\{\{jobTitle\}\}/g, vars.jobTitle || "this position");
+}
+
 export function InterviewExperience({
   questions,
   agentId,
@@ -57,6 +73,8 @@ export function InterviewExperience({
   agentImageUrl,
   applicantName = "there",
   jobTitle,
+  openingTemplate,
+  closingTemplate,
   onSaveResponse,
   onUploadAudio,
   onComplete,
@@ -124,11 +142,15 @@ export function InterviewExperience({
     return `Question ${currentQuestionIndex + 1} of ${totalQuestions}`;
   };
   
-  // Pre-generate greeting text
+  // Pre-generate greeting text using opening template if available
   const getGreetingText = useCallback(() => {
     const question = questions[0];
+    if (openingTemplate) {
+      const greeting = substituteTemplateVariables(openingTemplate, { applicantName, agentName, jobTitle });
+      return `${greeting} ${question?.text || "Tell me about yourself."}`;
+    }
     return `Hello ${applicantName}! I'm ${agentName}, and I'll be conducting your interview today. Let's get started with our first question. ${question?.text || "Tell me about yourself."}`;
-  }, [applicantName, agentName, questions]);
+  }, [applicantName, agentName, jobTitle, questions, openingTemplate]);
 
   const handleTranscript = useCallback((text: string) => {
     setTranscript((prev) => {
@@ -413,10 +435,12 @@ export function InterviewExperience({
       console.error("Failed to complete interview:", err);
     }
 
-    // Thank the applicant
-    const closing = `Thank you for completing this interview, ${applicantName}! We appreciate your time and will be in touch soon with next steps. Have a great day!`;
+    // Thank the applicant using closing template if available
+    const closing = closingTemplate
+      ? substituteTemplateVariables(closingTemplate, { applicantName, agentName, jobTitle })
+      : `Thank you for completing this interview, ${applicantName}! We appreciate your time and will be in touch soon with next steps. Have a great day!`;
     await speakText(closing);
-  }, [applicantName, onComplete, stateMachine]);
+  }, [applicantName, agentName, jobTitle, closingTemplate, onComplete, stateMachine]);
 
   const handleReRecord = useCallback(async () => {
     setTranscript("");

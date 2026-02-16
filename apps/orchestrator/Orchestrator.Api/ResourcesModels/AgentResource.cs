@@ -16,9 +16,19 @@ public class AgentResource
     public Guid Id { get; set; }
 
     /// <summary>
-    /// The organization this agent belongs to
+    /// The group this agent belongs to
     /// </summary>
-    public Guid OrganizationId { get; set; }
+    public Guid GroupId { get; set; }
+
+    /// <summary>
+    /// The ATS organization this agent is scoped to (null = group-wide)
+    /// </summary>
+    public Guid? OrganizationId { get; set; }
+
+    /// <summary>
+    /// The visibility scope of this agent
+    /// </summary>
+    public string VisibilityScope { get; set; } = "owner_only";
 
     /// <summary>
     /// The display name of the agent
@@ -87,7 +97,12 @@ public class AgentResource
 public class CreateAgentResource
 {
     /// <summary>
-    /// The organization this agent belongs to (optional - will use default if not specified)
+    /// The group this agent belongs to (optional - will use default if not specified)
+    /// </summary>
+    public Guid? GroupId { get; set; }
+
+    /// <summary>
+    /// The ATS organization this agent is scoped to (null = group-wide)
     /// </summary>
     public Guid? OrganizationId { get; set; }
 
@@ -226,9 +241,9 @@ public class AtsAgentResource
 public class SearchAgentRequest : PaginatedRequest
 {
     /// <summary>
-    /// Filter by organization ID
+    /// Filter by group ID
     /// </summary>
-    public Guid? OrganizationId { get; set; }
+    public Guid? GroupId { get; set; }
 
     /// <summary>
     /// Filter by display name

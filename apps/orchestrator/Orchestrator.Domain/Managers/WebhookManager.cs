@@ -30,18 +30,18 @@ internal class WebhookManager : IDisposable
     /// Send a webhook notification for an interview event
     /// </summary>
     public async Task<bool> SendInterviewWebhookAsync(
-        Guid organizationId,
+        Guid groupId,
         string eventType,
         Interview interview,
         InterviewResult? result = null)
     {
         try
         {
-            // Get the organization to find the webhook URL
-            var organization = await _dataFacade.GetOrganizationByIdAsync(organizationId);
-            if (organization == null || string.IsNullOrEmpty(organization.WebhookUrl))
+            // Get the group to find the webhook URL
+            var group = await _dataFacade.GetGroupByIdAsync(groupId);
+            if (group == null || string.IsNullOrEmpty(group.WebhookUrl))
             {
-                _logger?.LogWarning("No webhook URL configured for organization {OrganizationId}", organizationId);
+                _logger?.LogWarning("No webhook URL configured for group {GroupId}", groupId);
                 return false;
             }
 
@@ -54,7 +54,7 @@ internal class WebhookManager : IDisposable
             });
 
             // Send the webhook
-            return await SendWebhookAsync(organization.WebhookUrl, organization.ApiKey, eventType, payloadJson);
+            return await SendWebhookAsync(group.WebhookUrl, group.ApiKey, eventType, payloadJson);
         }
         catch (Exception ex)
         {
