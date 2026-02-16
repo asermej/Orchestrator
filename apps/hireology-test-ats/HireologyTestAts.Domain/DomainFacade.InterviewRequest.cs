@@ -27,6 +27,14 @@ public sealed partial class DomainFacade
         return await InterviewRequestManager.GetByJobId(jobId).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Verifies the HMAC-SHA256 signature and timestamp of an incoming webhook payload.
+    /// </summary>
+    public bool VerifyWebhookSignature(string body, string? signature, string? timestamp)
+    {
+        return InterviewRequestManager.VerifyWebhookSignature(body, signature, timestamp);
+    }
+
     public async Task<InterviewRequest> UpdateInterviewRequestFromWebhook(
         Guid orchestratorInterviewId,
         string status,
@@ -47,6 +55,15 @@ public sealed partial class DomainFacade
     }
 
     /// <summary>
+    /// On-demand refresh of interview request status from Orchestrator.
+    /// Use when a webhook may have been missed.
+    /// </summary>
+    public async Task<InterviewRequest> RefreshInterviewRequestStatus(Guid interviewRequestId)
+    {
+        return await InterviewRequestManager.RefreshStatusFromOrchestrator(interviewRequestId).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Gets available agents from Orchestrator for a specific group.
     /// Pass the group's OrchestratorApiKey; falls back to global config if null.
     /// </summary>
@@ -64,21 +81,4 @@ public sealed partial class DomainFacade
         return await InterviewRequestManager.GetConfigurations(groupApiKey).ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Gets the current webhook status from Orchestrator for a specific group.
-    /// Pass the group's OrchestratorApiKey; falls back to global config if null.
-    /// </summary>
-    public async Task<(bool Configured, string? WebhookUrl)> GetWebhookStatus(string? groupApiKey = null)
-    {
-        return await InterviewRequestManager.GetWebhookStatus(groupApiKey).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Configures the webhook URL in Orchestrator for a specific group.
-    /// Pass the group's OrchestratorApiKey; falls back to global config if null.
-    /// </summary>
-    public async Task<bool> ConfigureWebhookUrl(string webhookUrl, string? groupApiKey = null)
-    {
-        return await InterviewRequestManager.ConfigureWebhookUrl(webhookUrl, groupApiKey).ConfigureAwait(false);
-    }
 }

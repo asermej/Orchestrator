@@ -51,14 +51,6 @@ internal static class OrchestratorMapper
         };
     }
 
-    public static OrchestratorSetWebhookRequest ToSetWebhookRequest(string webhookUrl)
-    {
-        return new OrchestratorSetWebhookRequest
-        {
-            WebhookUrl = webhookUrl
-        };
-    }
-
     public static OrchestratorProvisionUserRequest ToProvisionUserRequest(string auth0Sub, string? email, string? name)
     {
         var safeEmail = !string.IsNullOrWhiteSpace(email)
@@ -162,7 +154,7 @@ internal static class OrchestratorMapper
         }).ToList();
     }
 
-    public static OrchestratorSyncGroupRequest ToSyncGroupRequest(Group group, string? atsBaseUrl)
+    public static OrchestratorSyncGroupRequest ToSyncGroupRequest(Group group, string? atsBaseUrl, string? webhookUrl, string? atsApiKey)
     {
         if (group == null)
             throw new ArgumentNullException(nameof(group));
@@ -171,7 +163,9 @@ internal static class OrchestratorMapper
         {
             ExternalGroupId = group.Id,
             Name = group.Name,
-            AtsBaseUrl = atsBaseUrl
+            AtsBaseUrl = atsBaseUrl,
+            WebhookUrl = webhookUrl,
+            AtsApiKey = atsApiKey
         };
     }
 

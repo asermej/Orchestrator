@@ -68,10 +68,11 @@ public sealed partial class DomainFacade
 
     /// <summary>
     /// Creates or updates a group by its external (ATS) group ID.
+    /// Automatically stores the ATS webhook URL so webhooks are configured during sync.
     /// Returns the upserted group including the API key.
     /// </summary>
-    public async Task<Group> UpsertGroupByExternalId(Guid externalGroupId, string name, string? atsBaseUrl)
+    public async Task<Group> UpsertGroupByExternalId(Guid externalGroupId, string name, string? atsBaseUrl, string? webhookUrl = null, string? atsApiKey = null)
     {
-        return await GroupManager.UpsertGroupByExternalId(externalGroupId, name, atsBaseUrl).ConfigureAwait(false);
+        return await GroupManager.UpsertGroupByExternalId(externalGroupId, name, atsBaseUrl, webhookUrl, atsApiKey).ConfigureAwait(false);
     }
 }

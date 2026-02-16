@@ -20,7 +20,7 @@ internal sealed class GroupDataManager
     {
         const string sql = @"
             SELECT id, name, api_key, webhook_url, is_active, external_group_id, ats_base_url,
-                   created_at, updated_at, is_deleted
+                   ats_api_key, created_at, updated_at, is_deleted
             FROM groups
             WHERE id = @id AND is_deleted = false";
         using var connection = new NpgsqlConnection(_dbConnectionString);
@@ -31,7 +31,7 @@ internal sealed class GroupDataManager
     {
         const string sql = @"
             SELECT id, name, api_key, webhook_url, is_active, external_group_id, ats_base_url,
-                   created_at, updated_at, is_deleted
+                   ats_api_key, created_at, updated_at, is_deleted
             FROM groups
             WHERE external_group_id = @ExternalGroupId AND is_deleted = false";
         using var connection = new NpgsqlConnection(_dbConnectionString);
@@ -42,20 +42,22 @@ internal sealed class GroupDataManager
     {
         const string sql = @"
             SELECT id, name, api_key, webhook_url, is_active, external_group_id, ats_base_url,
-                   created_at, updated_at, is_deleted
+                   ats_api_key, created_at, updated_at, is_deleted
             FROM groups
             WHERE api_key = @ApiKey AND is_deleted = false AND is_active = true";
         using var connection = new NpgsqlConnection(_dbConnectionString);
         return await connection.QueryFirstOrDefaultAsync<Group>(sql, new { ApiKey = apiKey });
     }
 
-    public async Task<Group> Upsert(Guid externalGroupId, string name, string? atsBaseUrl)
+    public async Task<Group> Upsert(Guid externalGroupId, string name, string? atsBaseUrl, string? webhookUrl, string? atsApiKey = null)
     {
         var existing = await GetByExternalGroupId(externalGroupId);
         if (existing != null)
         {
             existing.Name = name;
             if (atsBaseUrl != null) existing.AtsBaseUrl = atsBaseUrl;
+            if (webhookUrl != null) existing.WebhookUrl = webhookUrl;
+            if (atsApiKey != null) existing.AtsApiKey = atsApiKey;
             return await Update(existing);
         }
 
@@ -66,6 +68,8 @@ internal sealed class GroupDataManager
             ApiKey = Guid.NewGuid().ToString("N"),
             ExternalGroupId = externalGroupId,
             AtsBaseUrl = atsBaseUrl,
+            WebhookUrl = webhookUrl,
+            AtsApiKey = atsApiKey,
             IsActive = true
         };
         return await Add(group);
@@ -79,10 +83,10 @@ internal sealed class GroupDataManager
         }
 
         const string sql = @"
-            INSERT INTO groups (id, name, api_key, webhook_url, is_active, external_group_id, ats_base_url, created_by)
-            VALUES (@Id, @Name, @ApiKey, @WebhookUrl, @IsActive, @ExternalGroupId, @AtsBaseUrl, @CreatedBy)
+            INSERT INTO groups (id, name, api_key, webhook_url, is_active, external_group_id, ats_base_url, ats_api_key, created_by)
+            VALUES (@Id, @Name, @ApiKey, @WebhookUrl, @IsActive, @ExternalGroupId, @AtsBaseUrl, @AtsApiKey, @CreatedBy)
             RETURNING id, name, api_key, webhook_url, is_active, external_group_id, ats_base_url,
-                      created_at, updated_at, is_deleted";
+                      ats_api_key, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var newItem = await connection.QueryFirstOrDefaultAsync<Group>(sql, group);
@@ -99,11 +103,12 @@ internal sealed class GroupDataManager
                 is_active = @IsActive,
                 external_group_id = @ExternalGroupId,
                 ats_base_url = @AtsBaseUrl,
+                ats_api_key = @AtsApiKey,
                 updated_at = CURRENT_TIMESTAMP,
                 updated_by = @UpdatedBy
             WHERE id = @Id AND is_deleted = false
             RETURNING id, name, api_key, webhook_url, is_active, external_group_id, ats_base_url,
-                      created_at, updated_at, is_deleted";
+                      ats_api_key, created_at, updated_at, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var updatedItem = await connection.QueryFirstOrDefaultAsync<Group>(sql, group);
@@ -154,7 +159,7 @@ internal sealed class GroupDataManager
         var offset = (pageNumber - 1) * pageSize;
         var querySql = $@"
             SELECT id, name, api_key, webhook_url, is_active, external_group_id, ats_base_url,
-                   created_at, updated_at, is_deleted
+                   ats_api_key, created_at, updated_at, is_deleted
             FROM groups
             {whereSql}
             ORDER BY created_at DESC

@@ -82,13 +82,13 @@ internal sealed class GroupManager : IDisposable
 
     /// <summary>
     /// Creates or updates a group by its external (ATS) group ID.
-    /// If a group with the given external ID exists, updates its name and ATS base URL.
+    /// If a group with the given external ID exists, updates its name, ATS base URL, and webhook URL.
     /// If not, creates a new group with a generated API key.
     /// Returns the upserted group and the API key (callers need it for future requests).
     /// </summary>
-    public async Task<Group> UpsertGroupByExternalId(Guid externalGroupId, string name, string? atsBaseUrl)
+    public async Task<Group> UpsertGroupByExternalId(Guid externalGroupId, string name, string? atsBaseUrl, string? webhookUrl, string? atsApiKey = null)
     {
-        return await DataFacade.UpsertGroupByExternalId(externalGroupId, name, atsBaseUrl).ConfigureAwait(false);
+        return await DataFacade.UpsertGroupByExternalId(externalGroupId, name, atsBaseUrl, webhookUrl, atsApiKey).ConfigureAwait(false);
     }
 
     private static string GenerateApiKey()

@@ -20,12 +20,13 @@ public class WebhookController : ControllerBase
     }
 
     /// <summary>
-    /// Receives webhook notifications from Orchestrator (e.g., interview.completed)
+    /// Receives webhook notifications from Orchestrator (e.g., interview.completed, interview.started)
     /// </summary>
     [HttpPost("orchestrator")]
     [AllowAnonymous]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
     public async Task<ActionResult> ReceiveWebhook()
     {
         try
@@ -41,10 +42,18 @@ public class WebhookController : ControllerBase
                 return BadRequest("Empty webhook body");
             }
 
+            var signature = Request.Headers["X-Webhook-Signature"].FirstOrDefault();
+            var timestamp = Request.Headers["X-Webhook-Timestamp"].FirstOrDefault();
+
+            if (!_domainFacade.VerifyWebhookSignature(body, signature, timestamp))
+            {
+                _logger.LogWarning("Webhook signature verification failed for event {EventType}", eventType);
+                return Unauthorized("Invalid webhook signature");
+            }
+
             using var doc = JsonDocument.Parse(body);
             var root = doc.RootElement;
 
-            // Extract interview data
             if (!root.TryGetProperty("interview", out var interviewElement))
             {
                 _logger.LogWarning("Webhook payload missing 'interview' property");
@@ -54,7 +63,6 @@ public class WebhookController : ControllerBase
             var interviewId = interviewElement.GetProperty("id").GetGuid();
             var status = interviewElement.GetProperty("status").GetString() ?? "completed";
 
-            // Map Orchestrator status to our status
             var mappedStatus = status switch
             {
                 "completed" => InterviewRequestStatus.Completed,
@@ -62,7 +70,6 @@ public class WebhookController : ControllerBase
                 _ => status
             };
 
-            // Extract result data if present
             int? score = null;
             string? summary = null;
             string? recommendation = null;
@@ -87,7 +94,6 @@ public class WebhookController : ControllerBase
                     areasForImprovement = impEl.GetString();
             }
 
-            // Update local interview request record
             try
             {
                 await _domainFacade.UpdateInterviewRequestFromWebhook(

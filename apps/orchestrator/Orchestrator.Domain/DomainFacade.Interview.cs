@@ -43,11 +43,13 @@ public sealed partial class DomainFacade
     }
 
     /// <summary>
-    /// Starts an Interview
+    /// Starts an Interview and sends a webhook notification
     /// </summary>
     public async Task<Interview> StartInterview(Guid interviewId)
     {
-        return await InterviewManager.StartInterview(interviewId).ConfigureAwait(false);
+        var interview = await InterviewManager.StartInterview(interviewId).ConfigureAwait(false);
+        await SendInterviewWebhookAsync(interview, WebhookEventTypes.InterviewStarted);
+        return interview;
     }
 
     /// <summary>
@@ -72,37 +74,34 @@ public sealed partial class DomainFacade
         }
         
         // Send webhook notification (will now include the score if auto-scoring succeeded)
-        await SendInterviewCompletedWebhookAsync(interview);
+        await SendInterviewWebhookAsync(interview, WebhookEventTypes.InterviewCompleted);
         
         return interview;
     }
 
     /// <summary>
-    /// Sends a webhook notification when an interview is completed
+    /// Sends a webhook notification for any interview status change.
+    /// Fetches the job (for group routing) and result (if available) automatically.
     /// </summary>
-    private async Task SendInterviewCompletedWebhookAsync(Interview interview)
+    private async Task SendInterviewWebhookAsync(Interview interview, string eventType)
     {
         try
         {
-            // Get the job to find the group ID
             var job = await JobManager.GetJobById(interview.JobId).ConfigureAwait(false);
             if (job == null) return;
 
-            // Get the interview result if available
             var result = await InterviewManager.GetResultByInterviewId(interview.Id).ConfigureAwait(false);
 
-            // Send the webhook
             await WebhookManager.SendInterviewWebhookAsync(
                 job.GroupId,
-                WebhookEventTypes.InterviewCompleted,
+                eventType,
                 interview,
                 result
             ).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            // Log but don't fail the interview completion
-            System.Diagnostics.Debug.WriteLine($"Failed to send webhook for interview {interview.Id}: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Failed to send {eventType} webhook for interview {interview.Id}: {ex.Message}");
         }
     }
 

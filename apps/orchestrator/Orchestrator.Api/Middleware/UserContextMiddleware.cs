@@ -118,11 +118,14 @@ public class UserContextMiddleware
                 "Failed to resolve user context from ATS for auth0Sub={Auth0Sub}, groupId={GroupId}. Proceeding without ATS context.",
                 auth0Sub, groupId);
 
+            // IsResolved = false: we know the group but could NOT determine org-level
+            // access from the ATS.  Downstream controllers must treat this as
+            // "show everything in the group" rather than "show nothing".
             context.Items["UserContext"] = new UserContext
             {
                 Auth0Sub = auth0Sub,
                 GroupId = groupId,
-                IsResolved = true
+                IsResolved = false
             };
         }
 

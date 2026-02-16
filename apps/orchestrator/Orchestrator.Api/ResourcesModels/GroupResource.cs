@@ -87,6 +87,16 @@ public class SyncGroupResource
 
     [Url]
     public string? AtsBaseUrl { get; set; }
+
+    [Url]
+    public string? WebhookUrl { get; set; }
+
+    /// <summary>
+    /// The ATS's own API key for authenticating Orchestrator→ATS callbacks
+    /// (e.g. user-access and organization queries).
+    /// </summary>
+    [StringLength(255)]
+    public string? AtsApiKey { get; set; }
 }
 
 /// <summary>

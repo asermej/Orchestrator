@@ -56,7 +56,7 @@ public class AtsController : ControllerBase
 
         var existingGroup = await _domainFacade.GetGroupByExternalGroupId(resource.ExternalGroupId);
         var group = await _domainFacade.UpsertGroupByExternalId(
-            resource.ExternalGroupId, resource.Name.Trim(), resource.AtsBaseUrl);
+            resource.ExternalGroupId, resource.Name.Trim(), resource.AtsBaseUrl, resource.WebhookUrl, resource.AtsApiKey);
 
         var response = new SyncGroupResponseResource
         {

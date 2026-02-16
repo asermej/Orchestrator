@@ -69,9 +69,11 @@ internal sealed class OrchestratorManager : IDisposable
         try
         {
             var config = _serviceLocator.CreateConfigurationProvider();
-            var atsBaseUrl = config.GetOrchestratorBaseUrl();
+            var selfBaseUrl = config.GetSelfBaseUrl();
+            var webhookUrl = $"{selfBaseUrl}/api/v1/webhooks/orchestrator";
+            var atsApiKey = config.GetOrchestratorApiKey();
 
-            var requestResource = OrchestratorMapper.ToSyncGroupRequest(group, atsBaseUrl);
+            var requestResource = OrchestratorMapper.ToSyncGroupRequest(group, selfBaseUrl, webhookUrl, atsApiKey);
             var jsonContent = JsonSerializer.Serialize(requestResource);
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
@@ -522,103 +524,6 @@ internal sealed class OrchestratorManager : IDisposable
             }
 
             return OrchestratorMapper.ToRefreshInviteResult(orchestratorInterviewId, responseResource);
-        }
-        catch (HttpRequestException ex)
-        {
-            throw new OrchestratorConnectionException($"Failed to connect to Orchestrator API: {ex.Message}", ex);
-        }
-        catch (TaskCanceledException ex)
-        {
-            throw new OrchestratorConnectionException($"Orchestrator API request timed out: {ex.Message}", ex);
-        }
-        catch (OrchestratorApiException)
-        {
-            throw;
-        }
-        catch (OrchestratorConnectionException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            throw new OrchestratorApiException($"Unexpected error calling Orchestrator API: {ex.Message}", ex);
-        }
-    }
-
-    /// <summary>
-    /// Gets the current webhook URL for this ATS group from Orchestrator.
-    /// Returns unconfigured response if no API key is available.
-    /// </summary>
-    public async Task<OrchestratorGetWebhookResponse> GetWebhookUrl(string? groupApiKey)
-    {
-        var apiKey = ResolveApiKey(groupApiKey);
-        if (string.IsNullOrEmpty(apiKey)) return new OrchestratorGetWebhookResponse { Configured = false };
-
-        try
-        {
-            var client = CreateHttpClientWithApiKey(apiKey);
-            var response = await client.GetAsync("/api/v1/ats/settings/webhook").ConfigureAwait(false);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                throw new OrchestratorApiException(
-                    $"Orchestrator API returned error: {response.StatusCode} - {errorContent}");
-            }
-
-            var responseContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-            var result = JsonSerializer.Deserialize<OrchestratorGetWebhookResponse>(
-                responseContent, JsonOptions);
-
-            return result ?? new OrchestratorGetWebhookResponse { Configured = false };
-        }
-        catch (HttpRequestException ex)
-        {
-            throw new OrchestratorConnectionException($"Failed to connect to Orchestrator API: {ex.Message}", ex);
-        }
-        catch (TaskCanceledException ex)
-        {
-            throw new OrchestratorConnectionException($"Orchestrator API request timed out: {ex.Message}", ex);
-        }
-        catch (OrchestratorApiException)
-        {
-            throw;
-        }
-        catch (OrchestratorConnectionException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            throw new OrchestratorApiException($"Unexpected error calling Orchestrator API: {ex.Message}", ex);
-        }
-    }
-
-    /// <summary>
-    /// Sets the webhook URL for this ATS group in Orchestrator.
-    /// Silently skips if no API key is available.
-    /// </summary>
-    public async Task SetWebhookUrl(string webhookUrl, string? groupApiKey)
-    {
-        var apiKey = ResolveApiKey(groupApiKey);
-        if (string.IsNullOrEmpty(apiKey)) return;
-
-        try
-        {
-            var client = CreateHttpClientWithApiKey(apiKey);
-            var requestResource = OrchestratorMapper.ToSetWebhookRequest(webhookUrl);
-            var jsonContent = JsonSerializer.Serialize(requestResource);
-            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-
-            var response = await client.PutAsync(
-                "/api/v1/ats/settings/webhook", content).ConfigureAwait(false);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                throw new OrchestratorApiException(
-                    $"Orchestrator API returned error: {response.StatusCode} - {errorContent}");
-            }
         }
         catch (HttpRequestException ex)
         {

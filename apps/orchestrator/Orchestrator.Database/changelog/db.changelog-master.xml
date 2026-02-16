@@ -116,4 +116,10 @@
 
     <!-- Simplify InterviewConfiguration: remove config-level questions and scoring rubric -->
     <include file="changes/20260216120000-drop-interview-configuration-questions-and-scoring-rubric.xml" relativeToChangelogFile="true"/>
+
+    <!-- Webhook cleanup: drop unused webhook_configs and webhook_deliveries tables -->
+    <include file="changes/20260216150000-drop-unused-webhook-tables.xml" relativeToChangelogFile="true"/>
+
+    <!-- Add ats_api_key to groups for Orchestrator→ATS callback authentication -->
+    <include file="changes/20260216160000-add-ats-api-key-to-groups.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog> 

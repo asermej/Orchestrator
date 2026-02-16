@@ -116,35 +116,16 @@ public class InterviewRequestController : ControllerBase
     }
 
     /// <summary>
-    /// Gets the current webhook configuration status from Orchestrator
+    /// Manually refreshes the status of an interview request by querying Orchestrator.
+    /// Use when a webhook may have been missed or delayed.
     /// </summary>
-    [HttpGet("settings/webhook-status")]
-    [ProducesResponseType(200)]
-    public async Task<ActionResult> GetWebhookStatus()
+    [HttpPost("interview-requests/{id:guid}/refresh-status")]
+    [ProducesResponseType(typeof(InterviewRequestResource), 200)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<InterviewRequestResource>> RefreshStatus(Guid id)
     {
-        var (configured, webhookUrl) = await _domainFacade.GetWebhookStatus();
-        return Ok(new { configured, webhookUrl });
+        var request = await _domainFacade.RefreshInterviewRequestStatus(id);
+        return Ok(InterviewRequestMapper.ToResource(request));
     }
 
-    /// <summary>
-    /// Configures the webhook URL in Orchestrator so interview results are sent back to this ATS
-    /// </summary>
-    [HttpPost("settings/configure-webhook")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(400)]
-    public async Task<ActionResult> ConfigureWebhook()
-    {
-        // Determine our own webhook URL based on the request
-        var scheme = Request.Scheme;
-        var host = Request.Host;
-        var webhookUrl = $"{scheme}://{host}/api/v1/webhooks/orchestrator";
-
-        var success = await _domainFacade.ConfigureWebhookUrl(webhookUrl);
-        if (!success)
-        {
-            return BadRequest("Failed to configure webhook URL in Orchestrator");
-        }
-
-        return Ok(new { webhookUrl, configured = true });
-    }
 }

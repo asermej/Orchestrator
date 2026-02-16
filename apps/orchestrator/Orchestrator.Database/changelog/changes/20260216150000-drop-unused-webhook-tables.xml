@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="20260216150000-drop-webhook-deliveries" author="system">
+        <comment>Drop unused webhook_deliveries table (webhook delivery is handled inline with retries, not via a tracking table)</comment>
+        <dropTable tableName="webhook_deliveries" schemaName="public"/>
+    </changeSet>
+
+    <changeSet id="20260216150000-drop-webhook-configs" author="system">
+        <comment>Drop unused webhook_configs table (webhook URL is stored directly on the groups table)</comment>
+        <dropTable tableName="webhook_configs" schemaName="public"/>
+    </changeSet>
+
+</databaseChangeLog>

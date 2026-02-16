@@ -1,16 +1,23 @@
+using System.Security.Cryptography;
+using System.Text;
+
 namespace HireologyTestAts.Domain;
 
 internal sealed class InterviewRequestManager : IDisposable
 {
     private readonly DataFacade _dataFacade;
     private readonly GatewayFacade _gatewayFacade;
+    private readonly string _webhookSecret;
     private bool _disposed;
+
+    private const int MaxTimestampAgeSecs = 300; // 5 minutes
 
     public InterviewRequestManager(ServiceLocatorBase serviceLocator, GatewayFacade gatewayFacade)
     {
         var configProvider = serviceLocator.CreateConfigurationProvider();
         _dataFacade = new DataFacade(configProvider.GetDbConnectionString());
         _gatewayFacade = gatewayFacade ?? throw new ArgumentNullException(nameof(gatewayFacade));
+        _webhookSecret = configProvider.GetOrchestratorApiKey();
     }
 
     /// <summary>
@@ -85,42 +92,77 @@ internal sealed class InterviewRequestManager : IDisposable
 
     public async Task<IReadOnlyList<InterviewRequest>> GetByJobId(Guid jobId)
     {
-        var requests = await _dataFacade.GetInterviewRequestsByJobId(jobId).ConfigureAwait(false);
+        return await _dataFacade.GetInterviewRequestsByJobId(jobId).ConfigureAwait(false);
+    }
 
-        // Resolve the API key once for the job
-        var job = await _dataFacade.GetJobById(jobId).ConfigureAwait(false);
-        string? apiKey = null;
-        if (job != null)
+    /// <summary>
+    /// On-demand refresh: syncs local status from Orchestrator for a single interview request.
+    /// Use when a user suspects a missed webhook.
+    /// </summary>
+    public async Task<InterviewRequest> RefreshStatusFromOrchestrator(Guid interviewRequestId)
+    {
+        var request = await _dataFacade.GetInterviewRequestById(interviewRequestId).ConfigureAwait(false);
+        if (request == null) throw new InterviewRequestNotFoundException();
+
+        if (request.Status is InterviewRequestStatus.Completed or InterviewRequestStatus.LinkExpired)
+            return request;
+
+        if (!request.OrchestratorInterviewId.HasValue)
+            return request;
+
+        var apiKey = await ResolveApiKeyForInterviewRequest(request).ConfigureAwait(false);
+        var orchestratorStatus = await _gatewayFacade.GetInterviewStatus(
+            request.OrchestratorInterviewId.Value, apiKey).ConfigureAwait(false);
+
+        if (orchestratorStatus == null)
+            return request;
+
+        var newStatus = orchestratorStatus.InterviewStatus switch
         {
-            apiKey = await ResolveApiKeyForJob(job).ConfigureAwait(false);
+            "completed" => InterviewRequestStatus.Completed,
+            "in_progress" => InterviewRequestStatus.InProgress,
+            _ when orchestratorStatus.InviteStatus is "max_uses_reached" or "expired" or "revoked"
+                => InterviewRequestStatus.LinkExpired,
+            _ => (string?)null
+        };
+
+        if (newStatus != null && newStatus != request.Status)
+        {
+            request.Status = newStatus;
+            return await _dataFacade.UpdateInterviewRequest(request).ConfigureAwait(false);
         }
 
-        var updated = new List<InterviewRequest>(requests.Count);
-        foreach (var request in requests)
-        {
-            if (request.Status == InterviewRequestStatus.NotStarted && request.OrchestratorInterviewId.HasValue)
-            {
-                var orchestratorStatus = await _gatewayFacade.GetInterviewStatus(
-                    request.OrchestratorInterviewId.Value, apiKey).ConfigureAwait(false);
+        return request;
+    }
 
-                if (orchestratorStatus != null)
-                {
-                    if (orchestratorStatus.InviteStatus is "max_uses_reached" or "expired" or "revoked")
-                    {
-                        request.Status = InterviewRequestStatus.LinkExpired;
-                        await _dataFacade.UpdateInterviewRequest(request).ConfigureAwait(false);
-                    }
-                    else if (orchestratorStatus.InterviewStatus == "in_progress")
-                    {
-                        request.Status = InterviewRequestStatus.InProgress;
-                        await _dataFacade.UpdateInterviewRequest(request).ConfigureAwait(false);
-                    }
-                }
-            }
-            updated.Add(request);
+    /// <summary>
+    /// Verifies the HMAC-SHA256 signature and timestamp of an incoming webhook.
+    /// Returns true if verification passes, or if no secret is configured (graceful degradation).
+    /// </summary>
+    public bool VerifyWebhookSignature(string body, string? signature, string? timestamp)
+    {
+        if (string.IsNullOrEmpty(_webhookSecret))
+            return true;
+
+        if (string.IsNullOrEmpty(signature))
+            return false;
+
+        if (!string.IsNullOrEmpty(timestamp) && long.TryParse(timestamp, out var ts))
+        {
+            var age = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - ts;
+            if (Math.Abs(age) > MaxTimestampAgeSecs)
+                return false;
         }
 
-        return updated;
+        var expected = ComputeSignature(body, _webhookSecret);
+        return string.Equals(signature, expected, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ComputeSignature(string payload, string secret)
+    {
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
+        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
+        return $"sha256={Convert.ToHexString(hash).ToLowerInvariant()}";
     }
 
     /// <summary>
@@ -166,24 +208,6 @@ internal sealed class InterviewRequestManager : IDisposable
     public async Task<IReadOnlyList<OrchestratorInterviewConfiguration>> GetConfigurations(string? groupApiKey)
     {
         return await _gatewayFacade.GetConfigurations(groupApiKey).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Gets the current webhook status from Orchestrator for a specific group
-    /// </summary>
-    public async Task<(bool Configured, string? WebhookUrl)> GetWebhookStatus(string? groupApiKey)
-    {
-        var response = await _gatewayFacade.GetWebhookUrl(groupApiKey).ConfigureAwait(false);
-        return (response.Configured, response.WebhookUrl);
-    }
-
-    /// <summary>
-    /// Configures the webhook URL in Orchestrator for a specific group
-    /// </summary>
-    public async Task<bool> ConfigureWebhookUrl(string webhookUrl, string? groupApiKey)
-    {
-        await _gatewayFacade.SetWebhookUrl(webhookUrl, groupApiKey).ConfigureAwait(false);
-        return true;
     }
 
     private async Task<string?> ResolveApiKeyForJob(Job job)

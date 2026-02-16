@@ -27,6 +27,20 @@ public abstract class ConfigurationProviderBase
         return RetrieveConfigurationSettingValue("HireologyAts:BootstrapSecret") ?? string.Empty;
     }
 
+    /// <summary>
+    /// Returns this ATS application's own publicly-reachable base URL.
+    /// Used to construct the webhook callback URL sent to Orchestrator during group sync.
+    /// </summary>
+    public string GetSelfBaseUrl()
+    {
+        var value = RetrieveConfigurationSettingValue("HireologyAts:SelfBaseUrl");
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "http://localhost:5001";
+        }
+        return value.TrimEnd('/');
+    }
+
     // --- Gateway Configuration Methods ---
 
     public string GetGatewayBaseUrl(string integrationName)

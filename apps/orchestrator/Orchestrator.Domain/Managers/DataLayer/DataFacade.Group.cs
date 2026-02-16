@@ -19,9 +19,9 @@ internal sealed partial class DataFacade
         return await GroupDataManager.GetByExternalGroupId(externalGroupId);
     }
 
-    public async Task<Group> UpsertGroupByExternalId(Guid externalGroupId, string name, string? atsBaseUrl)
+    public async Task<Group> UpsertGroupByExternalId(Guid externalGroupId, string name, string? atsBaseUrl, string? webhookUrl, string? atsApiKey = null)
     {
-        return await GroupDataManager.Upsert(externalGroupId, name, atsBaseUrl);
+        return await GroupDataManager.Upsert(externalGroupId, name, atsBaseUrl, webhookUrl, atsApiKey);
     }
 
     // Alias for WebhookManager

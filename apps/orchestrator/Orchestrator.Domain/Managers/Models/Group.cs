@@ -26,4 +26,7 @@ public class Group : Entity
 
     [Column("ats_base_url")]
     public string? AtsBaseUrl { get; set; }
+
+    [Column("ats_api_key")]
+    public string? AtsApiKey { get; set; }
 }

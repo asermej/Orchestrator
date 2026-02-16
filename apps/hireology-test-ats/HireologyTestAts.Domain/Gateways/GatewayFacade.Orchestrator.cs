@@ -87,22 +87,6 @@ internal sealed partial class GatewayFacade
     }
 
     /// <summary>
-    /// Gets the current webhook URL for this ATS group from Orchestrator
-    /// </summary>
-    public async Task<OrchestratorGetWebhookResponse> GetWebhookUrl(string? groupApiKey)
-    {
-        return await OrchestratorManager.GetWebhookUrl(groupApiKey).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Sets the webhook URL for this ATS group in Orchestrator
-    /// </summary>
-    public async Task SetWebhookUrl(string webhookUrl, string? groupApiKey)
-    {
-        await OrchestratorManager.SetWebhookUrl(webhookUrl, groupApiKey).ConfigureAwait(false);
-    }
-
-    /// <summary>
     /// Provisions a user in Orchestrator. Checks if user exists first, creates if not found.
     /// </summary>
     public async Task ProvisionUser(string auth0Sub, string? email, string? name, string? groupApiKey)

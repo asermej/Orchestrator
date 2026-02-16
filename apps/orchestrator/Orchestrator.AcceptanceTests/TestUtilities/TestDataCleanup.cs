@@ -128,22 +128,15 @@ public static class TestDataCleanup
             TryExecute(connection,
                 "DELETE FROM consent_audit WHERE agent_id IN (" + testAgentIds + ")");
 
-            // 11. Webhook deliveries → webhook_configs → groups
-            TryExecute(connection,
-                "DELETE FROM webhook_deliveries WHERE webhook_config_id IN (" +
-                "SELECT id FROM webhook_configs WHERE group_id IN (" + testGroupIds + "))");
-            TryExecute(connection,
-                "DELETE FROM webhook_configs WHERE group_id IN (" + testGroupIds + ")");
-
-            // 12. Agents → groups
+            // 11. Agents → groups
             TryExecute(connection,
                 "DELETE FROM agents WHERE group_id IN (" + testGroupIds + ")");
 
-            // 13. Groups (root — Orchestrator test groups + ATS-synced test groups)
+            // 12. Groups (root — Orchestrator test groups + ATS-synced test groups)
             TryExecute(connection,
                 "DELETE FROM groups WHERE name LIKE 'TestOrg_%' OR name LIKE 'TestGroup_%'");
 
-            // 14. Users (no group FK — identify by email pattern)
+            // 13. Users (no group FK — identify by email pattern)
             TryExecute(connection,
                 "DELETE FROM users WHERE email LIKE '%@example.com'");
         }

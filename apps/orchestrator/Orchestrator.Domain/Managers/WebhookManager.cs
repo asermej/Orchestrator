@@ -106,52 +106,70 @@ internal class WebhookManager : IDisposable
         return payload;
     }
 
+    private const int MaxRetries = 3;
+    private static readonly int[] RetryDelaysMs = { 1_000, 5_000, 25_000 };
+
     /// <summary>
-    /// Send a webhook request
+    /// Send a webhook request with exponential backoff retries
     /// </summary>
     private async Task<bool> SendWebhookAsync(string url, string? secret, string eventType, string payload)
     {
-        try
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+
+        for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
-            var request = new HttpRequestMessage(HttpMethod.Post, url)
+            if (attempt > 0)
             {
-                Content = new StringContent(payload, Encoding.UTF8, "application/json")
-            };
-
-            // Add webhook headers
-            request.Headers.Add("X-Webhook-Event", eventType);
-            request.Headers.Add("X-Webhook-Timestamp", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString());
-
-            // Add signature if secret is configured
-            if (!string.IsNullOrEmpty(secret))
-            {
-                var signature = ComputeSignature(payload, secret);
-                request.Headers.Add("X-Webhook-Signature", signature);
+                var delayMs = RetryDelaysMs[attempt - 1];
+                _logger?.LogInformation(
+                    "Webhook retry {Attempt}/{MaxRetries} to {Url} in {DelayMs}ms",
+                    attempt, MaxRetries, url, delayMs);
+                await Task.Delay(delayMs).ConfigureAwait(false);
             }
 
-            var response = await _httpClient.SendAsync(request);
-            
-            if (response.IsSuccessStatusCode)
+            try
             {
-                _logger?.LogInformation("Webhook delivered successfully to {Url} for event {EventType}", url, eventType);
-                return true;
-            }
-            else
-            {
-                var responseBody = await response.Content.ReadAsStringAsync();
+                using var request = new HttpRequestMessage(HttpMethod.Post, url)
+                {
+                    Content = new StringContent(payload, Encoding.UTF8, "application/json")
+                };
+
+                request.Headers.Add("X-Webhook-Event", eventType);
+                request.Headers.Add("X-Webhook-Timestamp", timestamp);
+
+                if (!string.IsNullOrEmpty(secret))
+                {
+                    var signature = ComputeSignature(payload, secret);
+                    request.Headers.Add("X-Webhook-Signature", signature);
+                }
+
+                var response = await _httpClient.SendAsync(request).ConfigureAwait(false);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger?.LogInformation(
+                        "Webhook delivered successfully to {Url} for event {EventType} (attempt {Attempt})",
+                        url, eventType, attempt + 1);
+                    return true;
+                }
+
+                var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 _logger?.LogWarning(
-                    "Webhook delivery failed to {Url}: {StatusCode} - {ResponseBody}",
-                    url,
-                    response.StatusCode,
-                    responseBody);
-                return false;
+                    "Webhook delivery failed to {Url}: {StatusCode} - {ResponseBody} (attempt {Attempt}/{Total})",
+                    url, response.StatusCode, responseBody, attempt + 1, MaxRetries + 1);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex,
+                    "Exception sending webhook to {Url} (attempt {Attempt}/{Total})",
+                    url, attempt + 1, MaxRetries + 1);
             }
         }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Exception while sending webhook to {Url}", url);
-            return false;
-        }
+
+        _logger?.LogError(
+            "Webhook delivery to {Url} for event {EventType} failed after {Total} attempts",
+            url, eventType, MaxRetries + 1);
+        return false;
     }
 
     /// <summary>

@@ -15,4 +15,10 @@ internal class OrchestratorSyncGroupRequest
 
     [JsonPropertyName("atsBaseUrl")]
     public string? AtsBaseUrl { get; set; }
+
+    [JsonPropertyName("webhookUrl")]
+    public string? WebhookUrl { get; set; }
+
+    [JsonPropertyName("atsApiKey")]
+    public string? AtsApiKey { get; set; }
 }
