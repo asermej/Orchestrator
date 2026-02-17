@@ -32,6 +32,7 @@ export default function EditInterviewGuidePage({ params }: { params: Promise<{ i
 
   const [guide, setGuide] = useState<InterviewGuideItem | null>(null);
   const [isLoadingGuide, setIsLoadingGuide] = useState(true);
+  const [isInherited, setIsInherited] = useState(false);
 
   // Form state
   const [name, setName] = useState("");
@@ -40,6 +41,7 @@ export default function EditInterviewGuidePage({ params }: { params: Promise<{ i
   const [closingTemplate, setClosingTemplate] = useState("");
   const [scoringRubric, setScoringRubric] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [visibilityScope, setVisibilityScope] = useState("organization_only");
   const [questions, setQuestions] = useState<QuestionInput[]>([]);
 
   const { execute: executeUpdate, isLoading: isUpdating } = useServerAction(
@@ -51,6 +53,7 @@ export default function EditInterviewGuidePage({ params }: { params: Promise<{ i
         closingTemplate: closingTemplate || null,
         scoringRubric: scoringRubric || null,
         isActive,
+        visibilityScope,
         questions: questions
           .filter(q => q.question.trim() !== "")
           .map((q, index) => ({
@@ -98,12 +101,21 @@ export default function EditInterviewGuidePage({ params }: { params: Promise<{ i
       setIsLoadingGuide(true);
       const data = await fetchInterviewGuideById(guideId);
       setGuide(data);
+
+      // Inherited guard: redirect if the guide is inherited
+      if (data.isInherited) {
+        setIsInherited(true);
+        router.push("/interview-guides");
+        return;
+      }
+
       setName(data.name);
       setDescription(data.description || "");
       setOpeningTemplate(data.openingTemplate || "");
       setClosingTemplate(data.closingTemplate || "");
       setScoringRubric(data.scoringRubric || "");
       setIsActive(data.isActive);
+      setVisibilityScope(data.visibilityScope || "organization_only");
       setQuestions(
         data.questions && data.questions.length > 0
           ? data.questions.map(q => ({
@@ -228,6 +240,67 @@ export default function EditInterviewGuidePage({ params }: { params: Promise<{ i
                   onCheckedChange={setIsActive}
                   disabled={isUpdating}
                 />
+              </div>
+
+              {/* Visibility Scope */}
+              <div className="space-y-3">
+                <Label>Visibility</Label>
+                <p className="text-sm text-muted-foreground">
+                  Control which organizations can see and use this guide.
+                </p>
+                <div className="space-y-2">
+                  <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
+                    <input
+                      type="radio"
+                      name="visibilityScopeRadio"
+                      value="organization_only"
+                      checked={visibilityScope === "organization_only"}
+                      onChange={(e) => setVisibilityScope(e.target.value)}
+                      className="mt-0.5"
+                      disabled={isUpdating}
+                    />
+                    <div>
+                      <div className="font-medium text-sm">This organization only</div>
+                      <div className="text-xs text-muted-foreground">
+                        Only visible at the current organization.
+                      </div>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
+                    <input
+                      type="radio"
+                      name="visibilityScopeRadio"
+                      value="organization_and_descendants"
+                      checked={visibilityScope === "organization_and_descendants"}
+                      onChange={(e) => setVisibilityScope(e.target.value)}
+                      className="mt-0.5"
+                      disabled={isUpdating}
+                    />
+                    <div>
+                      <div className="font-medium text-sm">This organization and sub-organizations</div>
+                      <div className="text-xs text-muted-foreground">
+                        Visible here and at all sub-organizations below.
+                      </div>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
+                    <input
+                      type="radio"
+                      name="visibilityScopeRadio"
+                      value="descendants_only"
+                      checked={visibilityScope === "descendants_only"}
+                      onChange={(e) => setVisibilityScope(e.target.value)}
+                      className="mt-0.5"
+                      disabled={isUpdating}
+                    />
+                    <div>
+                      <div className="font-medium text-sm">Sub-organizations only</div>
+                      <div className="text-xs text-muted-foreground">
+                        Only visible at sub-organizations, not at this organization.
+                      </div>
+                    </div>
+                  </label>
+                </div>
               </div>
             </CardContent>
           </Card>

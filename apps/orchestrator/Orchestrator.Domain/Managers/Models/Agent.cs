@@ -45,5 +45,5 @@ public class Agent : Entity
     public string? VoiceName { get; set; }
 
     [Column("visibility_scope")]
-    public string VisibilityScope { get; set; } = AgentVisibilityScope.OrganizationOnly;
+    public string VisibilityScope { get; set; } = Domain.VisibilityScope.OrganizationOnly;
 }

@@ -15,6 +15,18 @@ internal static class InterviewGuideValidator
             errors.Add("GroupId is required.");
         }
 
+        // OrganizationId is required
+        if (!guide.OrganizationId.HasValue || guide.OrganizationId.Value == Guid.Empty)
+        {
+            errors.Add("OrganizationId is required. Please select an organization.");
+        }
+
+        // VisibilityScope must be a valid value
+        if (!Domain.VisibilityScope.IsValid(guide.VisibilityScope))
+        {
+            errors.Add($"VisibilityScope must be one of: {string.Join(", ", Domain.VisibilityScope.AllValues)}.");
+        }
+
         // Name is required
         var nameError = ValidatorString.Validate("Name", guide.Name);
         if (nameError != null)

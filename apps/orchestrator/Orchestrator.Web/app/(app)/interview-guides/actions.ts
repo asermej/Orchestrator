@@ -1,7 +1,7 @@
 "use server";
 
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api-client-server";
-import { getGroupId } from "@/lib/group-context";
+import { getGroupId, getSelectedOrgId } from "@/lib/group-context";
 
 export interface InterviewGuideQuestion {
   id: string;
@@ -33,6 +33,8 @@ export interface InterviewGuideItem {
   updatedAt?: string | null;
   createdBy?: string | null;
   updatedBy?: string | null;
+  isInherited?: boolean;
+  ownerOrganizationName?: string | null;
 }
 
 interface PaginatedResponse {
@@ -43,13 +45,14 @@ interface PaginatedResponse {
 }
 
 /**
- * Fetch interview guides with pagination and filters
+ * Fetch interview guides with pagination, filters, and optional source filtering.
  */
 export async function fetchInterviewGuides(
   pageNumber: number = 1,
   pageSize: number = 12,
   searchTerm?: string,
-  isActive?: boolean
+  isActive?: boolean,
+  source?: "local" | "inherited"
 ): Promise<PaginatedResponse> {
   const params = new URLSearchParams({
     PageNumber: pageNumber.toString(),
@@ -62,6 +65,10 @@ export async function fetchInterviewGuides(
 
   if (isActive !== undefined) {
     params.append("IsActive", isActive.toString());
+  }
+
+  if (source) {
+    params.append("Source", source);
   }
 
   const data = await apiGet<PaginatedResponse>(`/InterviewGuide?${params.toString()}`);
@@ -78,11 +85,12 @@ export async function fetchInterviewGuideById(id: string): Promise<InterviewGuid
 
 /**
  * Create a new interview guide.
- * groupId is automatically resolved from the group context cookie.
+ * groupId and organizationId are automatically resolved from context cookies.
  */
 export async function createInterviewGuide(data: {
   groupId?: string;
   organizationId?: string | null;
+  visibilityScope?: string;
   name: string;
   description?: string | null;
   openingTemplate?: string | null;
@@ -100,9 +108,17 @@ export async function createInterviewGuide(data: {
   createdBy?: string;
 }): Promise<InterviewGuideItem> {
   const groupId = data.groupId || (await getGroupId()) || "";
+  const selectedOrgId = data.organizationId || (await getSelectedOrgId());
+
+  if (!selectedOrgId) {
+    throw new Error("Please select an organization before creating an interview guide.");
+  }
+
   const createdGuide = await apiPost<InterviewGuideItem>("/InterviewGuide", {
     ...data,
     groupId,
+    organizationId: selectedOrgId,
+    visibilityScope: data.visibilityScope || "organization_only",
   });
   return createdGuide as InterviewGuideItem;
 }
@@ -119,6 +135,7 @@ export async function updateInterviewGuide(
     closingTemplate?: string | null;
     scoringRubric?: string | null;
     isActive?: boolean;
+    visibilityScope?: string;
     questions?: Array<{
       question: string;
       displayOrder: number;
@@ -139,4 +156,12 @@ export async function updateInterviewGuide(
  */
 export async function deleteInterviewGuide(id: string): Promise<void> {
   await apiDelete(`/InterviewGuide/${id}`);
+}
+
+/**
+ * Clone an inherited interview guide into the currently selected organization.
+ */
+export async function cloneInterviewGuide(id: string): Promise<InterviewGuideItem> {
+  const clonedGuide = await apiPost<InterviewGuideItem>(`/InterviewGuide/${id}/clone`);
+  return clonedGuide as InterviewGuideItem;
 }

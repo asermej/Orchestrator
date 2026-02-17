@@ -93,7 +93,7 @@ internal sealed class AgentManager : IDisposable
             VoiceProvider = source.VoiceProvider,
             VoiceType = source.VoiceType,
             VoiceName = source.VoiceName,
-            VisibilityScope = AgentVisibilityScope.OrganizationOnly,
+            VisibilityScope = Domain.VisibilityScope.OrganizationOnly,
         };
 
         AgentValidator.Validate(clone);

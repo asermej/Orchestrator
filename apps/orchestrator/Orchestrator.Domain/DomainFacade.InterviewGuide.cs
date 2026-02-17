@@ -109,4 +109,30 @@ public sealed partial class DomainFacade
         var dataFacade = new DataFacade(_serviceLocator.CreateConfigurationProvider().GetDbConnectionString());
         return await dataFacade.GetInterviewGuideQuestionById(questionId).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Searches for local interview guides (created at the specified organization).
+    /// </summary>
+    public async Task<PaginatedResult<InterviewGuide>> SearchLocalInterviewGuides(
+        Guid groupId, Guid organizationId, string? name, bool? isActive, string? sortBy, int pageNumber, int pageSize)
+    {
+        return await InterviewGuideManager.SearchLocalGuides(groupId, organizationId, name, isActive, sortBy, pageNumber, pageSize).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Searches for inherited interview guides (from ancestor organizations with propagating visibility).
+    /// </summary>
+    public async Task<PaginatedResult<InterviewGuide>> SearchInheritedInterviewGuides(
+        Guid groupId, IReadOnlyList<Guid> ancestorOrgIds, string? name, bool? isActive, string? sortBy, int pageNumber, int pageSize)
+    {
+        return await InterviewGuideManager.SearchInheritedGuides(groupId, ancestorOrgIds, name, isActive, sortBy, pageNumber, pageSize).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Clones an interview guide (including all questions) to a target organization.
+    /// </summary>
+    public async Task<InterviewGuide> CloneInterviewGuide(Guid guideId, Guid targetOrganizationId, Guid targetGroupId)
+    {
+        return await InterviewGuideManager.CloneGuide(guideId, targetOrganizationId, targetGroupId).ConfigureAwait(false);
+    }
 }

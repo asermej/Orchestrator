@@ -9,11 +9,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Plus, Trash2, GripVertical, Info } from "lucide-react";
+import { Loader2, Plus, Trash2, GripVertical, Info, Building2 } from "lucide-react";
 import Link from "next/link";
 import { createInterviewGuide } from "../actions";
 import { useServerAction } from "@/lib/use-server-action";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
 
 interface QuestionInput {
   id: string;
@@ -28,6 +34,9 @@ export default function NewInterviewGuidePage() {
   const { user, isLoading: isUserLoading } = useUser();
   const router = useRouter();
 
+  const selectedOrgId = getCookie("orchestrator_selected_org");
+  const hasOrgSelected = !!selectedOrgId;
+
   // Form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -35,6 +44,7 @@ export default function NewInterviewGuidePage() {
   const [closingTemplate, setClosingTemplate] = useState("");
   const [scoringRubric, setScoringRubric] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [visibilityScope, setVisibilityScope] = useState("organization_only");
   const [questions, setQuestions] = useState<QuestionInput[]>([
     { id: crypto.randomUUID(), question: "", scoringWeight: 1, scoringGuidance: "", followUpsEnabled: true, maxFollowUps: 2 }
   ]);
@@ -48,6 +58,7 @@ export default function NewInterviewGuidePage() {
         closingTemplate: closingTemplate || null,
         scoringRubric: scoringRubric || null,
         isActive,
+        visibilityScope,
         questions: questions
           .filter(q => q.question.trim() !== "")
           .map((q, index) => ({
@@ -112,6 +123,27 @@ export default function NewInterviewGuidePage() {
 
   const templateVariableHint = "Available variables: {{applicantName}}, {{agentName}}, {{jobTitle}}";
 
+  // Org required gate
+  if (!hasOrgSelected) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold">New Interview Guide</h1>
+          <p className="text-muted-foreground mt-2">
+            Create a reusable interview guide with questions, templates, and scoring criteria
+          </p>
+        </div>
+        <div className="text-center py-20">
+          <Building2 className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-xl font-semibold mb-2">Select an organization</h3>
+          <p className="text-muted-foreground max-w-md mx-auto">
+            Please select an organization from the dropdown in the top-right corner before creating a guide.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
@@ -168,6 +200,67 @@ export default function NewInterviewGuidePage() {
                   onCheckedChange={setIsActive}
                   disabled={isCreating}
                 />
+              </div>
+
+              {/* Visibility Scope */}
+              <div className="space-y-3">
+                <Label>Visibility</Label>
+                <p className="text-sm text-muted-foreground">
+                  Control which organizations can see and use this guide.
+                </p>
+                <div className="space-y-2">
+                  <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
+                    <input
+                      type="radio"
+                      name="visibilityScopeRadio"
+                      value="organization_only"
+                      checked={visibilityScope === "organization_only"}
+                      onChange={(e) => setVisibilityScope(e.target.value)}
+                      className="mt-0.5"
+                      disabled={isCreating}
+                    />
+                    <div>
+                      <div className="font-medium text-sm">This organization only</div>
+                      <div className="text-xs text-muted-foreground">
+                        Only visible at the current organization.
+                      </div>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
+                    <input
+                      type="radio"
+                      name="visibilityScopeRadio"
+                      value="organization_and_descendants"
+                      checked={visibilityScope === "organization_and_descendants"}
+                      onChange={(e) => setVisibilityScope(e.target.value)}
+                      className="mt-0.5"
+                      disabled={isCreating}
+                    />
+                    <div>
+                      <div className="font-medium text-sm">This organization and sub-organizations</div>
+                      <div className="text-xs text-muted-foreground">
+                        Visible here and at all sub-organizations below.
+                      </div>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
+                    <input
+                      type="radio"
+                      name="visibilityScopeRadio"
+                      value="descendants_only"
+                      checked={visibilityScope === "descendants_only"}
+                      onChange={(e) => setVisibilityScope(e.target.value)}
+                      className="mt-0.5"
+                      disabled={isCreating}
+                    />
+                    <div>
+                      <div className="font-medium text-sm">Sub-organizations only</div>
+                      <div className="text-xs text-muted-foreground">
+                        Only visible at sub-organizations, not at this organization.
+                      </div>
+                    </div>
+                  </label>
+                </div>
               </div>
             </CardContent>
           </Card>

@@ -81,7 +81,7 @@ public static class AgentMapper
         {
             GroupId = groupId,
             OrganizationId = createResource.OrganizationId,
-            VisibilityScope = createResource.VisibilityScope ?? AgentVisibilityScope.OrganizationOnly,
+            VisibilityScope = createResource.VisibilityScope ?? Domain.VisibilityScope.OrganizationOnly,
             DisplayName = createResource.DisplayName,
             ProfileImageUrl = createResource.ProfileImageUrl,
             SystemPrompt = createResource.SystemPrompt,

@@ -34,7 +34,7 @@ public class InterviewGuide : Entity
     public bool IsActive { get; set; } = true;
 
     [Column("visibility_scope")]
-    public string VisibilityScope { get; set; } = "owner_only";
+    public string VisibilityScope { get; set; } = Domain.VisibilityScope.OrganizationOnly;
 
     // Navigation property (not mapped to DB, populated by manager)
     [NotMapped]

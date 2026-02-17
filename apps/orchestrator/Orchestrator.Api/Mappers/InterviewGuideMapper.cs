@@ -11,7 +11,7 @@ public static class InterviewGuideMapper
     /// <summary>
     /// Maps an InterviewGuide domain object to an InterviewGuideResource for API responses.
     /// </summary>
-    public static InterviewGuideResource ToResource(InterviewGuide guide)
+    public static InterviewGuideResource ToResource(InterviewGuide guide, bool isInherited = false, string? ownerOrganizationName = null)
     {
         ArgumentNullException.ThrowIfNull(guide);
 
@@ -34,17 +34,28 @@ public static class InterviewGuideMapper
             CreatedAt = guide.CreatedAt,
             UpdatedAt = guide.UpdatedAt,
             CreatedBy = guide.CreatedBy,
-            UpdatedBy = guide.UpdatedBy
+            UpdatedBy = guide.UpdatedBy,
+            IsInherited = isInherited,
+            OwnerOrganizationName = ownerOrganizationName
         };
     }
 
     /// <summary>
     /// Maps a collection of InterviewGuide domain objects to resources.
     /// </summary>
-    public static IEnumerable<InterviewGuideResource> ToResource(IEnumerable<InterviewGuide> guides)
+    public static IEnumerable<InterviewGuideResource> ToResource(IEnumerable<InterviewGuide> guides, bool isInherited = false, IDictionary<Guid, string>? orgNameLookup = null)
     {
         ArgumentNullException.ThrowIfNull(guides);
-        return guides.Select(ToResource);
+
+        return guides.Select(g =>
+        {
+            string? ownerOrgName = null;
+            if (orgNameLookup != null && g.OrganizationId.HasValue)
+            {
+                orgNameLookup.TryGetValue(g.OrganizationId.Value, out ownerOrgName);
+            }
+            return ToResource(g, isInherited, ownerOrgName);
+        });
     }
 
     /// <summary>
@@ -80,6 +91,7 @@ public static class InterviewGuideMapper
         {
             GroupId = groupId,
             OrganizationId = createResource.OrganizationId,
+            VisibilityScope = createResource.VisibilityScope ?? Domain.VisibilityScope.OrganizationOnly,
             Name = createResource.Name,
             Description = createResource.Description,
             OpeningTemplate = createResource.OpeningTemplate,
@@ -118,7 +130,7 @@ public static class InterviewGuideMapper
             Id = existingGuide.Id,
             GroupId = existingGuide.GroupId,
             OrganizationId = existingGuide.OrganizationId,
-            VisibilityScope = existingGuide.VisibilityScope,
+            VisibilityScope = updateResource.VisibilityScope ?? existingGuide.VisibilityScope,
             Name = updateResource.Name ?? existingGuide.Name,
             Description = updateResource.Description ?? existingGuide.Description,
             OpeningTemplate = updateResource.OpeningTemplate ?? existingGuide.OpeningTemplate,

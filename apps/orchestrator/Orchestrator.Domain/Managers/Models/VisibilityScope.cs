@@ -1,11 +1,11 @@
 namespace Orchestrator.Domain;
 
 /// <summary>
-/// Defines the allowed visibility scope values for agents.
-/// Controls whether an agent is visible only at its owning organization,
+/// Defines the allowed visibility scope values for entities (Agents, Interview Guides, etc.).
+/// Controls whether an entity is visible only at its owning organization,
 /// at the owning org plus descendants, or only at descendant organizations.
 /// </summary>
-public static class AgentVisibilityScope
+public static class VisibilityScope
 {
     /// <summary>Visible only at the creating organization</summary>
     public const string OrganizationOnly = "organization_only";

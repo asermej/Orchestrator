@@ -86,6 +86,7 @@ internal sealed class InterviewGuideDataManager
                 closing_template = @ClosingTemplate,
                 scoring_rubric = @ScoringRubric,
                 is_active = @IsActive,
+                visibility_scope = @VisibilityScope,
                 updated_at = CURRENT_TIMESTAMP,
                 updated_by = @UpdatedBy
             WHERE id = @Id AND is_deleted = false
@@ -174,6 +175,146 @@ internal sealed class InterviewGuideDataManager
             FROM interview_guides ig
             {whereSql.Replace("group_id", "ig.group_id").Replace("name", "ig.name").Replace("is_active", "ig.is_active").Replace("is_deleted", "ig.is_deleted")}
             ORDER BY {orderByClause.Replace("name", "ig.name").Replace("created_at", "ig.created_at")}
+            LIMIT @PageSize OFFSET @Offset";
+
+        parameters.Add("PageSize", pageSize);
+        parameters.Add("Offset", offset);
+
+        var items = await connection.QueryAsync<InterviewGuide>(querySql, parameters);
+
+        return new PaginatedResult<InterviewGuide>(items, totalCount, pageNumber, pageSize);
+    }
+
+    /// <summary>
+    /// Searches for local interview guides (created at the specified organization).
+    /// </summary>
+    public async Task<PaginatedResult<InterviewGuide>> SearchLocal(
+        Guid groupId,
+        Guid organizationId,
+        string? name,
+        bool? isActive,
+        string? sortBy,
+        int pageNumber,
+        int pageSize)
+    {
+        var whereClauses = new List<string>
+        {
+            "ig.group_id = @GroupId",
+            "ig.organization_id = @OrganizationId",
+            "ig.is_deleted = false"
+        };
+        var parameters = new DynamicParameters();
+        parameters.Add("GroupId", groupId);
+        parameters.Add("OrganizationId", organizationId);
+
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            whereClauses.Add("ig.name ILIKE @Name");
+            parameters.Add("Name", $"%{name}%");
+        }
+
+        if (isActive.HasValue)
+        {
+            whereClauses.Add("ig.is_active = @IsActive");
+            parameters.Add("IsActive", isActive.Value);
+        }
+
+        var whereSql = $"WHERE {string.Join(" AND ", whereClauses)}";
+
+        var orderByClause = sortBy?.ToLowerInvariant() switch
+        {
+            "alphabetical" => "ig.name ASC",
+            "recent" => "ig.created_at DESC",
+            _ => "ig.created_at DESC"
+        };
+
+        using var connection = new NpgsqlConnection(_dbConnectionString);
+
+        var countSql = $"SELECT COUNT(*) FROM interview_guides ig {whereSql}";
+        var totalCount = await connection.QueryFirstOrDefaultAsync<int>(countSql, parameters);
+
+        var offset = (pageNumber - 1) * pageSize;
+        var querySql = $@"
+            SELECT ig.id, ig.group_id, ig.organization_id, ig.name, ig.description, ig.opening_template, ig.closing_template,
+                   ig.scoring_rubric, ig.is_active, ig.visibility_scope,
+                   ig.created_at, ig.updated_at, ig.created_by, ig.updated_by, ig.is_deleted, ig.deleted_at, ig.deleted_by,
+                   (SELECT COUNT(*) FROM interview_guide_questions igq WHERE igq.interview_guide_id = ig.id) as question_count
+            FROM interview_guides ig
+            {whereSql}
+            ORDER BY {orderByClause}
+            LIMIT @PageSize OFFSET @Offset";
+
+        parameters.Add("PageSize", pageSize);
+        parameters.Add("Offset", offset);
+
+        var items = await connection.QueryAsync<InterviewGuide>(querySql, parameters);
+
+        return new PaginatedResult<InterviewGuide>(items, totalCount, pageNumber, pageSize);
+    }
+
+    /// <summary>
+    /// Searches for inherited interview guides (from ancestor organizations with propagating visibility).
+    /// </summary>
+    public async Task<PaginatedResult<InterviewGuide>> SearchInherited(
+        Guid groupId,
+        IReadOnlyList<Guid> ancestorOrgIds,
+        string? name,
+        bool? isActive,
+        string? sortBy,
+        int pageNumber,
+        int pageSize)
+    {
+        if (ancestorOrgIds == null || ancestorOrgIds.Count == 0)
+        {
+            return new PaginatedResult<InterviewGuide>(Enumerable.Empty<InterviewGuide>(), 0, pageNumber, pageSize);
+        }
+
+        var whereClauses = new List<string>
+        {
+            "ig.group_id = @GroupId",
+            "ig.organization_id = ANY(@AncestorOrgIds)",
+            "ig.visibility_scope IN ('organization_and_descendants', 'descendants_only')",
+            "ig.is_deleted = false"
+        };
+        var parameters = new DynamicParameters();
+        parameters.Add("GroupId", groupId);
+        parameters.Add("AncestorOrgIds", ancestorOrgIds.ToArray());
+
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            whereClauses.Add("ig.name ILIKE @Name");
+            parameters.Add("Name", $"%{name}%");
+        }
+
+        if (isActive.HasValue)
+        {
+            whereClauses.Add("ig.is_active = @IsActive");
+            parameters.Add("IsActive", isActive.Value);
+        }
+
+        var whereSql = $"WHERE {string.Join(" AND ", whereClauses)}";
+
+        var orderByClause = sortBy?.ToLowerInvariant() switch
+        {
+            "alphabetical" => "ig.name ASC",
+            "recent" => "ig.created_at DESC",
+            _ => "ig.created_at DESC"
+        };
+
+        using var connection = new NpgsqlConnection(_dbConnectionString);
+
+        var countSql = $"SELECT COUNT(*) FROM interview_guides ig {whereSql}";
+        var totalCount = await connection.QueryFirstOrDefaultAsync<int>(countSql, parameters);
+
+        var offset = (pageNumber - 1) * pageSize;
+        var querySql = $@"
+            SELECT ig.id, ig.group_id, ig.organization_id, ig.name, ig.description, ig.opening_template, ig.closing_template,
+                   ig.scoring_rubric, ig.is_active, ig.visibility_scope,
+                   ig.created_at, ig.updated_at, ig.created_by, ig.updated_by, ig.is_deleted, ig.deleted_at, ig.deleted_by,
+                   (SELECT COUNT(*) FROM interview_guide_questions igq WHERE igq.interview_guide_id = ig.id) as question_count
+            FROM interview_guides ig
+            {whereSql}
+            ORDER BY {orderByClause}
             LIMIT @PageSize OFFSET @Offset";
 
         parameters.Add("PageSize", pageSize);

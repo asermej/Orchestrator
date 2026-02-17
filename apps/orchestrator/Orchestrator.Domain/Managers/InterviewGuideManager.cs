@@ -153,6 +153,83 @@ internal sealed class InterviewGuideManager : IDisposable
         return await DataFacade.GetInterviewGuideQuestions(guideId).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Searches for local interview guides (created at the specified organization).
+    /// </summary>
+    public async Task<PaginatedResult<InterviewGuide>> SearchLocalGuides(
+        Guid groupId, Guid organizationId, string? name, bool? isActive, string? sortBy, int pageNumber, int pageSize)
+    {
+        return await DataFacade.SearchLocalInterviewGuides(groupId, organizationId, name, isActive, sortBy, pageNumber, pageSize).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Searches for inherited interview guides (from ancestor organizations with propagating visibility).
+    /// </summary>
+    public async Task<PaginatedResult<InterviewGuide>> SearchInheritedGuides(
+        Guid groupId, IReadOnlyList<Guid> ancestorOrgIds, string? name, bool? isActive, string? sortBy, int pageNumber, int pageSize)
+    {
+        return await DataFacade.SearchInheritedInterviewGuides(groupId, ancestorOrgIds, name, isActive, sortBy, pageNumber, pageSize).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Clones an interview guide (including all questions) to a target organization.
+    /// Sets visibility to OrganizationOnly and appends "(Copy)" on name conflict.
+    /// </summary>
+    public async Task<InterviewGuide> CloneGuide(Guid guideId, Guid targetOrganizationId, Guid targetGroupId)
+    {
+        var source = await DataFacade.GetInterviewGuideByIdWithQuestions(guideId).ConfigureAwait(false);
+        if (source == null)
+        {
+            throw new InterviewGuideNotFoundException($"Interview guide with ID {guideId} not found.");
+        }
+
+        var clone = new InterviewGuide
+        {
+            GroupId = targetGroupId,
+            OrganizationId = targetOrganizationId,
+            Name = source.Name,
+            Description = source.Description,
+            OpeningTemplate = source.OpeningTemplate,
+            ClosingTemplate = source.ClosingTemplate,
+            ScoringRubric = source.ScoringRubric,
+            IsActive = source.IsActive,
+            VisibilityScope = Domain.VisibilityScope.OrganizationOnly,
+        };
+
+        InterviewGuideValidator.Validate(clone);
+
+        // Check for duplicate name in the target org
+        var existingGuides = await DataFacade.SearchLocalInterviewGuides(targetGroupId, targetOrganizationId, clone.Name, null, null, 1, 100).ConfigureAwait(false);
+        if (existingGuides.Items.Any(g => g.Name.Equals(clone.Name, StringComparison.OrdinalIgnoreCase)))
+        {
+            clone.Name = $"{clone.Name} (Copy)";
+        }
+
+        var createdGuide = await DataFacade.AddInterviewGuide(clone).ConfigureAwait(false);
+
+        // Clone all questions
+        if (source.Questions != null && source.Questions.Count > 0)
+        {
+            foreach (var sourceQuestion in source.Questions)
+            {
+                var clonedQuestion = new InterviewGuideQuestion
+                {
+                    InterviewGuideId = createdGuide.Id,
+                    Question = sourceQuestion.Question,
+                    DisplayOrder = sourceQuestion.DisplayOrder,
+                    ScoringWeight = sourceQuestion.ScoringWeight,
+                    ScoringGuidance = sourceQuestion.ScoringGuidance,
+                    FollowUpsEnabled = sourceQuestion.FollowUpsEnabled,
+                    MaxFollowUps = sourceQuestion.MaxFollowUps,
+                };
+                await DataFacade.AddInterviewGuideQuestion(clonedQuestion).ConfigureAwait(false);
+            }
+        }
+
+        // Reload with questions
+        return (await DataFacade.GetInterviewGuideByIdWithQuestions(createdGuide.Id).ConfigureAwait(false))!;
+    }
+
     public void Dispose()
     {
         // DataFacade doesn't implement IDisposable, so no disposal needed

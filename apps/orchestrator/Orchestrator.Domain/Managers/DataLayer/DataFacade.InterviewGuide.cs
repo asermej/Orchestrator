@@ -71,4 +71,16 @@ internal sealed partial class DataFacade
     {
         return InterviewGuideDataManager.ReplaceQuestions(guideId, questions);
     }
+
+    public Task<PaginatedResult<InterviewGuide>> SearchLocalInterviewGuides(
+        Guid groupId, Guid organizationId, string? name, bool? isActive, string? sortBy, int pageNumber, int pageSize)
+    {
+        return InterviewGuideDataManager.SearchLocal(groupId, organizationId, name, isActive, sortBy, pageNumber, pageSize);
+    }
+
+    public Task<PaginatedResult<InterviewGuide>> SearchInheritedInterviewGuides(
+        Guid groupId, IReadOnlyList<Guid> ancestorOrgIds, string? name, bool? isActive, string? sortBy, int pageNumber, int pageSize)
+    {
+        return InterviewGuideDataManager.SearchInherited(groupId, ancestorOrgIds, name, isActive, sortBy, pageNumber, pageSize);
+    }
 }

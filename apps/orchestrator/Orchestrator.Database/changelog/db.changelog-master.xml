@@ -125,4 +125,7 @@
 
     <!-- Agent visibility scope: migrate owner_only to organization_only + add CHECK constraint -->
     <include file="changes/20260216180000-agent-visibility-scope-values.xml" relativeToChangelogFile="true"/>
+
+    <!-- Interview Guide visibility scope: migrate owner_only to organization_only + add CHECK constraint -->
+    <include file="changes/20260216190000-interview-guide-visibility-scope-values.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog> 

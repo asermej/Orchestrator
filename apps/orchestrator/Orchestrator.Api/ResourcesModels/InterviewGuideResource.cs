@@ -13,7 +13,7 @@ public class InterviewGuideResource
     public Guid Id { get; set; }
     public Guid GroupId { get; set; }
     public Guid? OrganizationId { get; set; }
-    public string VisibilityScope { get; set; } = "owner_only";
+    public string VisibilityScope { get; set; } = "organization_only";
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string? OpeningTemplate { get; set; }
@@ -26,6 +26,16 @@ public class InterviewGuideResource
     public DateTime? UpdatedAt { get; set; }
     public string? CreatedBy { get; set; }
     public string? UpdatedBy { get; set; }
+
+    /// <summary>
+    /// Whether this guide is inherited from a parent organization
+    /// </summary>
+    public bool IsInherited { get; set; }
+
+    /// <summary>
+    /// The name of the organization that owns this guide (for inherited guides)
+    /// </summary>
+    public string? OwnerOrganizationName { get; set; }
 }
 
 /// <summary>
@@ -54,6 +64,11 @@ public class CreateInterviewGuideResource
     public Guid GroupId { get; set; }
 
     public Guid? OrganizationId { get; set; }
+
+    /// <summary>
+    /// The visibility scope (organization_only, organization_and_descendants, descendants_only)
+    /// </summary>
+    public string? VisibilityScope { get; set; }
 
     [Required(ErrorMessage = "Name is required")]
     public string Name { get; set; } = string.Empty;
@@ -93,6 +108,12 @@ public class UpdateInterviewGuideResource
     public string? ClosingTemplate { get; set; }
     public string? ScoringRubric { get; set; }
     public bool? IsActive { get; set; }
+
+    /// <summary>
+    /// The visibility scope (organization_only, organization_and_descendants, descendants_only)
+    /// </summary>
+    public string? VisibilityScope { get; set; }
+
     public List<CreateInterviewGuideQuestionResource>? Questions { get; set; }
     public string? UpdatedBy { get; set; }
 }
@@ -106,4 +127,10 @@ public class SearchInterviewGuideRequest : PaginatedRequest
     public string? Name { get; set; }
     public bool? IsActive { get; set; }
     public new string? SortBy { get; set; }
+
+    /// <summary>
+    /// Filter by source: "local" for guides created at the current org,
+    /// "inherited" for guides from ancestor orgs. Omit for legacy behavior.
+    /// </summary>
+    public string? Source { get; set; }
 }

@@ -33,9 +33,9 @@ internal static class AgentValidator
         }
 
         // VisibilityScope must be a valid value
-        if (!AgentVisibilityScope.IsValid(agent.VisibilityScope))
+        if (!Domain.VisibilityScope.IsValid(agent.VisibilityScope))
         {
-            errors.Add($"VisibilityScope must be one of: {string.Join(", ", AgentVisibilityScope.AllValues)}.");
+            errors.Add($"VisibilityScope must be one of: {string.Join(", ", Domain.VisibilityScope.AllValues)}.");
         }
 
         // ProfileImageUrl is optional - only validate format when value is not empty
