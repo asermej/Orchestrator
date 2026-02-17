@@ -13,6 +13,7 @@ public class InterviewResource
     public Guid ApplicantId { get; set; }
     public Guid AgentId { get; set; }
     public Guid? InterviewConfigurationId { get; set; }
+    public Guid? InterviewGuideId { get; set; }
     public string Token { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public string InterviewType { get; set; } = string.Empty;
@@ -84,6 +85,12 @@ public class CreateInterviewWithApplicantResource
     /// When provided, AgentId is determined from the configuration.
     /// </summary>
     public Guid? InterviewConfigurationId { get; set; }
+
+    /// <summary>
+    /// The interview guide containing the questions for this interview.
+    /// When provided alongside AgentId, no InterviewConfigurationId is needed.
+    /// </summary>
+    public Guid? InterviewGuideId { get; set; }
 
     public string InterviewType { get; set; } = "voice";
 

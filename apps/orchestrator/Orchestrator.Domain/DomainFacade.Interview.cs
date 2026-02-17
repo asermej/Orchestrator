@@ -59,12 +59,19 @@ public sealed partial class DomainFacade
     {
         var interview = await InterviewManager.CompleteInterview(interviewId).ConfigureAwait(false);
         
-        // Auto-score the interview if it has a configuration
-        if (interview.InterviewConfigurationId.HasValue)
+        // Auto-score the interview if it has a guide (direct or via configuration)
+        Guid? guideIdForScoring = interview.InterviewGuideId;
+        if (!guideIdForScoring.HasValue && interview.InterviewConfigurationId.HasValue)
+        {
+            var config = await InterviewConfigurationManager.GetConfigurationById(interview.InterviewConfigurationId.Value).ConfigureAwait(false);
+            guideIdForScoring = config?.InterviewGuideId;
+        }
+
+        if (guideIdForScoring.HasValue)
         {
             try
             {
-                await ScoreTestInterview(interview.Id, interview.InterviewConfigurationId.Value).ConfigureAwait(false);
+                await ScoreInterview(interview.Id, guideIdForScoring.Value).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -225,6 +232,7 @@ public sealed partial class DomainFacade
             ApplicantId = createdApplicant.Id,
             AgentId = config.AgentId,
             InterviewConfigurationId = interviewConfigurationId,
+            InterviewGuideId = config.InterviewGuideId,
             Status = InterviewStatus.Pending,
             InterviewType = InterviewType.Voice,
             Token = Guid.NewGuid().ToString("N")
@@ -234,9 +242,23 @@ public sealed partial class DomainFacade
     }
 
     /// <summary>
-    /// Scores a completed test interview using AI
+    /// Scores a completed test interview using AI (legacy: resolves guide from configuration)
     /// </summary>
     public async Task<InterviewResult> ScoreTestInterview(Guid interviewId, Guid interviewConfigurationId)
+    {
+        var config = await InterviewConfigurationManager.GetConfigurationById(interviewConfigurationId).ConfigureAwait(false);
+        if (config == null)
+        {
+            throw new InterviewConfigurationNotFoundException($"Interview configuration with ID {interviewConfigurationId} not found");
+        }
+
+        return await ScoreInterview(interviewId, config.InterviewGuideId).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Scores a completed interview using the questions from the given interview guide
+    /// </summary>
+    public async Task<InterviewResult> ScoreInterview(Guid interviewId, Guid interviewGuideId)
     {
         // Get the interview
         var interview = await InterviewManager.GetInterviewById(interviewId).ConfigureAwait(false);
@@ -245,15 +267,8 @@ public sealed partial class DomainFacade
             throw new InterviewNotFoundException($"Interview with ID {interviewId} not found");
         }
 
-        // Get the configuration to find the interview guide
-        var config = await InterviewConfigurationManager.GetConfigurationById(interviewConfigurationId).ConfigureAwait(false);
-        if (config == null)
-        {
-            throw new InterviewConfigurationNotFoundException($"Interview configuration with ID {interviewConfigurationId} not found");
-        }
-
         // Get the guide's questions
-        var guideQuestions = await InterviewGuideManager.GetQuestionsByGuideId(config.InterviewGuideId).ConfigureAwait(false);
+        var guideQuestions = await InterviewGuideManager.GetQuestionsByGuideId(interviewGuideId).ConfigureAwait(false);
 
         // Get the responses
         var responses = await InterviewManager.GetResponsesByInterviewId(interviewId).ConfigureAwait(false);

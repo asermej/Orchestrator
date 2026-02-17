@@ -16,6 +16,7 @@ public static class InterviewMapper
             ApplicantId = interview.ApplicantId,
             AgentId = interview.AgentId,
             InterviewConfigurationId = interview.InterviewConfigurationId,
+            InterviewGuideId = interview.InterviewGuideId,
             Token = interview.Token,
             Status = interview.Status,
             InterviewType = interview.InterviewType,

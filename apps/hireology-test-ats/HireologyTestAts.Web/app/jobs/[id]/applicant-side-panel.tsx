@@ -5,13 +5,18 @@ import { testAtsApi } from "@/lib/test-ats-api";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-interface InterviewConfiguration {
+interface AgentItem {
+  id: string;
+  displayName: string;
+  profileImageUrl?: string | null;
+}
+
+interface InterviewGuideItem {
   id: string;
   name: string;
   description?: string | null;
-  agentId: string;
-  agentDisplayName?: string | null;
   questionCount: number;
+  isActive: boolean;
 }
 
 interface InterviewResponseData {
@@ -456,45 +461,51 @@ function SendSchedulingLinkContent({
   onBack: () => void;
   onSent: (request: InterviewRequestItem) => void;
 }) {
-  const [configurations, setConfigurations] = useState<InterviewConfiguration[]>([]);
-  const [selectedConfigId, setSelectedConfigId] = useState<string>("");
-  const [loadingConfigs, setLoadingConfigs] = useState(true);
+  const [agents, setAgents] = useState<AgentItem[]>([]);
+  const [guides, setGuides] = useState<InterviewGuideItem[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState<string>("");
+  const [selectedGuideId, setSelectedGuideId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    async function loadConfigurations() {
+    async function loadData() {
       try {
-        const data = await testAtsApi.get<InterviewConfiguration[]>("/api/v1/configurations");
+        const [agentsData, guidesData] = await Promise.all([
+          testAtsApi.get<AgentItem[]>("/api/v1/agents"),
+          testAtsApi.get<InterviewGuideItem[]>("/api/v1/interview-guides"),
+        ]);
         if (!cancelled) {
-          setConfigurations(data);
-          if (data.length > 0) {
-            setSelectedConfigId(data[0].id);
-          }
+          setAgents(agentsData);
+          setGuides(guidesData);
+          if (agentsData.length > 0) setSelectedAgentId(agentsData[0].id);
+          if (guidesData.length > 0) setSelectedGuideId(guidesData[0].id);
         }
       } catch (e) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load interview configurations");
+          setError(e instanceof Error ? e.message : "Failed to load agents and interview guides");
         }
       } finally {
-        if (!cancelled) setLoadingConfigs(false);
+        if (!cancelled) setLoading(false);
       }
     }
-    loadConfigurations();
+    loadData();
     return () => { cancelled = true; };
   }, []);
 
-  const selectedConfig = configurations.find((c) => c.id === selectedConfigId);
+  const selectedAgent = agents.find((a) => a.id === selectedAgentId);
+  const selectedGuide = guides.find((g) => g.id === selectedGuideId);
 
   const handleSend = async () => {
-    if (!selectedConfigId) return;
+    if (!selectedAgentId || !selectedGuideId) return;
     setSending(true);
     setError(null);
     try {
       const data = await testAtsApi.post<InterviewRequestItem>(
         `/api/v1/applicants/${applicant.id}/interview`,
-        { interviewConfigurationId: selectedConfigId }
+        { agentId: selectedAgentId, interviewGuideId: selectedGuideId }
       );
       onSent(data);
     } catch (e) {
@@ -504,69 +515,78 @@ function SendSchedulingLinkContent({
     }
   };
 
+  const canSend = selectedAgentId && selectedGuideId && agents.length > 0 && guides.length > 0;
+
   return (
     <div className="flex flex-col h-full">
       <h3 className="text-base font-semibold text-slate-900 mb-5">Send Scheduling Link</h3>
 
       <div className="flex-1">
-          {/* Interview Configuration selector (functional) */}
-          {loadingConfigs ? (
-            <div className="text-sm text-slate-500 mb-4">Loading interview configurations...</div>
-          ) : configurations.length === 0 ? (
+          {loading ? (
+            <div className="text-sm text-slate-500 mb-4">Loading agents and interview guides...</div>
+          ) : agents.length === 0 || guides.length === 0 ? (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-amber-800 text-sm">
-              No interview configurations found. Please create an interview configuration in the
-              Orchestrator first (with an agent and questions).
+              {agents.length === 0 && "No agents found. "}
+              {guides.length === 0 && "No interview guides found. "}
+              Please create agents and interview guides in the Orchestrator first.
             </div>
           ) : (
-            <div className="mb-5">
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Interview Configuration
-              </label>
-              <select
-                value={selectedConfigId}
-                onChange={(e) => setSelectedConfigId(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-              >
-                {configurations.map((config) => (
-                  <option key={config.id} value={config.id}>
-                    {config.name}
-                    {config.agentDisplayName ? ` (${config.agentDisplayName})` : ""}
-                    {` \u2014 ${config.questionCount} questions`}
-                  </option>
-                ))}
-              </select>
+            <>
+              {/* Agent selector */}
+              <div className="mb-5">
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Agent
+                </label>
+                <select
+                  value={selectedAgentId}
+                  onChange={(e) => setSelectedAgentId(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  {agents.map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.displayName}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-              {/* Selected configuration detail */}
-              {selectedConfig && (
-                <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 space-y-1">
-                  {selectedConfig.description && <p>{selectedConfig.description}</p>}
-                  <div className="flex items-center gap-3">
-                    {selectedConfig.agentDisplayName && (
+              {/* Interview Guide selector */}
+              <div className="mb-5">
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Interview Guide
+                </label>
+                <select
+                  value={selectedGuideId}
+                  onChange={(e) => setSelectedGuideId(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                >
+                  {guides.map((guide) => (
+                    <option key={guide.id} value={guide.id}>
+                      {guide.name} {`\u2014 ${guide.questionCount} questions`}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedGuide && (
+                  <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 space-y-1">
+                    {selectedGuide.description && <p>{selectedGuide.description}</p>}
+                    <div className="flex items-center gap-3">
+                      {selectedAgent && (
+                        <span>
+                          <span className="font-medium text-slate-700">Agent:</span>{" "}
+                          {selectedAgent.displayName}
+                        </span>
+                      )}
                       <span>
-                        <span className="font-medium text-slate-700">Agent:</span>{" "}
-                        {selectedConfig.agentDisplayName}
+                        <span className="font-medium text-slate-700">Questions:</span>{" "}
+                        {selectedGuide.questionCount}
                       </span>
-                    )}
-                    <span>
-                      <span className="font-medium text-slate-700">Questions:</span>{" "}
-                      {selectedConfig.questionCount}
-                    </span>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            </>
           )}
-
-          {/* Placeholder: AI Interviewer */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">AI Interviewer</label>
-            <select
-              disabled
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-400 bg-slate-50 cursor-not-allowed"
-            >
-              <option>Select AI interviewer</option>
-            </select>
-          </div>
 
           {/* Placeholder: Template */}
           <div className="mb-4">
@@ -666,7 +686,7 @@ function SendSchedulingLinkContent({
           </button>
           <button
             onClick={handleSend}
-            disabled={sending || !selectedConfigId || configurations.length === 0}
+            disabled={sending || !canSend}
             className="px-5 py-2 text-sm font-medium text-white bg-teal-700 rounded-lg hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {sending ? "Sending..." : "Send Interview Request"}

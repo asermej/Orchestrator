@@ -40,13 +40,14 @@ internal static class OrchestratorMapper
     }
 
     public static OrchestratorCreateInterviewRequest ToCreateInterviewRequest(
-        string externalApplicantId, string externalJobId, Guid interviewConfigurationId)
+        string externalApplicantId, string externalJobId, Guid agentId, Guid interviewGuideId)
     {
         return new OrchestratorCreateInterviewRequest
         {
             ExternalApplicantId = externalApplicantId,
             ExternalJobId = externalJobId,
-            InterviewConfigurationId = interviewConfigurationId,
+            AgentId = agentId,
+            InterviewGuideId = interviewGuideId,
             InterviewType = "voice"
         };
     }
@@ -134,6 +135,22 @@ internal static class OrchestratorMapper
             Id = r.Id,
             DisplayName = r.DisplayName,
             ProfileImageUrl = r.ProfileImageUrl
+        }).ToList();
+    }
+
+    public static IReadOnlyList<OrchestratorInterviewGuide> ToInterviewGuides(
+        List<OrchestratorInterviewGuideResponse>? responses)
+    {
+        if (responses == null || responses.Count == 0)
+            return Array.Empty<OrchestratorInterviewGuide>();
+
+        return responses.Select(r => new OrchestratorInterviewGuide
+        {
+            Id = r.Id,
+            Name = r.Name,
+            Description = r.Description,
+            QuestionCount = r.QuestionCount,
+            IsActive = r.IsActive
         }).ToList();
     }
 

@@ -47,6 +47,23 @@ public static class InterviewRequestMapper
         return agents.Select(ToAgentResource).ToList();
     }
 
+    public static InterviewGuideResource ToInterviewGuideResource(OrchestratorInterviewGuide guide)
+    {
+        return new InterviewGuideResource
+        {
+            Id = guide.Id,
+            Name = guide.Name,
+            Description = guide.Description,
+            QuestionCount = guide.QuestionCount,
+            IsActive = guide.IsActive
+        };
+    }
+
+    public static IReadOnlyList<InterviewGuideResource> ToInterviewGuideResource(IEnumerable<OrchestratorInterviewGuide> guides)
+    {
+        return guides.Select(ToInterviewGuideResource).ToList();
+    }
+
     public static InterviewConfigurationResource ToConfigurationResource(OrchestratorInterviewConfiguration config)
     {
         return new InterviewConfigurationResource

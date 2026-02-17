@@ -323,6 +323,32 @@ public class AtsController : ControllerBase
         return Ok(resources);
     }
 
+    // Interview Guide Endpoints
+
+    /// <summary>
+    /// Lists interview guides available for the authenticated group
+    /// </summary>
+    [HttpGet("interview-guides")]
+    [ProducesResponseType(typeof(IEnumerable<AtsInterviewGuideResource>), 200)]
+    [ProducesResponseType(401)]
+    public async Task<ActionResult<IEnumerable<AtsInterviewGuideResource>>> ListInterviewGuides()
+    {
+        var groupId = GetGroupId();
+        var result = await _domainFacade.SearchInterviewGuides(
+            groupId, null, true, null, 1, 100);
+
+        var resources = result.Items.Select(g => new AtsInterviewGuideResource
+        {
+            Id = g.Id,
+            Name = g.Name,
+            Description = g.Description,
+            QuestionCount = g.QuestionCount,
+            IsActive = g.IsActive
+        });
+
+        return Ok(resources);
+    }
+
     // Interview Configuration Endpoints
 
     /// <summary>
@@ -392,19 +418,21 @@ public class AtsController : ControllerBase
             resource.ApplicantEmail,
             resource.ApplicantPhone);
 
-        // Resolve agent from configuration or direct AgentId
+        // Resolve agent and interview guide from configuration or direct IDs
         Guid agentId = resource.AgentId;
         Guid? interviewConfigurationId = resource.InterviewConfigurationId;
+        Guid? interviewGuideId = resource.InterviewGuideId;
 
         if (interviewConfigurationId.HasValue)
         {
-            // Use the configuration to determine agent and questions
+            // Use the configuration to determine agent, guide, and questions
             var config = await _domainFacade.GetInterviewConfigurationById(interviewConfigurationId.Value);
             if (config == null || config.GroupId != groupId)
             {
                 return BadRequest($"Interview configuration with ID {interviewConfigurationId} not found or does not belong to this group.");
             }
             agentId = config.AgentId;
+            interviewGuideId ??= config.InterviewGuideId;
         }
 
         // Validate agent exists and belongs to group
@@ -414,6 +442,16 @@ public class AtsController : ControllerBase
             return BadRequest($"Agent with ID {agentId} not found or does not belong to this group.");
         }
 
+        // Validate interview guide if provided
+        if (interviewGuideId.HasValue)
+        {
+            var guide = await _domainFacade.GetInterviewGuideById(interviewGuideId.Value);
+            if (guide == null || guide.GroupId != groupId)
+            {
+                return BadRequest($"Interview guide with ID {interviewGuideId} not found or does not belong to this group.");
+            }
+        }
+
         // Create interview
         var interview = new Interview
         {
@@ -421,6 +459,7 @@ public class AtsController : ControllerBase
             ApplicantId = applicant.Id,
             AgentId = agentId,
             InterviewConfigurationId = interviewConfigurationId,
+            InterviewGuideId = interviewGuideId,
             InterviewType = resource.InterviewType,
             ScheduledAt = resource.ScheduledAt
         };

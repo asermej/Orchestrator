@@ -155,19 +155,25 @@ internal sealed class VoiceManager : IDisposable
         var config = GatewayFacade.GetElevenLabsConfig();
         var voiceId = agent.ElevenlabsVoiceId ?? config.DefaultVoiceId;
         
-        // Load questions from the interview guide linked to the configuration
-        if (!interview.InterviewConfigurationId.HasValue)
+        // Load questions from the interview guide (direct reference or via configuration fallback)
+        List<InterviewGuideQuestion> guideQuestions;
+        if (interview.InterviewGuideId.HasValue)
         {
-            return result; // No configuration, no questions to warm up
+            guideQuestions = await DataFacade.GetInterviewGuideQuestions(interview.InterviewGuideId.Value).ConfigureAwait(false);
         }
-
-        var interviewConfig = await DataFacade.GetInterviewConfigurationById(interview.InterviewConfigurationId.Value).ConfigureAwait(false);
-        if (interviewConfig == null)
+        else if (interview.InterviewConfigurationId.HasValue)
         {
-            return result; // Configuration not found
+            var interviewConfig = await DataFacade.GetInterviewConfigurationById(interview.InterviewConfigurationId.Value).ConfigureAwait(false);
+            if (interviewConfig == null)
+            {
+                return result;
+            }
+            guideQuestions = await DataFacade.GetInterviewGuideQuestions(interviewConfig.InterviewGuideId).ConfigureAwait(false);
         }
-
-        var guideQuestions = await DataFacade.GetInterviewGuideQuestions(interviewConfig.InterviewGuideId).ConfigureAwait(false);
+        else
+        {
+            return result; // No guide or configuration, no questions to warm up
+        }
         result.TotalQuestions = guideQuestions.Count;
 
         // Pre-generate audio for each question

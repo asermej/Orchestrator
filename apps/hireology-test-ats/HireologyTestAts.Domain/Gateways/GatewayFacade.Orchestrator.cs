@@ -52,6 +52,14 @@ internal sealed partial class GatewayFacade
     }
 
     /// <summary>
+    /// Lists available interview guides from Orchestrator
+    /// </summary>
+    public async Task<IReadOnlyList<OrchestratorInterviewGuide>> GetInterviewGuides(string? groupApiKey)
+    {
+        return await OrchestratorManager.GetInterviewGuides(groupApiKey).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Syncs an applicant to Orchestrator (create or update)
     /// </summary>
     public async Task SyncApplicant(Applicant applicant, string externalJobId, string? groupApiKey)
@@ -63,10 +71,10 @@ internal sealed partial class GatewayFacade
     /// Creates an interview in Orchestrator and returns the interview ID and invite URL
     /// </summary>
     public async Task<OrchestratorCreateInterviewResult> CreateInterview(
-        string externalApplicantId, string externalJobId, Guid interviewConfigurationId, string? groupApiKey)
+        string externalApplicantId, string externalJobId, Guid agentId, Guid interviewGuideId, string? groupApiKey)
     {
         return await OrchestratorManager.CreateInterview(
-            externalApplicantId, externalJobId, interviewConfigurationId, groupApiKey).ConfigureAwait(false);
+            externalApplicantId, externalJobId, agentId, interviewGuideId, groupApiKey).ConfigureAwait(false);
     }
 
     /// <summary>

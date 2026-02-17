@@ -277,6 +277,55 @@ internal sealed class OrchestratorManager : IDisposable
     }
 
     /// <summary>
+    /// Lists available interview guides from Orchestrator.
+    /// Returns an empty list if no API key is available.
+    /// </summary>
+    public async Task<IReadOnlyList<OrchestratorInterviewGuide>> GetInterviewGuides(string? groupApiKey)
+    {
+        var apiKey = ResolveApiKey(groupApiKey);
+        if (string.IsNullOrEmpty(apiKey)) return Array.Empty<OrchestratorInterviewGuide>();
+
+        try
+        {
+            var client = CreateHttpClientWithApiKey(apiKey);
+            var response = await client.GetAsync("/api/v1/ats/interview-guides").ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                throw new OrchestratorApiException(
+                    $"Orchestrator API returned error: {response.StatusCode} - {errorContent}");
+            }
+
+            var responseContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            var responseResource = JsonSerializer.Deserialize<List<OrchestratorInterviewGuideResponse>>(
+                responseContent, JsonOptions);
+
+            return OrchestratorMapper.ToInterviewGuides(responseResource);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new OrchestratorConnectionException($"Failed to connect to Orchestrator API: {ex.Message}", ex);
+        }
+        catch (TaskCanceledException ex)
+        {
+            throw new OrchestratorConnectionException($"Orchestrator API request timed out: {ex.Message}", ex);
+        }
+        catch (OrchestratorApiException)
+        {
+            throw;
+        }
+        catch (OrchestratorConnectionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new OrchestratorApiException($"Unexpected error calling Orchestrator API: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
     /// Lists available interview configurations from Orchestrator.
     /// Returns an empty list if no API key is available.
     /// </summary>
@@ -377,7 +426,7 @@ internal sealed class OrchestratorManager : IDisposable
     /// Throws OrchestratorConnectionException if no API key is available.
     /// </summary>
     public async Task<OrchestratorCreateInterviewResult> CreateInterview(
-        string externalApplicantId, string externalJobId, Guid interviewConfigurationId, string? groupApiKey)
+        string externalApplicantId, string externalJobId, Guid agentId, Guid interviewGuideId, string? groupApiKey)
     {
         var apiKey = ResolveApiKey(groupApiKey);
         if (string.IsNullOrEmpty(apiKey))
@@ -387,7 +436,7 @@ internal sealed class OrchestratorManager : IDisposable
         {
             var client = CreateHttpClientWithApiKey(apiKey);
             var requestResource = OrchestratorMapper.ToCreateInterviewRequest(
-                externalApplicantId, externalJobId, interviewConfigurationId);
+                externalApplicantId, externalJobId, agentId, interviewGuideId);
             var jsonContent = JsonSerializer.Serialize(requestResource);
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 

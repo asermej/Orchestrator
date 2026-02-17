@@ -128,4 +128,7 @@
 
     <!-- Interview Guide visibility scope: migrate owner_only to organization_only + add CHECK constraint -->
     <include file="changes/20260216190000-interview-guide-visibility-scope-values.xml" relativeToChangelogFile="true"/>
+
+    <!-- Add interview_guide_id to interviews table for direct guide reference -->
+    <include file="changes/20260217120000-add-interview-guide-id-to-interviews.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog> 

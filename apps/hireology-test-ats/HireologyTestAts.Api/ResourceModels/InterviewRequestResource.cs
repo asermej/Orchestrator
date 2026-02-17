@@ -21,7 +21,8 @@ public class InterviewRequestResource
 
 public class SendInterviewRequestResource
 {
-    public Guid InterviewConfigurationId { get; set; }
+    public Guid AgentId { get; set; }
+    public Guid InterviewGuideId { get; set; }
 }
 
 public class AgentResource
@@ -29,6 +30,15 @@ public class AgentResource
     public Guid Id { get; set; }
     public string DisplayName { get; set; } = string.Empty;
     public string? ProfileImageUrl { get; set; }
+}
+
+public class InterviewGuideResource
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public int QuestionCount { get; set; }
+    public bool IsActive { get; set; }
 }
 
 public class InterviewConfigurationResource

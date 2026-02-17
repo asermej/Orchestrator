@@ -2,9 +2,9 @@ namespace HireologyTestAts.Domain;
 
 public sealed partial class DomainFacade
 {
-    public async Task<InterviewRequest> SendInterviewRequest(Guid applicantId, Guid interviewConfigurationId)
+    public async Task<InterviewRequest> SendInterviewRequest(Guid applicantId, Guid agentId, Guid interviewGuideId)
     {
-        return await InterviewRequestManager.SendInterviewRequest(applicantId, interviewConfigurationId).ConfigureAwait(false);
+        return await InterviewRequestManager.SendInterviewRequest(applicantId, agentId, interviewGuideId).ConfigureAwait(false);
     }
 
     public async Task<InterviewRequest?> GetInterviewRequestByApplicantId(Guid applicantId)
@@ -79,6 +79,15 @@ public sealed partial class DomainFacade
     public async Task<IReadOnlyList<OrchestratorInterviewConfiguration>> GetInterviewConfigurations(string? groupApiKey = null)
     {
         return await InterviewRequestManager.GetConfigurations(groupApiKey).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gets available interview guides from Orchestrator for a specific group.
+    /// Pass the group's OrchestratorApiKey; falls back to global config if null.
+    /// </summary>
+    public async Task<IReadOnlyList<OrchestratorInterviewGuide>> GetInterviewGuides(string? groupApiKey = null)
+    {
+        return await InterviewRequestManager.GetInterviewGuides(groupApiKey).ConfigureAwait(false);
     }
 
 }

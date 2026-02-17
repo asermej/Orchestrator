@@ -20,6 +20,9 @@ public class Interview : Entity
     [Column("interview_configuration_id")]
     public Guid? InterviewConfigurationId { get; set; }
 
+    [Column("interview_guide_id")]
+    public Guid? InterviewGuideId { get; set; }
+
     [Column("token")]
     public string Token { get; set; } = string.Empty;
 
