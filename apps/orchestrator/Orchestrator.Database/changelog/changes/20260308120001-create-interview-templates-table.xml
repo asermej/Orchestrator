@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260308120001-create-interview-templates-table" author="system">
+        <comment>Create interview_templates table replacing interview_configurations. Templates reference a role (from Interview Content) and an agent, and include opening/closing templates.</comment>
+
+        <createTable tableName="interview_templates">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="group_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_interview_templates_group" references="groups(id)"/>
+            </column>
+            <column name="organization_id" type="uuid">
+                <constraints nullable="true"/>
+            </column>
+            <column name="name" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="role_template_id" type="uuid">
+                <constraints nullable="true" foreignKeyName="fk_interview_templates_role_template" references="role_templates(id)"/>
+            </column>
+            <column name="agent_id" type="uuid">
+                <constraints nullable="true" foreignKeyName="fk_interview_templates_agent" references="agents(id)"/>
+            </column>
+            <column name="opening_template" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <column name="closing_template" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="updated_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_deleted" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="deleted_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="interview_templates" indexName="idx_interview_templates_group_id">
+            <column name="group_id"/>
+        </createIndex>
+        <createIndex tableName="interview_templates" indexName="idx_interview_templates_role_template_id">
+            <column name="role_template_id"/>
+        </createIndex>
+        <createIndex tableName="interview_templates" indexName="idx_interview_templates_agent_id">
+            <column name="agent_id"/>
+        </createIndex>
+        <createIndex tableName="interview_templates" indexName="idx_interview_templates_is_deleted">
+            <column name="is_deleted"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="20260308120001-add-interview-template-id-to-interviews" author="system">
+        <comment>Add interview_template_id to interviews table (nullable during migration).</comment>
+        <addColumn tableName="interviews">
+            <column name="interview_template_id" type="uuid">
+                <constraints nullable="true" foreignKeyName="fk_interviews_interview_template" references="interview_templates(id)"/>
+            </column>
+        </addColumn>
+        <createIndex tableName="interviews" indexName="idx_interviews_interview_template_id">
+            <column name="interview_template_id"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

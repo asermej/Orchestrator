@@ -1,6 +1,7 @@
-using Orchestrator.Domain;
 using Microsoft.AspNetCore.Http.Features;
+using Npgsql;
 using Orchestrator.Api.Common;
+using Orchestrator.Domain;
 
 namespace Orchestrator.Api.Middleware.Translators;
 
@@ -31,75 +32,63 @@ public static class ExceptionToHttpTranslator
             logger?.LogError("BaseException reason: {Reason}", baseException.Reason);
         }
 
-        var statusCode = MapExceptionToStatusCode(exception);
+        var (statusCode, userFacingMessage) = MapExceptionToStatusCodeAndMessage(exception);
 
-        // Determine the user-facing message based on exception type
-        string userFacingMessage;
-        if (exception is ElevenLabsDisabledException disabledEx)
+        // Determine the user-facing message based on exception type (override if not set by mapper)
+        if (userFacingMessage == null)
         {
-            userFacingMessage = disabledEx.Message;
-        }
-        else if (exception is TechnicalBaseException)
-        {
-            // For technical exceptions, never expose internal details
-            // Use a generic, user-friendly message
-            userFacingMessage = "An error occurred. Please try again or contact support if the problem persists.";
-        }
-        else if (exception is BusinessBaseException businessEx)
-        {
-            // For business exceptions, use the Reason property which is user-friendly
-            // Examples: "Topic not found", "User not found", "Invalid email format"
-            // Reason does NOT contain internal IDs or technical details
-            userFacingMessage = businessEx.Reason;
-        }
-        else if (exception is BaseException baseEx)
-        {
-            // For other BaseExceptions, use the Reason property
-            userFacingMessage = baseEx.Reason;
+            userFacingMessage = GetUserFacingMessage(exception);
         }
         else
         {
-            // For any unhandled exception type, use a generic message
-            userFacingMessage = "An unexpected error occurred. Please contact support if the problem persists.";
+            // statusCode already set by mapper
         }
-        
-        // Create structured error response
+
+        // 409 Conflict with our message is user-facing (e.g. duplicate question label)
+        var isUserFacing = exception is BusinessBaseException || statusCode == 409;
         var errorResponse = new ErrorResponse
         {
             StatusCode = statusCode,
             Message = userFacingMessage, // User-friendly message without internal IDs
             ExceptionType = exception.GetType().Name,
-            IsBusinessException = exception is BusinessBaseException,
+            IsBusinessException = isUserFacing,
             IsTechnicalException = exception is TechnicalBaseException,
             Timestamp = DateTime.UtcNow
         };
-        
+
         httpResponse.StatusCode = statusCode;
         httpResponse.ContentType = "application/json";
-        
+
         logger?.LogError("Returning status code {StatusCode} with structured error response", statusCode);
-        
+
         await httpResponse.WriteAsJsonAsync(errorResponse);
         await httpResponse.Body.FlushAsync();
     }
 
-    private static int MapExceptionToStatusCode(Exception exception)
+    private static string GetUserFacingMessage(Exception exception)
+    {
+        if (exception is ElevenLabsDisabledException disabledEx)
+            return disabledEx.Message;
+        if (exception is TechnicalBaseException)
+            return "An error occurred. Please try again or contact support if the problem persists.";
+        if (exception is BusinessBaseException businessEx)
+            return businessEx.Reason;
+        if (exception is BaseException baseEx)
+            return baseEx.Reason;
+        return "An unexpected error occurred. Please contact support if the problem persists.";
+    }
+
+    private static (int StatusCode, string? UserFacingMessage) MapExceptionToStatusCodeAndMessage(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
 
         if (exception is ElevenLabsDisabledException)
-        {
-            return 503;
-        }
+            return (503, null);
         if (exception is NotFoundBaseException)
-        {
-            return 404;
-        }
+            return (404, null);
         if (exception is BusinessBaseException)
-        {
-            return 400;
-        }
+            return (400, null);
 
-        return 500;
+        return (500, null);
     }
 }

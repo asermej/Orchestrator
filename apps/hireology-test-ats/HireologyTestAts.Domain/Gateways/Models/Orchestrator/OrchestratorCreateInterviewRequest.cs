@@ -13,11 +13,14 @@ internal class OrchestratorCreateInterviewRequest
     [JsonPropertyName("externalJobId")]
     public string ExternalJobId { get; set; } = string.Empty;
 
-    [JsonPropertyName("agentId")]
-    public Guid AgentId { get; set; }
+    [JsonPropertyName("interviewTemplateId")]
+    public Guid InterviewTemplateId { get; set; }
 
-    [JsonPropertyName("interviewGuideId")]
-    public Guid InterviewGuideId { get; set; }
+    /// <summary>
+    /// Optional. When provided, used as the interview agent; otherwise resolved from the template.
+    /// </summary>
+    [JsonPropertyName("agentId")]
+    public Guid? AgentId { get; set; }
 
     [JsonPropertyName("interviewType")]
     public string InterviewType { get; set; } = "voice";

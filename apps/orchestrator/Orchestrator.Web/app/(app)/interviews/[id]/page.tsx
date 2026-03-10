@@ -54,30 +54,29 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.R
   cancelled: { label: "Cancelled", color: "bg-red-100 text-red-800", icon: <XCircle className="h-3 w-3" /> },
 };
 
-function getRecommendationBadge(recommendation?: string) {
-  if (!recommendation) return null;
-  const lower = recommendation.toLowerCase();
-  if (lower === "hire" || lower === "strong_hire" || lower.includes("excellent")) {
-    return { label: "Excellent Fit", className: "bg-emerald-100 text-emerald-800 border-emerald-200" };
-  }
-  if (lower === "lean_hire" || lower.includes("good")) {
-    return { label: "Good Fit", className: "bg-blue-100 text-blue-800 border-blue-200" };
-  }
-  if (lower === "no_hire" || lower.includes("not")) {
-    return { label: "Not Recommended", className: "bg-red-100 text-red-800 border-red-200" };
-  }
-  return { label: "Further Review", className: "bg-amber-100 text-amber-800 border-amber-200" };
+const recommendationBadgeConfig: Record<string, { label: string; className: string }> = {
+  "Strongly Recommend": { label: "Strongly Recommend", className: "bg-emerald-100 text-emerald-800 border-emerald-200" },
+  "Recommend": { label: "Recommend", className: "bg-green-100 text-green-800 border-green-200" },
+  "Consider": { label: "Consider", className: "bg-amber-100 text-amber-800 border-amber-200" },
+  "Do Not Recommend": { label: "Do Not Recommend", className: "bg-red-100 text-red-800 border-red-200" },
+};
+
+function getRecommendationBadge(tier?: string) {
+  if (!tier) return null;
+  return recommendationBadgeConfig[tier] || { label: tier, className: "bg-slate-100 text-slate-800 border-slate-200" };
 }
 
-function getScoreColor(score: number): string {
-  if (score >= 80) return "text-emerald-600";
-  if (score >= 60) return "text-blue-600";
-  if (score >= 40) return "text-amber-600";
+function getScoreColor(displayScore: number): string {
+  if (displayScore >= 80) return "text-emerald-600";
+  if (displayScore >= 65) return "text-blue-600";
+  if (displayScore >= 50) return "text-amber-600";
   return "text-red-600";
 }
 
-function getScoreGradientPosition(score: number): number {
-  return Math.min(100, Math.max(0, score));
+function getScoreBarColor(displayScore: number): string {
+  if (displayScore >= 70) return "bg-emerald-500";
+  if (displayScore >= 40) return "bg-amber-500";
+  return "bg-red-500";
 }
 
 /** Returns color classes for a per-question score on a 0-10 scale */
@@ -454,7 +453,7 @@ export default function InterviewDetailPage({ params }: InterviewDetailPageProps
   }
 
   const duration = getDuration(interview.startedAt, interview.completedAt);
-  const recBadge = getRecommendationBadge(interview.result?.recommendation);
+  const recBadge = getRecommendationBadge(interview.result?.recommendationTier || interview.result?.recommendation);
   const responseGroups = interview.responses ? groupResponses(interview.responses) : [];
   const mainQuestionCount = responseGroups.length;
 
@@ -654,29 +653,32 @@ export default function InterviewDetailPage({ params }: InterviewDetailPageProps
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {interview.result.score != null ? (
-                  <div className="space-y-4">
-                    <div className="text-center py-2">
-                      <span className={`text-5xl font-bold ${getScoreColor(interview.result.score)}`}>
-                        {interview.result.score}
-                      </span>
-                      <span className="text-2xl text-muted-foreground">/100</span>
-                    </div>
-                    <div className="relative">
-                      <div className="h-3 rounded-full bg-gradient-to-r from-red-400 via-amber-400 via-blue-400 to-emerald-400" />
-                      <div
-                        className="absolute top-0 w-1 h-3 bg-slate-900 rounded-full"
-                        style={{ left: `${getScoreGradientPosition(interview.result.score)}%`, transform: "translateX(-50%)" }}
-                      />
-                      <div className="flex justify-between mt-1">
-                        <span className="text-[10px] text-muted-foreground">Poor</span>
-                        <span className="text-[10px] text-muted-foreground">Average</span>
-                        <span className="text-[10px] text-muted-foreground">Good</span>
-                        <span className="text-[10px] text-muted-foreground">Excellent</span>
+                {(interview.result.overallScoreDisplay != null || interview.result.score != null) ? (() => {
+                  const displayScore = interview.result!.overallScoreDisplay
+                    ?? Math.round(((interview.result!.score ?? 0) / 500) * 100);
+                  const pct = Math.min(100, Math.max(0, displayScore));
+                  return (
+                    <div className="space-y-4">
+                      <div className="text-center py-2">
+                        <span className={`text-5xl font-bold ${getScoreColor(displayScore)}`}>
+                          {displayScore}
+                        </span>
+                        <span className="text-2xl text-muted-foreground"> / 100</span>
+                      </div>
+                      <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${getScoreBarColor(displayScore)}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-[10px] text-muted-foreground">0</span>
+                        <span className="text-[10px] text-muted-foreground">50</span>
+                        <span className="text-[10px] text-muted-foreground">100</span>
                       </div>
                     </div>
-                  </div>
-                ) : (
+                  );
+                })() : (
                   <div className="text-center py-8 text-muted-foreground">
                     <Star className="h-8 w-8 mx-auto mb-2 opacity-30" />
                     <p className="text-sm">Score not available</p>

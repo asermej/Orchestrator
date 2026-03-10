@@ -23,6 +23,7 @@ internal sealed class AgentDataManager
                    system_prompt, interview_guidelines,
                    elevenlabs_voice_id, voice_stability, voice_similarity_boost,
                    voice_provider, voice_type, voice_name, visibility_scope,
+                   tone, pace, acknowledgment_style, additional_instructions,
                    created_at, updated_at, created_by, is_deleted
             FROM agents
             WHERE id = @id AND is_deleted = false";
@@ -41,15 +42,18 @@ internal sealed class AgentDataManager
             INSERT INTO agents (id, group_id, organization_id, display_name, profile_image_url,
                 system_prompt, interview_guidelines,
                 elevenlabs_voice_id, voice_stability, voice_similarity_boost,
-                voice_provider, voice_type, voice_name, visibility_scope, created_by)
+                voice_provider, voice_type, voice_name, visibility_scope,
+                tone, pace, acknowledgment_style, additional_instructions, created_by)
             VALUES (@Id, @GroupId, @OrganizationId, @DisplayName, @ProfileImageUrl,
                 @SystemPrompt, @InterviewGuidelines,
                 @ElevenlabsVoiceId, @VoiceStability, @VoiceSimilarityBoost,
-                @VoiceProvider, @VoiceType, @VoiceName, @VisibilityScope, @CreatedBy)
+                @VoiceProvider, @VoiceType, @VoiceName, @VisibilityScope,
+                @Tone, @Pace, @AcknowledgmentStyle, @AdditionalInstructions, @CreatedBy)
             RETURNING id, group_id, organization_id, display_name, profile_image_url,
                 system_prompt, interview_guidelines,
                 elevenlabs_voice_id, voice_stability, voice_similarity_boost,
                 voice_provider, voice_type, voice_name, visibility_scope,
+                tone, pace, acknowledgment_style, additional_instructions,
                 created_at, updated_at, created_by, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
@@ -74,6 +78,10 @@ internal sealed class AgentDataManager
                 voice_type = @VoiceType,
                 voice_name = @VoiceName,
                 visibility_scope = @VisibilityScope,
+                tone = @Tone,
+                pace = @Pace,
+                acknowledgment_style = @AcknowledgmentStyle,
+                additional_instructions = @AdditionalInstructions,
                 updated_at = CURRENT_TIMESTAMP,
                 updated_by = @UpdatedBy
             WHERE id = @Id AND is_deleted = false
@@ -81,6 +89,7 @@ internal sealed class AgentDataManager
                 system_prompt, interview_guidelines,
                 elevenlabs_voice_id, voice_stability, voice_similarity_boost,
                 voice_provider, voice_type, voice_name, visibility_scope,
+                tone, pace, acknowledgment_style, additional_instructions,
                 created_at, updated_at, created_by, updated_by, is_deleted";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
@@ -155,6 +164,7 @@ internal sealed class AgentDataManager
                    system_prompt, interview_guidelines,
                    elevenlabs_voice_id, voice_stability, voice_similarity_boost,
                    voice_provider, voice_type, voice_name, visibility_scope,
+                   tone, pace, acknowledgment_style, additional_instructions,
                    created_at, updated_at, created_by, is_deleted
             FROM agents
             {whereSql}
@@ -210,6 +220,7 @@ internal sealed class AgentDataManager
                    system_prompt, interview_guidelines,
                    elevenlabs_voice_id, voice_stability, voice_similarity_boost,
                    voice_provider, voice_type, voice_name, visibility_scope,
+                   tone, pace, acknowledgment_style, additional_instructions,
                    created_at, updated_at, created_by, is_deleted
             FROM agents
             {whereSql}
@@ -271,6 +282,7 @@ internal sealed class AgentDataManager
                    system_prompt, interview_guidelines,
                    elevenlabs_voice_id, voice_stability, voice_similarity_boost,
                    voice_provider, voice_type, voice_name, visibility_scope,
+                   tone, pace, acknowledgment_style, additional_instructions,
                    created_at, updated_at, created_by, is_deleted
             FROM agents
             {whereSql}

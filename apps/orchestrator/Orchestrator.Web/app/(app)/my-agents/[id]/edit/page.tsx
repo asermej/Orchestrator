@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, Save, BookOpen, Trash2, AlertTriangle, Mic, Volume2, Search } from "lucide-react";
-import Link from "next/link";
+import { Loader2, Save, Trash2, AlertTriangle, Mic, Volume2, Search } from "lucide-react";
 import { fetchAgentById, updateAgent, deleteAgent } from "../../actions";
 import { ImageUpload } from "@/components/image-upload";
 import { AgentAvatar } from "@/components/agent-avatar";
@@ -55,6 +54,12 @@ export default function EditAgent() {
   const [visibilityScope, setVisibilityScope] = useState("organization_only");
   const [isInherited, setIsInherited] = useState(false);
 
+  // Behavioral fields
+  const [tone, setTone] = useState("");
+  const [pace, setPace] = useState("");
+  const [acknowledgmentStyle, setAcknowledgmentStyle] = useState("");
+  const [additionalInstructions, setAdditionalInstructions] = useState("");
+
   // Voice state
   const [voiceName, setVoiceName] = useState<string | null>(null);
   const [chooseVoiceOpen, setChooseVoiceOpen] = useState(false);
@@ -80,6 +85,10 @@ export default function EditAgent() {
         displayName: displayName.trim(),
         profileImageUrl: profileImageUrl.trim() || null,
         visibilityScope,
+        tone: tone || null,
+        pace: pace || null,
+        acknowledgmentStyle: acknowledgmentStyle || null,
+        additionalInstructions: additionalInstructions.trim() || null,
       });
     },
     {
@@ -120,6 +129,10 @@ export default function EditAgent() {
       setVoiceName(agent.voiceName ?? null);
       setVisibilityScope(agent.visibilityScope || "organization_only");
       setIsInherited(agent.isInherited ?? false);
+      setTone(agent.tone || "");
+      setPace(agent.pace || "");
+      setAcknowledgmentStyle(agent.acknowledgmentStyle || "");
+      setAdditionalInstructions(agent.additionalInstructions || "");
     } catch (err) {
       console.error("Error loading agent:", err);
       setError("Failed to load agent. Please try again.");
@@ -213,7 +226,10 @@ export default function EditAgent() {
     }
   };
 
+  const testVoiceInFlightRef = useRef(false);
   const handleTestVoice = async () => {
+    if (testVoiceInFlightRef.current) return;
+    testVoiceInFlightRef.current = true;
     setTestVoiceLoading(true);
     try {
       const res = await fetch(`/api/agents/${agentId}/voice/test`, {
@@ -235,6 +251,7 @@ export default function EditAgent() {
       console.error("Test voice error", err);
       toast.error("Failed to play test");
     } finally {
+      testVoiceInFlightRef.current = false;
       setTestVoiceLoading(false);
     }
   };
@@ -471,16 +488,80 @@ export default function EditAgent() {
             </CardContent>
           </Card>
 
-          {/* Quick Links */}
-          <Card className="bg-muted/50">
-            <CardContent className="p-6">
-              <h3 className="font-semibold mb-4">Quick Links</h3>
-              <Link href={`/my-agents/${agentId}/general-training`}>
-                <Button variant="outline" className="w-full justify-start">
-                  <BookOpen className="mr-2 h-4 w-4" />
-                  General Training
-                </Button>
-              </Link>
+          {/* Behavioral Settings Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Interview Behavior</CardTitle>
+              <CardDescription>
+                Configure how this agent behaves during interviews. These settings are combined automatically to guide the agent.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Tone */}
+              <div className="space-y-2">
+                <Label htmlFor="tone">Tone</Label>
+                <select
+                  id="tone"
+                  value={tone}
+                  onChange={(e) => setTone(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  disabled={isSaving}
+                >
+                  <option value="">Select tone...</option>
+                  <option value="warm">Warm</option>
+                  <option value="neutral">Neutral</option>
+                  <option value="professional">Professional</option>
+                </select>
+              </div>
+
+              {/* Pace */}
+              <div className="space-y-2">
+                <Label htmlFor="pace">Pace</Label>
+                <select
+                  id="pace"
+                  value={pace}
+                  onChange={(e) => setPace(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  disabled={isSaving}
+                >
+                  <option value="">Select pace...</option>
+                  <option value="conversational">Conversational — takes time to acknowledge answers, natural transitions</option>
+                  <option value="efficient">Efficient — brief acknowledgments, moves through questions promptly</option>
+                </select>
+              </div>
+
+              {/* Acknowledgment Style */}
+              <div className="space-y-2">
+                <Label htmlFor="acknowledgmentStyle">Acknowledgment Style</Label>
+                <select
+                  id="acknowledgmentStyle"
+                  value={acknowledgmentStyle}
+                  onChange={(e) => setAcknowledgmentStyle(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  disabled={isSaving}
+                >
+                  <option value="">Select style...</option>
+                  <option value="brief">Brief — short acknowledgments before moving on</option>
+                  <option value="reflective">Reflective — mirrors something back before moving on</option>
+                </select>
+              </div>
+
+              {/* Additional Instructions */}
+              <div className="space-y-2">
+                <Label htmlFor="additionalInstructions">Additional instructions (optional)</Label>
+                <Textarea
+                  id="additionalInstructions"
+                  value={additionalInstructions}
+                  onChange={(e) => setAdditionalInstructions(e.target.value)}
+                  placeholder="Edge case overrides, role-specific context, or anything the structured fields above can't express."
+                  rows={3}
+                  className="resize-none"
+                  disabled={isSaving}
+                />
+                <p className="text-sm text-muted-foreground">
+                  This is appended to the agent&apos;s behavioral instructions. It is not a full system prompt.
+                </p>
+              </div>
             </CardContent>
           </Card>
 

@@ -9,8 +9,10 @@ export interface AgentItem {
   visibilityScope?: string;
   displayName: string;
   profileImageUrl?: string | null;
-  systemPrompt?: string | null;
-  interviewGuidelines?: string | null;
+  tone?: string | null;
+  pace?: string | null;
+  acknowledgmentStyle?: string | null;
+  additionalInstructions?: string | null;
   elevenlabsVoiceId?: string | null;
   voiceStability?: number;
   voiceSimilarityBoost?: number;
@@ -72,9 +74,11 @@ export async function updateAgent(
   data: {
     displayName?: string;
     profileImageUrl?: string | null;
-    systemPrompt?: string | null;
-    interviewGuidelines?: string | null;
     visibilityScope?: string;
+    tone?: string | null;
+    pace?: string | null;
+    acknowledgmentStyle?: string | null;
+    additionalInstructions?: string | null;
   }
 ): Promise<AgentItem> {
   const updatedAgent = await apiPut<AgentItem>(`/Agent/${id}`, data);

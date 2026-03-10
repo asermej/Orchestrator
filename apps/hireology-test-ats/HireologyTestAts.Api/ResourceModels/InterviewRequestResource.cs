@@ -21,8 +21,12 @@ public class InterviewRequestResource
 
 public class SendInterviewRequestResource
 {
-    public Guid AgentId { get; set; }
-    public Guid InterviewGuideId { get; set; }
+    public Guid InterviewTemplateId { get; set; }
+
+    /// <summary>
+    /// Optional. When provided, used as the interview agent; otherwise resolved from the template in Orchestrator.
+    /// </summary>
+    public Guid? AgentId { get; set; }
 }
 
 public class AgentResource
@@ -32,12 +36,13 @@ public class AgentResource
     public string? ProfileImageUrl { get; set; }
 }
 
-public class InterviewGuideResource
+public class InterviewTemplateResource
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public int QuestionCount { get; set; }
+    public Guid? AgentId { get; set; }
+    public string? AgentDisplayName { get; set; }
     public bool IsActive { get; set; }
 }
 

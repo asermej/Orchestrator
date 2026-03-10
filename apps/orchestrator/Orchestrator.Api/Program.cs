@@ -1,5 +1,6 @@
 using Orchestrator.Domain;
 using Orchestrator.Api.Middleware;
+using Orchestrator.Api.Handlers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
@@ -141,6 +142,7 @@ if (app.Environment.IsDevelopment())
     {
         HasDb = !string.IsNullOrWhiteSpace(config["ConnectionStrings:DbConnectionString"]),
         HasOpenAiKey = !string.IsNullOrWhiteSpace(config["Gateways:OpenAI:ApiKey"]),
+        HasAnthropicKey = !string.IsNullOrWhiteSpace(config["Gateways:Anthropic:ApiKey"]),
         StorageProvider = config["Storage:Provider"],
         StorageContainer = config["Storage:BlobContainer"],
         HasBlobConn = !string.IsNullOrWhiteSpace(config["Storage:BlobConnectionString"])
@@ -209,6 +211,12 @@ if (!app.Environment.IsDevelopment())
 
 // Apply CORS first so static files also have CORS headers
 app.UseCors("AllowNext");
+
+// Enable WebSocket support for Telnyx media streams
+app.UseWebSockets();
+
+// Map the Telnyx media stream WebSocket endpoint (before auth so it is accessible externally)
+app.Map("/api/v1/phonecall/media-stream", PhoneCallWebSocketHandler.HandleAsync);
 
 // Serve static files from wwwroot (images now served via /api/v1/images/{key} from blob storage)
 app.UseStaticFiles();

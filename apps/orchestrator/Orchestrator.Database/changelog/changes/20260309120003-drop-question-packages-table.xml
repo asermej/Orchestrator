@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260309120003-drop-question-packages-table" author="system">
+        <comment>Remove question_packages table; each competency now has a single canonical_example field.</comment>
+        <dropTable tableName="question_packages"/>
+    </changeSet>
+</databaseChangeLog>

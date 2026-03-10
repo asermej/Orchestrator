@@ -82,24 +82,31 @@ internal sealed class CandidateSessionManager : IDisposable
         Agent? agent = null;
         Job? job = null;
         Applicant? applicant = null;
-        List<InterviewGuideQuestion> questions = new();
+        InterviewTemplate? interviewTemplate = null;
+        List<Competency>? competencies = null;
         if (interview != null)
         {
             agent = await DataFacade.GetAgentById(interview.AgentId).ConfigureAwait(false);
             job = await DataFacade.GetJobById(interview.JobId).ConfigureAwait(false);
             applicant = await DataFacade.GetApplicantById(interview.ApplicantId).ConfigureAwait(false);
 
-            // Load questions from the interview guide (direct reference or via configuration fallback)
-            if (interview.InterviewGuideId.HasValue)
+            if (interview.InterviewTemplateId.HasValue)
             {
-                questions = await DataFacade.GetInterviewGuideQuestions(interview.InterviewGuideId.Value).ConfigureAwait(false);
-            }
-            else if (interview.InterviewConfigurationId.HasValue)
-            {
-                var config = await DataFacade.GetInterviewConfigurationById(interview.InterviewConfigurationId.Value).ConfigureAwait(false);
-                if (config != null)
+                interviewTemplate = await DataFacade.GetInterviewTemplateById(interview.InterviewTemplateId.Value).ConfigureAwait(false);
+
+                // For template-based interviews, prefer the template's agent (matches runtime behavior)
+                if (interviewTemplate?.AgentId.HasValue == true)
                 {
-                    questions = await DataFacade.GetInterviewGuideQuestions(config.InterviewGuideId).ConfigureAwait(false);
+                    var templateAgent = await DataFacade.GetAgentById(interviewTemplate.AgentId.Value).ConfigureAwait(false);
+                    if (templateAgent != null)
+                        agent = templateAgent;
+                }
+
+                // Load competencies from the role template (these serve as interview questions)
+                if (interviewTemplate?.RoleTemplateId.HasValue == true)
+                {
+                    competencies = await DataFacade.GetCompetenciesByRoleTemplateId(interviewTemplate.RoleTemplateId.Value).ConfigureAwait(false);
+                    competencies.Sort((a, b) => a.DisplayOrder.CompareTo(b.DisplayOrder));
                 }
             }
         }
@@ -122,7 +129,8 @@ internal sealed class CandidateSessionManager : IDisposable
             Agent = agent,
             Job = job,
             Applicant = applicant,
-            Questions = questions,
+            InterviewTemplate = interviewTemplate,
+            Competencies = competencies,
             Session = createdSession,
         };
     }

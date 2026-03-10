@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260307120002-create-competency-responses-table" author="system">
+        <comment>Stores per-competency scoring and dimensions surfaced for AI-conducted interviews.</comment>
+        <createTable tableName="competency_responses">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="interview_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_competency_responses_interview" references="interviews(id)"/>
+            </column>
+            <column name="competency_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_competency_responses_competency" references="competencies(id)"/>
+            </column>
+            <column name="competency_score" type="int">
+                <constraints nullable="false"/>
+            </column>
+            <column name="dimensions_surfaced" type="jsonb">
+                <constraints nullable="true"/>
+            </column>
+            <column name="questions_asked" type="jsonb">
+                <constraints nullable="true"/>
+            </column>
+            <column name="response_text" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <column name="response_audio_url" type="varchar(500)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="updated_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_deleted" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="deleted_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="competency_responses" indexName="idx_competency_responses_interview_id">
+            <column name="interview_id"/>
+        </createIndex>
+        <createIndex tableName="competency_responses" indexName="idx_competency_responses_competency_id">
+            <column name="competency_id"/>
+        </createIndex>
+        <createIndex tableName="competency_responses" indexName="idx_competency_responses_is_deleted">
+            <column name="is_deleted"/>
+        </createIndex>
+        <addUniqueConstraint tableName="competency_responses"
+            columnNames="interview_id, competency_id"
+            constraintName="uk_competency_responses_interview_competency"/>
+    </changeSet>
+</databaseChangeLog>

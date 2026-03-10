@@ -502,10 +502,18 @@ public class AgentController : ControllerBase
         // Ensure headers are sent immediately
         await Response.Body.FlushAsync(HttpContext.RequestAborted);
 
-        await foreach (var chunk in _domainFacade.StreamVoiceAsync(voiceId, request.Text, HttpContext.RequestAborted))
+        try
         {
-            await Response.Body.WriteAsync(chunk, HttpContext.RequestAborted);
-            await Response.Body.FlushAsync(HttpContext.RequestAborted);
+            await foreach (var chunk in _domainFacade.StreamVoiceAsync(voiceId, request.Text, HttpContext.RequestAborted))
+            {
+                await Response.Body.WriteAsync(chunk, HttpContext.RequestAborted);
+                await Response.Body.FlushAsync(HttpContext.RequestAborted);
+            }
+        }
+        catch (Exception ex) when (Response.HasStarted)
+        {
+            _logger.LogError(ex, "Error during voice stream after response started for agent {AgentId}", id);
+            Response.Body.Close();
         }
     }
 }

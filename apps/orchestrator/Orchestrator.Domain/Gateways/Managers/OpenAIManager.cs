@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.Http;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orchestrator.Domain;
@@ -40,17 +43,18 @@ internal sealed class OpenAIManager : IDisposable
     }
 
     /// <summary>
-    /// Generates a chat completion using OpenAI API
+    /// Generates a chat completion using OpenAI API with optional model/temperature overrides.
     /// </summary>
-    /// <param name="systemPrompt">The system prompt that defines the persona behavior</param>
-    /// <param name="chatHistory">Previous messages in the conversation</param>
-    /// <returns>The AI-generated response content</returns>
-    public async Task<string> GenerateChatCompletion(string systemPrompt, IEnumerable<ConversationTurn> chatHistory)
+    public async Task<string> GenerateChatCompletion(
+        string systemPrompt,
+        IEnumerable<ConversationTurn> chatHistory,
+        string? modelOverride = null,
+        double? temperatureOverride = null)
     {
         try
         {
             var config = _serviceLocator.CreateConfigurationProvider();
-            var model = config.GetGatewaySetting("OpenAI", "Model") ?? "gpt-3.5-turbo";
+            var model = modelOverride ?? config.GetGatewaySetting("OpenAI", "Model") ?? "gpt-4o-mini";
             var maxTokensStr = config.GetGatewaySetting("OpenAI", "MaxTokens");
             var temperatureStr = config.GetGatewaySetting("OpenAI", "Temperature");
 
@@ -60,13 +64,12 @@ internal sealed class OpenAIManager : IDisposable
                 maxTokens = parsedMaxTokens;
             }
 
-            double temperature = 0.7;
-            if (!string.IsNullOrWhiteSpace(temperatureStr) && double.TryParse(temperatureStr, out var parsedTemperature))
+            double temperature = temperatureOverride ?? 0.7;
+            if (!temperatureOverride.HasValue && !string.IsNullOrWhiteSpace(temperatureStr) && double.TryParse(temperatureStr, out var parsedTemperature))
             {
                 temperature = parsedTemperature;
             }
 
-            // Map domain model to resource model
             var requestResource = OpenAIMapper.ToChatCompletionRequest(
                 systemPrompt,
                 chatHistory,
@@ -125,6 +128,117 @@ internal sealed class OpenAIManager : IDisposable
         catch (Exception ex)
         {
             throw new OpenAIApiException($"Unexpected error calling OpenAI API: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Streams a chat completion token-by-token using OpenAI's SSE streaming API.
+    /// </summary>
+    /// <param name="systemPrompt">The system prompt that defines the persona behavior</param>
+    /// <param name="chatHistory">Previous messages in the conversation</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Async enumerable of content tokens as they arrive</returns>
+    public async IAsyncEnumerable<string> StreamChatCompletionAsync(
+        string systemPrompt,
+        IEnumerable<ConversationTurn> chatHistory,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var config = _serviceLocator.CreateConfigurationProvider();
+        var model = config.GetGatewaySetting("OpenAI", "Model") ?? "gpt-4o-mini";
+        var maxTokensStr = config.GetGatewaySetting("OpenAI", "MaxTokens");
+        var temperatureStr = config.GetGatewaySetting("OpenAI", "Temperature");
+
+        int maxTokens = 500;
+        if (!string.IsNullOrWhiteSpace(maxTokensStr) && int.TryParse(maxTokensStr, out var parsedMaxTokens))
+            maxTokens = parsedMaxTokens;
+
+        double temperature = 0.7;
+        if (!string.IsNullOrWhiteSpace(temperatureStr) && double.TryParse(temperatureStr, out var parsedTemperature))
+            temperature = parsedTemperature;
+
+        var requestResource = OpenAIMapper.ToChatCompletionRequest(systemPrompt, chatHistory, model, temperature, maxTokens);
+        requestResource.Stream = true;
+
+        var jsonContent = JsonSerializer.Serialize(requestResource, new JsonSerializerOptions { WriteIndented = false });
+        var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+        HttpResponseMessage? response = null;
+        Stream? stream = null;
+
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, "/v1/chat/completions") { Content = content };
+            response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                throw new OpenAIApiException($"OpenAI streaming API returned error: {response.StatusCode} - {errorContent}");
+            }
+
+            stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpRequestException ex)
+        {
+            response?.Dispose();
+            throw new OpenAIConnectionException($"Failed to connect to OpenAI API: {ex.Message}", ex);
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            response?.Dispose();
+            throw new OpenAIConnectionException($"OpenAI streaming API request timed out: {ex.Message}", ex);
+        }
+        catch (OpenAIApiException)
+        {
+            response?.Dispose();
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            response?.Dispose();
+            throw;
+        }
+
+        // Parse SSE stream outside try-catch so yield is allowed
+        using var reader = new StreamReader(stream);
+        try
+        {
+            while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested)
+            {
+                var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+                if (line == null)
+                    break;
+
+                if (!line.StartsWith("data: "))
+                    continue;
+
+                var data = line.Substring(6);
+                if (data == "[DONE]")
+                    break;
+
+                OpenAIStreamingChunk? chunk;
+                try
+                {
+                    chunk = JsonSerializer.Deserialize<OpenAIStreamingChunk>(data, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                }
+                catch (JsonException)
+                {
+                    continue;
+                }
+
+                var token = chunk?.Choices is { Count: > 0 }
+                    ? chunk.Choices[0].Delta?.Content
+                    : null;
+
+                if (!string.IsNullOrEmpty(token))
+                {
+                    yield return token;
+                }
+            }
+        }
+        finally
+        {
+            response?.Dispose();
         }
     }
 

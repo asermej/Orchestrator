@@ -121,6 +121,27 @@ internal sealed class InterviewManager : IDisposable
         return await DataFacade.UpdateInterviewResult(result).ConfigureAwait(false);
     }
 
+    // Competency responses (per-competency holistic scores for AI interviews)
+    public async Task<List<CompetencyResponse>> GetCompetencyResponsesByInterviewId(Guid interviewId)
+    {
+        return await DataFacade.GetCompetencyResponsesByInterviewId(interviewId).ConfigureAwait(false);
+    }
+
+    public async Task<CompetencyResponse> UpsertCompetencyResponse(CompetencyResponse response)
+    {
+        return await DataFacade.UpsertCompetencyResponse(response).ConfigureAwait(false);
+    }
+
+    public async Task<RecommendationThresholdDefaults> GetRecommendationThresholds()
+    {
+        return await DataFacade.GetRecommendationThresholds().ConfigureAwait(false);
+    }
+
+    public async Task<RecommendationThresholdDefaults> UpdateRecommendationThresholds(RecommendationThresholdDefaults thresholds)
+    {
+        return await DataFacade.UpdateRecommendationThresholds(thresholds).ConfigureAwait(false);
+    }
+
     private static string GenerateInterviewToken()
     {
         var bytes = new byte[24];

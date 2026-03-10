@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260303130000-add-description-to-competencies" author="system">
+        <addColumn tableName="competencies">
+            <column name="description" type="text">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20260303130000-seed-competency-descriptions" author="system">
+        <comment>Backfill descriptions for existing system competencies</comment>
+        <sql><![CDATA[
+UPDATE competencies SET description = 'Ability to understand, connect with, and respond to patients and families with genuine care and emotional sensitivity' WHERE competency_key = 'empathy_compassion';
+UPDATE competencies SET description = 'Consistent dependability in attendance, task completion, and following through on commitments to patients and the care team' WHERE competency_key = 'reliability_accountability';
+UPDATE competencies SET description = 'Capacity to stay calm, think clearly, and find effective solutions when facing unexpected challenges in a care setting' WHERE competency_key = 'problem_solving';
+UPDATE competencies SET description = 'Commitment to understanding and addressing the holistic needs of patients with attentiveness and clinical awareness' WHERE competency_key = 'patient_care_mindset';
+UPDATE competencies SET description = 'Skill in collaborating with colleagues and communicating clearly with patients, families, and the broader care team' WHERE competency_key = 'teamwork_communication';
+UPDATE competencies SET description = 'Thorough and precise approach to clinical tasks, documentation, and observation of patient conditions' WHERE competency_key = 'clinical_attention_detail';
+UPDATE competencies SET description = 'Careful, meticulous approach to cleaning standards, inspection routines, and maintaining facility quality' WHERE competency_key = 'attention_to_detail';
+UPDATE competencies SET description = 'Dependable work habits, punctuality, and a strong sense of personal accountability for completing tasks to standard' WHERE competency_key = 'reliability_work_ethic';
+UPDATE competencies SET description = 'Maintaining appropriate boundaries, respecting confidentiality, and representing the facility with dignity' WHERE competency_key = 'professionalism_discretion';
+        ]]></sql>
+    </changeSet>
+
+</databaseChangeLog>

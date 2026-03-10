@@ -6,11 +6,12 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   Bot,
-  BookOpen,
+  Library,
   Settings2,
   Mic,
   Briefcase,
   ShieldAlert,
+  SlidersHorizontal,
   LogOut,
 } from "lucide-react";
 
@@ -28,8 +29,8 @@ interface AppSidebarProps {
 
 const navItems = [
   { href: "/my-agents", label: "My Agents", icon: Bot },
-  { href: "/interview-guides", label: "Interview Guides", icon: BookOpen },
-  { href: "/interview-configurations", label: "Interview Configs", icon: Settings2 },
+  { href: "/interview-content", label: "Interview Content", icon: Library },
+  { href: "/interview-templates", label: "Interview Templates", icon: Settings2 },
   { href: "/interviews", label: "Interviews", icon: Mic },
   { href: "/jobs", label: "Jobs", icon: Briefcase },
 ];
@@ -76,6 +77,20 @@ export function AppSidebar({ hasGroup, user, displayName }: AppSidebarProps) {
               </p>
             </div>
             <ul className="space-y-1">
+              <li>
+                <Link
+                  href="/admin/recommendation-thresholds"
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                    isActive("/admin/recommendation-thresholds")
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                  )}
+                >
+                  <SlidersHorizontal className="h-4 w-4 shrink-0" />
+                  <span>Thresholds</span>
+                </Link>
+              </li>
               <li>
                 <Link
                   href="/admin/orphaned-entities"

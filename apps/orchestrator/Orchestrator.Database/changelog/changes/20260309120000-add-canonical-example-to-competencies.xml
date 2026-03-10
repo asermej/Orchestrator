@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260309120000-add-canonical-example-to-competencies" author="system">
+        <comment>Add canonical_example to competencies; single reference question per competency (replaces question_packages).</comment>
+        <addColumn tableName="competencies">
+            <column name="canonical_example" type="text">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20260309120001-backfill-canonical-example-from-question-packages" author="system">
+        <comment>Backfill canonical_example from question_packages (default or first primary_question_text per competency).</comment>
+        <sql>
+            UPDATE competencies c
+            SET canonical_example = (
+                SELECT qp.primary_question_text
+                FROM question_packages qp
+                WHERE qp.competency_id = c.id AND qp.is_deleted = false
+                ORDER BY qp.is_default DESC, qp.created_at
+                LIMIT 1
+            )
+            WHERE EXISTS (
+                SELECT 1 FROM question_packages qp2
+                WHERE qp2.competency_id = c.id AND qp2.is_deleted = false
+            );
+        </sql>
+    </changeSet>
+
+    <changeSet id="20260309120002-add-generated-question-text-to-competency-responses" author="system">
+        <comment>Store the AI-delivered primary question for audit; outcome tracing remains by competency_id.</comment>
+        <addColumn tableName="competency_responses">
+            <column name="generated_question_text" type="text">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>

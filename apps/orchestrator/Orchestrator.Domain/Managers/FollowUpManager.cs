@@ -59,7 +59,7 @@ Return format (strict JSON array):
             new ConversationTurn { Role = "user", Content = userPrompt }
         };
 
-        var response = await GatewayFacade.GenerateChatCompletion(systemPrompt, chatHistory).ConfigureAwait(false);
+        var response = await GatewayFacade.GenerateAnthropicCompletion(systemPrompt, chatHistory).ConfigureAwait(false);
 
         // Parse JSON response
         try
@@ -295,7 +295,7 @@ Select the most appropriate follow-up question, or return null if none are neede
             new ConversationTurn { Role = "user", Content = userPrompt }
         };
 
-        var response = await GatewayFacade.GenerateChatCompletion(systemPrompt, chatHistory).ConfigureAwait(false);
+        var response = await GatewayFacade.GenerateAnthropicCompletion(systemPrompt, chatHistory).ConfigureAwait(false);
 
         try
         {

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260302120003-create-rubric-levels-table" author="system">
+        <createTable tableName="rubric_levels">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="competency_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_rubric_levels_competency" references="competencies(id)"/>
+            </column>
+            <column name="level" type="int">
+                <constraints nullable="false"/>
+            </column>
+            <column name="label" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="min_dimensions_required" type="int">
+                <constraints nullable="false"/>
+            </column>
+            <column name="evidence_criteria" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <!-- Audit fields -->
+            <column name="created_at" type="timestamp" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="updated_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_deleted" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="deleted_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="rubric_levels" indexName="idx_rubric_levels_competency_id">
+            <column name="competency_id"/>
+        </createIndex>
+
+        <createIndex tableName="rubric_levels" indexName="idx_rubric_levels_is_deleted">
+            <column name="is_deleted"/>
+        </createIndex>
+
+        <addUniqueConstraint tableName="rubric_levels"
+            columnNames="competency_id, level"
+            constraintName="uk_rubric_levels_competency_level"/>
+    </changeSet>
+
+</databaseChangeLog>

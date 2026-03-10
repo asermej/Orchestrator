@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { InterviewExperience, InterviewQuestion } from "@/components/interview-experience";
 
 interface InterviewQuestionData {
@@ -49,25 +49,6 @@ export function InterviewClient({ token, interview }: InterviewClientProps) {
     id: q.id,
     text: q.questionText,
   }));
-
-  // Warmup audio cache on mount
-  useEffect(() => {
-    const warmupAudio = async () => {
-      try {
-        const response = await fetch(`/api/interview/${token}/warmup`, {
-          method: "POST",
-        });
-        if (response.ok) {
-          const result = await response.json();
-          console.log("Audio warmup complete:", result);
-        }
-      } catch (err) {
-        console.warn("Audio warmup failed:", err);
-      }
-    };
-    
-    warmupAudio();
-  }, [token]);
 
   const handleBegin = useCallback(async () => {
     try {

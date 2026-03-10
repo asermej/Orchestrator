@@ -32,9 +32,14 @@ public class CandidateSessionResult
     public Applicant? Applicant { get; set; }
 
     /// <summary>
-    /// The interview questions from the interview guide
+    /// The interview template associated with this interview (if template-based)
     /// </summary>
-    public List<InterviewGuideQuestion> Questions { get; set; } = new();
+    public InterviewTemplate? InterviewTemplate { get; set; }
+
+    /// <summary>
+    /// Competencies from the role template (used as interview questions for template-based interviews)
+    /// </summary>
+    public List<Competency>? Competencies { get; set; }
 
     /// <summary>
     /// The candidate session record

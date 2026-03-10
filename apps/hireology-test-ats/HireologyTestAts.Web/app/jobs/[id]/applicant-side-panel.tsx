@@ -5,17 +5,12 @@ import { testAtsApi } from "@/lib/test-ats-api";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-interface AgentItem {
-  id: string;
-  displayName: string;
-  profileImageUrl?: string | null;
-}
-
-interface InterviewGuideItem {
+interface InterviewTemplateItem {
   id: string;
   name: string;
   description?: string | null;
-  questionCount: number;
+  agentId?: string | null;
+  agentDisplayName?: string | null;
   isActive: boolean;
 }
 
@@ -31,6 +26,25 @@ interface InterviewResponseData {
   isFollowUp: boolean;
   questionType: string;
   createdAt: string;
+}
+
+interface CompetencyExchange {
+  question: string;
+  response: string;
+  label: string;
+}
+
+interface CompetencyResponseData {
+  competencyId: string;
+  competencyName: string;
+  scoringWeight?: number | null;
+  competencyScore: number;
+  competencyRationale?: string | null;
+  followUpCount?: number;
+  exchanges: CompetencyExchange[];
+  audioUrl?: string | null;
+  competencySkipped?: boolean;
+  skipReason?: string | null;
 }
 
 interface QuestionScoreData {
@@ -179,9 +193,10 @@ function InterviewStatusBadge({ status }: { status: string }) {
 
 function RecommendationBadge({ recommendation }: { recommendation: string }) {
   const config: Record<string, { label: string; className: string }> = {
-    hire: { label: "Excellent Fit", className: "bg-green-100 text-green-800" },
-    no_hire: { label: "No Hire", className: "bg-red-100 text-red-800" },
-    further_review: { label: "Further Review", className: "bg-amber-100 text-amber-800" },
+    "Strongly Recommend": { label: "Strongly Recommend", className: "bg-emerald-100 text-emerald-800" },
+    "Recommend": { label: "Recommend", className: "bg-green-100 text-green-800" },
+    "Consider": { label: "Consider", className: "bg-amber-100 text-amber-800" },
+    "Do Not Recommend": { label: "Do Not Recommend", className: "bg-red-100 text-red-800" },
   };
   const c = config[recommendation] || { label: recommendation, className: "bg-slate-100 text-slate-700" };
   return (
@@ -428,6 +443,132 @@ function ExpandableQuestionCard({
   );
 }
 
+// ── Competency scoring helpers ───────────────────────────────────────────────────
+
+function scoreLabel(score: number): string {
+  if (score >= 5) return "Exceptional";
+  if (score >= 4) return "Strong";
+  if (score >= 3) return "Adequate";
+  if (score >= 2) return "Weak";
+  return "No evidence";
+}
+
+function scoreColor(score: number): string {
+  if (score >= 4) return "text-emerald-700 bg-emerald-50 border-emerald-200";
+  if (score >= 3) return "text-amber-700 bg-amber-50 border-amber-200";
+  return "text-red-700 bg-red-50 border-red-200";
+}
+
+function CompetencyCard({ cr }: { cr: CompetencyResponseData }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (cr.competencySkipped) {
+    return (
+      <div className="border border-slate-200 rounded-lg overflow-hidden">
+        <div className="flex items-center gap-3 p-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-slate-900 truncate">{cr.competencyName}</span>
+              {cr.scoringWeight != null && (
+                <span className="text-[10px] text-slate-400 shrink-0">Weight: {cr.scoringWeight}%</span>
+              )}
+            </div>
+          </div>
+          <span className="shrink-0 px-2.5 py-1 rounded-md border text-xs font-semibold text-slate-600 bg-slate-100 border-slate-200">
+            Skipped
+          </span>
+        </div>
+        {cr.skipReason && (
+          <div className="px-4 pb-3">
+            <p className="text-sm text-slate-500 leading-relaxed">{cr.skipReason}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const followUpLabel = cr.followUpCount != null && cr.followUpCount > 0
+    ? `${cr.followUpCount} follow-up${cr.followUpCount > 1 ? "s" : ""} asked`
+    : "No follow-ups";
+
+  return (
+    <div className="border border-slate-200 rounded-lg overflow-hidden">
+      {/* Header: always visible */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-3 p-4 text-left hover:bg-slate-50 transition-colors"
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-slate-900 truncate">{cr.competencyName}</span>
+            {cr.scoringWeight != null && (
+              <span className="text-[10px] text-slate-400 shrink-0">Weight: {cr.scoringWeight}%</span>
+            )}
+          </div>
+          <div className="text-xs text-slate-400 mt-0.5">{followUpLabel}</div>
+        </div>
+        <span className={`shrink-0 px-2.5 py-1 rounded-md border text-xs font-semibold ${scoreColor(cr.competencyScore)}`}>
+          {cr.competencyScore} — {scoreLabel(cr.competencyScore)}
+        </span>
+        <svg
+          className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* AI Rationale — always visible, not collapsed */}
+      {cr.competencyRationale && (
+        <div className="px-4 pb-3">
+          <p className="text-sm text-slate-700 leading-relaxed">{cr.competencyRationale}</p>
+        </div>
+      )}
+
+      {expanded && (
+        <div className="px-4 pb-4 border-t border-slate-100 space-y-4">
+          {/* Transcript */}
+          <div className="mt-3">
+            <div className="text-xs font-medium text-slate-500 mb-2">Conversation Transcript</div>
+            <div className="space-y-3">
+              {cr.exchanges.map((exchange, idx) => (
+                <div key={idx} className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                  <div className="flex gap-2 mb-1.5">
+                    <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded shrink-0">
+                      {exchange.label}
+                    </span>
+                    <p className="text-sm text-slate-800">{exchange.question}</p>
+                  </div>
+                  {exchange.response && (
+                    <div className="flex gap-2 pl-0.5">
+                      <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded shrink-0">
+                        A
+                      </span>
+                      <p className="text-sm text-slate-600 italic">{exchange.response}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {cr.exchanges.length === 0 && (
+                <p className="text-sm text-slate-400 italic">No transcript available</p>
+              )}
+            </div>
+          </div>
+
+          {/* Audio Player */}
+          {cr.audioUrl ? (
+            <AudioPlayer src={cr.audioUrl} />
+          ) : (
+            <p className="text-xs text-slate-400 italic">No recording available</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Center content sections ────────────────────────────────────────────────────
 
 function NotSentContent({ onLaunch }: { onLaunch: () => void }) {
@@ -461,10 +602,8 @@ function SendSchedulingLinkContent({
   onBack: () => void;
   onSent: (request: InterviewRequestItem) => void;
 }) {
-  const [agents, setAgents] = useState<AgentItem[]>([]);
-  const [guides, setGuides] = useState<InterviewGuideItem[]>([]);
-  const [selectedAgentId, setSelectedAgentId] = useState<string>("");
-  const [selectedGuideId, setSelectedGuideId] = useState<string>("");
+  const [templates, setTemplates] = useState<InterviewTemplateItem[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -473,19 +612,14 @@ function SendSchedulingLinkContent({
     let cancelled = false;
     async function loadData() {
       try {
-        const [agentsData, guidesData] = await Promise.all([
-          testAtsApi.get<AgentItem[]>("/api/v1/agents"),
-          testAtsApi.get<InterviewGuideItem[]>("/api/v1/interview-guides"),
-        ]);
+        const templatesData = await testAtsApi.get<InterviewTemplateItem[]>("/api/v1/interview-templates");
         if (!cancelled) {
-          setAgents(agentsData);
-          setGuides(guidesData);
-          if (agentsData.length > 0) setSelectedAgentId(agentsData[0].id);
-          if (guidesData.length > 0) setSelectedGuideId(guidesData[0].id);
+          setTemplates(templatesData);
+          if (templatesData.length > 0) setSelectedTemplateId(templatesData[0].id);
         }
       } catch (e) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load agents and interview guides");
+          setError(e instanceof Error ? e.message : "Failed to load interview templates");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -495,17 +629,19 @@ function SendSchedulingLinkContent({
     return () => { cancelled = true; };
   }, []);
 
-  const selectedAgent = agents.find((a) => a.id === selectedAgentId);
-  const selectedGuide = guides.find((g) => g.id === selectedGuideId);
+  const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
 
   const handleSend = async () => {
-    if (!selectedAgentId || !selectedGuideId) return;
+    if (!selectedTemplateId) return;
     setSending(true);
     setError(null);
     try {
       const data = await testAtsApi.post<InterviewRequestItem>(
         `/api/v1/applicants/${applicant.id}/interview`,
-        { agentId: selectedAgentId, interviewGuideId: selectedGuideId }
+        {
+          interviewTemplateId: selectedTemplateId,
+          ...(selectedTemplate?.agentId && { agentId: selectedTemplate.agentId }),
+        }
       );
       onSent(data);
     } catch (e) {
@@ -515,7 +651,7 @@ function SendSchedulingLinkContent({
     }
   };
 
-  const canSend = selectedAgentId && selectedGuideId && agents.length > 0 && guides.length > 0;
+  const canSend = selectedTemplateId && templates.length > 0 && !!selectedTemplate?.agentId;
 
   return (
     <div className="flex flex-col h-full">
@@ -523,65 +659,45 @@ function SendSchedulingLinkContent({
 
       <div className="flex-1">
           {loading ? (
-            <div className="text-sm text-slate-500 mb-4">Loading agents and interview guides...</div>
-          ) : agents.length === 0 || guides.length === 0 ? (
+            <div className="text-sm text-slate-500 mb-4">Loading interview templates...</div>
+          ) : templates.length === 0 ? (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-amber-800 text-sm">
-              {agents.length === 0 && "No agents found. "}
-              {guides.length === 0 && "No interview guides found. "}
-              Please create agents and interview guides in the Orchestrator first.
+              No interview templates found. Please create interview templates in the Orchestrator first.
             </div>
           ) : (
             <>
-              {/* Agent selector */}
+              {/* Interview Template selector */}
               <div className="mb-5">
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Agent
+                  Interview Template
                 </label>
                 <select
-                  value={selectedAgentId}
-                  onChange={(e) => setSelectedAgentId(e.target.value)}
+                  value={selectedTemplateId}
+                  onChange={(e) => setSelectedTemplateId(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                 >
-                  {agents.map((agent) => (
-                    <option key={agent.id} value={agent.id}>
-                      {agent.displayName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Interview Guide selector */}
-              <div className="mb-5">
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Interview Guide
-                </label>
-                <select
-                  value={selectedGuideId}
-                  onChange={(e) => setSelectedGuideId(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                >
-                  {guides.map((guide) => (
-                    <option key={guide.id} value={guide.id}>
-                      {guide.name} {`\u2014 ${guide.questionCount} questions`}
+                  {templates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.name}
+                      {template.agentDisplayName ? ` \u2014 ${template.agentDisplayName}` : ""}
                     </option>
                   ))}
                 </select>
 
-                {selectedGuide && (
+                {selectedTemplate && (
                   <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 space-y-1">
-                    {selectedGuide.description && <p>{selectedGuide.description}</p>}
-                    <div className="flex items-center gap-3">
-                      {selectedAgent && (
-                        <span>
-                          <span className="font-medium text-slate-700">Agent:</span>{" "}
-                          {selectedAgent.displayName}
-                        </span>
-                      )}
-                      <span>
-                        <span className="font-medium text-slate-700">Questions:</span>{" "}
-                        {selectedGuide.questionCount}
-                      </span>
-                    </div>
+                    {selectedTemplate.description && <p>{selectedTemplate.description}</p>}
+                    {selectedTemplate.agentDisplayName && (
+                      <p>
+                        <span className="font-medium text-slate-700">Agent:</span>{" "}
+                        {selectedTemplate.agentDisplayName}
+                      </p>
+                    )}
+                    {!selectedTemplate.agentId && (
+                      <p className="text-amber-700 font-medium">
+                        This template has no agent assigned. Assign an agent in Orchestrator to send an interview.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -706,15 +822,24 @@ function InterviewDetailsContent({
   onResend?: () => void;
 }) {
   const [responses, setResponses] = useState<InterviewResponseData[]>([]);
+  const [competencyResponses, setCompetencyResponses] = useState<CompetencyResponseData[]>([]);
   const [questionScores, setQuestionScores] = useState<Map<number, QuestionScoreData>>(new Map());
   const [loadingResponses, setLoadingResponses] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
 
-  // Fetch real interview responses and result (with question scores) in parallel
   useEffect(() => {
     if (!ir.orchestratorInterviewId) return;
     let cancelled = false;
     setLoadingResponses(true);
+
+    const fetchCompetencyResponses = fetch(`/api/interview-competency-responses/${ir.orchestratorInterviewId}`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (!cancelled && Array.isArray(data)) {
+          setCompetencyResponses(data);
+        }
+      })
+      .catch(() => {});
 
     const fetchResponses = fetch(`/api/interview-responses/${ir.orchestratorInterviewId}`)
       .then((res) => (res.ok ? res.json() : []))
@@ -741,7 +866,7 @@ function InterviewDetailsContent({
       })
       .catch(() => {});
 
-    Promise.all([fetchResponses, fetchResult]).finally(() => {
+    Promise.all([fetchCompetencyResponses, fetchResponses, fetchResult]).finally(() => {
       if (!cancelled) setLoadingResponses(false);
     });
 
@@ -872,45 +997,58 @@ function InterviewDetailsContent({
         </div>
       )}
 
-      {/* Interview Questions */}
+      {/* Interview Results */}
       <div className="mb-4">
-        <h4 className="text-sm font-semibold text-slate-900 mb-3">
-          {isCompleted ? "Interview Responses" : "Interview Questions Preview"}
-        </h4>
         {loadingResponses ? (
           <div className="flex items-center justify-center py-6 text-sm text-slate-400">
             Loading responses…
           </div>
+        ) : competencyResponses.length > 0 ? (
+          <>
+            <h4 className="text-sm font-semibold text-slate-900 mb-3">
+              Competency Results
+            </h4>
+            <div className="space-y-2">
+              {competencyResponses.map((cr) => (
+                <CompetencyCard key={cr.competencyId} cr={cr} />
+              ))}
+            </div>
+          </>
         ) : (
-          <div className="space-y-2">
-            {(responses.length > 0 ? responses : PLACEHOLDER_QUESTIONS).map(
-              (item, i) => {
-                const isReal = responses.length > 0;
-                const realItem = item as InterviewResponseData;
-                const placeholderItem = item as (typeof PLACEHOLDER_QUESTIONS)[0];
-                const qScore = isReal ? questionScores.get(realItem.responseOrder) : undefined;
+          <>
+            <h4 className="text-sm font-semibold text-slate-900 mb-3">
+              {isCompleted ? "Interview Responses" : "Interview Questions Preview"}
+            </h4>
+            <div className="space-y-2">
+              {(responses.length > 0 ? responses : PLACEHOLDER_QUESTIONS).map(
+                (item, i) => {
+                  const isReal = responses.length > 0;
+                  const realItem = item as InterviewResponseData;
+                  const placeholderItem = item as (typeof PLACEHOLDER_QUESTIONS)[0];
+                  const qScore = isReal ? questionScores.get(realItem.responseOrder) : undefined;
 
-                return (
-                  <ExpandableQuestionCard
-                    key={isReal ? realItem.id : i}
-                    index={i}
-                    question={isReal ? realItem.questionText : placeholderItem.question}
-                    response={
-                      isReal
-                        ? realItem.transcript || "No transcript available"
-                        : placeholderItem.response
-                    }
-                    isCompleted={isCompleted}
-                    audioUrl={isReal ? realItem.audioUrl : null}
-                    durationSeconds={isReal ? realItem.durationSeconds : null}
-                    score={qScore?.score}
-                    maxScore={qScore?.maxScore}
-                    feedback={qScore?.feedback}
-                  />
-                );
-              }
-            )}
-          </div>
+                  return (
+                    <ExpandableQuestionCard
+                      key={isReal ? realItem.id : i}
+                      index={i}
+                      question={isReal ? realItem.questionText : placeholderItem.question}
+                      response={
+                        isReal
+                          ? realItem.transcript || "No transcript available"
+                          : placeholderItem.response
+                      }
+                      isCompleted={isCompleted}
+                      audioUrl={isReal ? realItem.audioUrl : null}
+                      durationSeconds={isReal ? realItem.durationSeconds : null}
+                      score={qScore?.score}
+                      maxScore={qScore?.maxScore}
+                      feedback={qScore?.feedback}
+                    />
+                  );
+                }
+              )}
+            </div>
+          </>
         )}
       </div>
 

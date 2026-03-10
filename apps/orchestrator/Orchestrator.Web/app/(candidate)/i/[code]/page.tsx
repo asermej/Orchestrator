@@ -40,6 +40,8 @@ export default async function CandidateInterviewPage({
       applicant={data.applicant}
       questions={data.questions}
       token={data.token}
+      openingTemplate={data.openingTemplate}
+      closingTemplate={data.closingTemplate}
     />
   );
 }

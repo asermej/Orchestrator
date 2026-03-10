@@ -19,6 +19,9 @@ public class CandidateSessionResponse
     public CandidateJobResource? Job { get; set; }
     public CandidateApplicantResource? Applicant { get; set; }
     public List<CandidateQuestionResource> Questions { get; set; } = new();
+    public Guid? InterviewTemplateId { get; set; }
+    public string? OpeningTemplate { get; set; }
+    public string? ClosingTemplate { get; set; }
 }
 
 /// <summary>
@@ -54,6 +57,7 @@ public class CandidateAgentResource
     public Guid Id { get; set; }
     public string DisplayName { get; set; } = string.Empty;
     public string? ProfileImageUrl { get; set; }
+    public string? ElevenlabsVoiceId { get; set; }
 }
 
 /// <summary>

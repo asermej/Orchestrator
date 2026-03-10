@@ -40,16 +40,18 @@ internal static class OrchestratorMapper
     }
 
     public static OrchestratorCreateInterviewRequest ToCreateInterviewRequest(
-        string externalApplicantId, string externalJobId, Guid agentId, Guid interviewGuideId)
+        string externalApplicantId, string externalJobId, Guid interviewTemplateId, Guid? agentId = null)
     {
-        return new OrchestratorCreateInterviewRequest
+        var request = new OrchestratorCreateInterviewRequest
         {
             ExternalApplicantId = externalApplicantId,
             ExternalJobId = externalJobId,
-            AgentId = agentId,
-            InterviewGuideId = interviewGuideId,
+            InterviewTemplateId = interviewTemplateId,
             InterviewType = "voice"
         };
+        if (agentId.HasValue && agentId.Value != Guid.Empty)
+            request.AgentId = agentId.Value;
+        return request;
     }
 
     public static OrchestratorProvisionUserRequest ToProvisionUserRequest(string auth0Sub, string? email, string? name)
@@ -138,18 +140,19 @@ internal static class OrchestratorMapper
         }).ToList();
     }
 
-    public static IReadOnlyList<OrchestratorInterviewGuide> ToInterviewGuides(
-        List<OrchestratorInterviewGuideResponse>? responses)
+    public static IReadOnlyList<OrchestratorInterviewTemplate> ToInterviewTemplates(
+        List<OrchestratorInterviewTemplateResponse>? responses)
     {
         if (responses == null || responses.Count == 0)
-            return Array.Empty<OrchestratorInterviewGuide>();
+            return Array.Empty<OrchestratorInterviewTemplate>();
 
-        return responses.Select(r => new OrchestratorInterviewGuide
+        return responses.Select(r => new OrchestratorInterviewTemplate
         {
             Id = r.Id,
             Name = r.Name,
             Description = r.Description,
-            QuestionCount = r.QuestionCount,
+            AgentId = r.AgentId,
+            AgentDisplayName = r.AgentDisplayName,
             IsActive = r.IsActive
         }).ToList();
     }

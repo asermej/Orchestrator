@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260310120000-drop-star-scoring-columns" author="system">
+        <comment>Drop individual STAR component scoring columns — replaced by holistic competency scoring</comment>
+        <dropColumn tableName="competency_responses" columnName="star_situation_score"/>
+        <dropColumn tableName="competency_responses" columnName="star_task_score"/>
+        <dropColumn tableName="competency_responses" columnName="star_action_score"/>
+        <dropColumn tableName="competency_responses" columnName="star_result_score"/>
+        <dropColumn tableName="competency_responses" columnName="star_overall_score"/>
+    </changeSet>
+
+    <changeSet id="20260310120000-add-holistic-scoring-columns" author="system">
+        <comment>Add holistic scoring columns: AI rationale text and follow-up count</comment>
+        <addColumn tableName="competency_responses">
+            <column name="competency_rationale" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <column name="follow_up_count" type="integer" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

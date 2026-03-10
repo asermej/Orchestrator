@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260310120003-create-recommendation-threshold-defaults" author="system">
+        <createTable tableName="recommendation_threshold_defaults">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="strongly_recommend_min" type="integer" defaultValueNumeric="80">
+                <constraints nullable="false"/>
+            </column>
+            <column name="recommend_min" type="integer" defaultValueNumeric="65">
+                <constraints nullable="false"/>
+            </column>
+            <column name="consider_min" type="integer" defaultValueNumeric="50">
+                <constraints nullable="false"/>
+            </column>
+            <column name="do_not_recommend_min" type="integer" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamptz" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamptz" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Seed with exactly one row of default values -->
+        <insert tableName="recommendation_threshold_defaults">
+            <column name="strongly_recommend_min" valueNumeric="80"/>
+            <column name="recommend_min" valueNumeric="65"/>
+            <column name="consider_min" valueNumeric="50"/>
+            <column name="do_not_recommend_min" valueNumeric="0"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>

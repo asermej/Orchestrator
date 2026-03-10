@@ -435,6 +435,46 @@ public class InterviewController : ControllerBase
     }
 
     /// <summary>
+    /// Gets all competency responses for an interview (per-competency holistic scores)
+    /// </summary>
+    [HttpGet("{id}/competency-responses")]
+    [Authorize]
+    [ProducesResponseType(typeof(List<CompetencyResponseResource>), 200)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<List<CompetencyResponseResource>>> GetCompetencyResponses(Guid id)
+    {
+        var interview = await _domainFacade.GetInterviewById(id);
+        if (interview == null)
+        {
+            return NotFound($"Interview with ID {id} not found");
+        }
+
+        var list = await _domainFacade.GetCompetencyResponsesByInterviewId(id);
+        return Ok(list.Select(InterviewMapper.ToResource).ToList());
+    }
+
+    /// <summary>
+    /// Creates or updates a competency response for an interview (upsert by interview_id + competency_id)
+    /// </summary>
+    [HttpPut("{id}/competency-responses")]
+    [Authorize]
+    [ProducesResponseType(typeof(CompetencyResponseResource), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<CompetencyResponseResource>> UpsertCompetencyResponse(Guid id, [FromBody] UpsertCompetencyResponseResource resource)
+    {
+        var interview = await _domainFacade.GetInterviewById(id);
+        if (interview == null)
+        {
+            return NotFound($"Interview with ID {id} not found");
+        }
+
+        var domain = InterviewMapper.ToCompetencyResponseDomain(resource, id);
+        var saved = await _domainFacade.UpsertCompetencyResponse(domain);
+        return Ok(InterviewMapper.ToResource(saved));
+    }
+
+    /// <summary>
     /// Deletes an interview
     /// </summary>
     [HttpDelete("{id}")]
@@ -454,7 +494,7 @@ public class InterviewController : ControllerBase
     // Test Interview Endpoints
 
     /// <summary>
-    /// Creates a test interview from an interview configuration
+    /// Creates a test interview from an interview template
     /// </summary>
     [HttpPost("test")]
     [Authorize]
@@ -463,20 +503,521 @@ public class InterviewController : ControllerBase
     [ProducesResponseType(404)]
     public async Task<ActionResult<InterviewResource>> CreateTestInterview([FromBody] CreateTestInterviewRequest request)
     {
-        var interview = await _domainFacade.CreateTestInterview(request.InterviewConfigurationId, request.TestUserName);
+        if (!request.InterviewTemplateId.HasValue)
+            return BadRequest("InterviewTemplateId is required.");
+
+        var interview = await _domainFacade.CreateTestInterviewFromTemplate(request.InterviewTemplateId.Value, request.TestUserName);
         return CreatedAtAction(nameof(GetById), new { id = interview.Id }, InterviewMapper.ToResource(interview));
     }
 
+    // Runtime Endpoints
+
     /// <summary>
-    /// Scores a completed test interview
+    /// Loads the full runtime context for a template-based interview.
+    /// Returns competencies, questions, agent info, and resolved templates.
     /// </summary>
-    [HttpPost("test/{id}/score")]
-    [Authorize]
+    [HttpGet("{id}/runtime")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(InterviewRuntimeContextResource), 200)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<InterviewRuntimeContextResource>> GetRuntimeContext(Guid id)
+    {
+        var context = await _domainFacade.LoadInterviewRuntimeContextAsync(id);
+        if (context == null)
+            return NotFound("Interview has no template assigned or template not found.");
+
+        var systemPrompt = context.Agent != null
+            ? _domainFacade.BuildInterviewSystemPrompt(context)
+            : null;
+
+        var resource = new InterviewRuntimeContextResource
+        {
+            InterviewId = context.Interview.Id,
+            AgentName = context.Agent?.DisplayName ?? "Interviewer",
+            ApplicantName = context.ApplicantName,
+            JobTitle = context.JobTitle,
+            RoleName = context.Role.RoleName,
+            Industry = context.Role.Industry,
+            OpeningText = _domainFacade.ResolveOpeningTemplate(context),
+            ClosingText = _domainFacade.ResolveClosingTemplate(context),
+            Competencies = context.Competencies.Select(c => new RuntimeCompetencyResource
+            {
+                CompetencyId = c.Id,
+                Name = c.Name,
+                Description = c.Description,
+                ScoringWeight = c.DefaultWeight,
+                DisplayOrder = c.DisplayOrder,
+                PrimaryQuestion = c.CanonicalExample ?? $"Tell me about a time when you demonstrated {c.Name}."
+            }).ToList()
+        };
+
+        return Ok(resource);
+    }
+
+    /// <summary>
+    /// Generates the primary AI interview question for a competency.
+    /// Call this before asking the candidate, so the exact question text can be
+    /// submitted back when completing the competency.
+    /// </summary>
+    [HttpPost("{id}/runtime/generate-question")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(GeneratedQuestionResource), 200)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<GeneratedQuestionResource>> GenerateQuestion(
+        Guid id,
+        [FromBody] GenerateQuestionRequest request)
+    {
+        var context = await _domainFacade.LoadInterviewRuntimeContextAsync(id);
+        if (context == null)
+            return NotFound("Interview has no template assigned or template not found.");
+
+        var competency = context.Competencies.FirstOrDefault(c => c.Id == request.CompetencyId);
+        if (competency == null)
+            return NotFound($"Competency {request.CompetencyId} not found in this interview's role.");
+
+        var systemPrompt = context.Agent != null
+            ? _domainFacade.BuildInterviewSystemPrompt(context)
+            : "";
+
+        var question = await _domainFacade.GeneratePrimaryQuestionAsync(
+            systemPrompt,
+            competency,
+            context.Role.RoleName,
+            context.Role.Industry,
+            context.JobTitle,
+            context.ApplicantName,
+            includeTransition: request.IncludeTransition,
+            previousCompetencyName: request.PreviousCompetencyName,
+            cancellationToken: HttpContext.RequestAborted
+        );
+
+        if (string.IsNullOrWhiteSpace(question))
+            question = competency.CanonicalExample ?? $"Tell me about your experience with {competency.Name}.";
+
+        return Ok(new GeneratedQuestionResource
+        {
+            CompetencyId = competency.Id,
+            Question = question
+        });
+    }
+
+    /// <summary>
+    /// Scores and records a completed competency from pre-collected conversation data.
+    /// Always runs AI evaluation on the full accumulated transcript to produce a holistic
+    /// 1-5 score. The client-provided score is ignored — the backend is the source of truth.
+    /// </summary>
+    [HttpPost("{id}/runtime/competency")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(CompetencyResponseResource), 200)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<CompetencyResponseResource>> ProcessCompetency(
+        Guid id,
+        [FromBody] ProcessCompetencyRequest request)
+    {
+        var context = await _domainFacade.LoadInterviewRuntimeContextAsync(id);
+        if (context == null)
+            return NotFound("Interview has no template assigned or template not found.");
+
+        var competency = context.Competencies.FirstOrDefault(c => c.Id == request.CompetencyId);
+        if (competency == null)
+            return NotFound($"Competency {request.CompetencyId} not found in this interview's role.");
+
+        var systemPrompt = context.Agent != null
+            ? _domainFacade.BuildInterviewSystemPrompt(context)
+            : "";
+
+        var followUpExchanges = request.FollowUpExchanges?.Select(f => new Orchestrator.Domain.FollowUpExchange
+        {
+            Question = f.Question,
+            Response = f.Response
+        }).ToList();
+
+        var transcriptParts = new List<string> { request.CandidateResponse };
+        if (followUpExchanges != null)
+        {
+            foreach (var exchange in followUpExchanges)
+                transcriptParts.Add(exchange.Response);
+        }
+        var fullTranscript = string.Join("\n\n", transcriptParts);
+
+        var evaluation = await _domainFacade.EvaluateCompetencyResponseAsync(
+            systemPrompt,
+            competency,
+            fullTranscript,
+            context.Role.RoleName,
+            context.Role.Industry,
+            cancellationToken: HttpContext.RequestAborted
+        );
+        evaluation.FollowUpNeeded = false;
+
+        var result = await _domainFacade.ScoreAndRecordCompetencyAsync(
+            id,
+            competency,
+            request.PrimaryQuestion,
+            request.CandidateResponse,
+            followUpExchanges,
+            evaluation
+        );
+
+        return Ok(InterviewMapper.ToResource(result));
+    }
+
+    /// <summary>
+    /// Evaluates a candidate's response holistically and determines if a follow-up is needed.
+    /// Supports cumulative context via PriorExchanges for accurate multi-turn evaluation.
+    /// Does not score or persist — use for real-time follow-up generation during the interview.
+    /// </summary>
+    [HttpPost("{id}/runtime/evaluate")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(CompetencyEvaluationResource), 200)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<CompetencyEvaluationResource>> EvaluateResponse(
+        Guid id,
+        [FromBody] EvaluateResponseRequest request)
+    {
+        var context = await _domainFacade.LoadInterviewRuntimeContextAsync(id);
+        if (context == null)
+            return NotFound("Interview has no template assigned or template not found.");
+
+        var competency = context.Competencies.FirstOrDefault(c => c.Id == request.CompetencyId);
+        if (competency == null)
+            return NotFound($"Competency {request.CompetencyId} not found in this interview's role.");
+
+        var systemPrompt = context.Agent != null
+            ? _domainFacade.BuildInterviewSystemPrompt(context)
+            : "";
+
+        var priorExchanges = request.PriorExchanges?.Select(p => new Orchestrator.Domain.PriorExchange
+        {
+            Question = p.Question,
+            Response = p.Response
+        }).ToList();
+
+        var evaluation = await _domainFacade.EvaluateCompetencyResponseWithContextAsync(
+            systemPrompt,
+            competency,
+            request.CandidateResponse,
+            context.Role.RoleName,
+            context.Role.Industry,
+            priorExchanges,
+            previousFollowUpTarget: request.PreviousFollowUpTarget,
+            cancellationToken: HttpContext.RequestAborted
+        );
+
+        var followUpQuestion = evaluation.FollowUpNeeded
+            ? evaluation.GetEffectiveFollowUpQuestion()
+            : null;
+
+        return Ok(new CompetencyEvaluationResource
+        {
+            CompetencyScore = evaluation.CompetencyScore,
+            Rationale = evaluation.Rationale,
+            FollowUpNeeded = evaluation.FollowUpNeeded,
+            FollowUpTarget = evaluation.FollowUpTarget,
+            FollowUpQuestion = followUpQuestion
+        });
+    }
+
+    /// <summary>
+    /// Classifies a candidate's response before STAR evaluation.
+    /// Returns a classification indicating how the response should be handled.
+    /// This is a pre-processing step — the classifier never scores.
+    /// </summary>
+    [HttpPost("{id}/runtime/classify")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ResponseClassificationResource), 200)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<ResponseClassificationResource>> ClassifyResponse(
+        Guid id,
+        [FromBody] ClassifyResponseRequest request)
+    {
+        var context = await _domainFacade.LoadInterviewRuntimeContextAsync(id);
+        if (context == null)
+            return NotFound("Interview has no template assigned or template not found.");
+
+        var competency = context.Competencies.FirstOrDefault(c => c.Id == request.CompetencyId);
+        if (competency == null)
+            return NotFound($"Competency {request.CompetencyId} not found in this interview's role.");
+
+        var systemPrompt = context.Agent != null
+            ? _domainFacade.BuildInterviewSystemPrompt(context)
+            : "";
+
+        var classification = await _domainFacade.ClassifyResponseAsync(
+            systemPrompt,
+            request.CandidateResponse,
+            request.CurrentQuestion,
+            competency.Name,
+            HttpContext.RequestAborted
+        );
+
+        return Ok(new ResponseClassificationResource
+        {
+            Classification = classification.Classification,
+            RequiresResponse = classification.RequiresResponse,
+            ResponseText = classification.ResponseText,
+            ConsumesRedirect = classification.ConsumesRedirect,
+            AbandonCompetency = classification.AbandonCompetency,
+            StoreNote = classification.StoreNote
+        });
+    }
+
+    /// <summary>
+    /// Classifies and evaluates a candidate's response in a single round-trip.
+    /// If on_topic, runs STAR evaluation immediately and returns both results.
+    /// Eliminates the sequential classify-then-evaluate pattern.
+    /// </summary>
+    [HttpPost("{id}/runtime/classify-and-evaluate")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ClassifyAndEvaluateResource), 200)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<ClassifyAndEvaluateResource>> ClassifyAndEvaluateResponse(
+        Guid id,
+        [FromBody] ClassifyAndEvaluateRequest request)
+    {
+        var context = await _domainFacade.LoadInterviewRuntimeContextAsync(id);
+        if (context == null)
+            return NotFound("Interview has no template assigned or template not found.");
+
+        var competency = context.Competencies.FirstOrDefault(c => c.Id == request.CompetencyId);
+        if (competency == null)
+            return NotFound($"Competency {request.CompetencyId} not found in this interview's role.");
+
+        var systemPrompt = context.Agent != null
+            ? _domainFacade.BuildInterviewSystemPrompt(context)
+            : "";
+
+        var result = await _domainFacade.ClassifyAndEvaluateResponseAsync(
+            systemPrompt,
+            competency,
+            request.CandidateResponse,
+            request.CurrentQuestion,
+            request.CompetencyTranscript,
+            context.Role.RoleName,
+            context.Role.Industry,
+            request.PreviousFollowUpTarget,
+            HttpContext.RequestAborted
+        );
+
+        var resource = new ClassifyAndEvaluateResource
+        {
+            Classification = result.Classification.Classification,
+            RequiresResponse = result.Classification.RequiresResponse,
+            ResponseText = result.Classification.ResponseText,
+            ConsumesRedirect = result.Classification.ConsumesRedirect,
+            AbandonCompetency = result.Classification.AbandonCompetency,
+            StoreNote = result.Classification.StoreNote
+        };
+
+        if (result.Evaluation != null)
+        {
+            resource.CompetencyScore = result.Evaluation.CompetencyScore;
+            resource.Rationale = result.Evaluation.Rationale;
+            resource.FollowUpNeeded = result.Evaluation.FollowUpNeeded;
+            resource.FollowUpTarget = result.Evaluation.FollowUpTarget;
+            resource.FollowUpQuestion = result.Evaluation.FollowUpNeeded
+                ? result.Evaluation.GetEffectiveFollowUpQuestion()
+                : null;
+        }
+
+        return Ok(resource);
+    }
+
+    /// <summary>
+    /// Records a skipped competency (e.g., candidate gave two off-topic responses).
+    /// Sets competency_skipped = true. Does NOT run STAR evaluation.
+    /// </summary>
+    [HttpPost("{id}/runtime/skip-competency")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(CompetencyResponseResource), 200)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<CompetencyResponseResource>> SkipCompetency(
+        Guid id,
+        [FromBody] SkipCompetencyRequest request)
+    {
+        var context = await _domainFacade.LoadInterviewRuntimeContextAsync(id);
+        if (context == null)
+            return NotFound("Interview has no template assigned or template not found.");
+
+        var competency = context.Competencies.FirstOrDefault(c => c.Id == request.CompetencyId);
+        if (competency == null)
+            return NotFound($"Competency {request.CompetencyId} not found in this interview's role.");
+
+        var result = await _domainFacade.ScoreAndRecordSkippedCompetencyAsync(
+            id,
+            competency,
+            request.PrimaryQuestion,
+            request.SkipReason
+        );
+
+        return Ok(InterviewMapper.ToResource(result));
+    }
+
+    /// <summary>
+    /// Generates a question and streams TTS audio in a single request.
+    /// Eliminates the separate generate-question + TTS round-trips.
+    /// Returns the generated question text in a header and streams audio/mpeg in the body.
+    /// </summary>
+    [HttpPost("{id}/runtime/generate-question-audio")]
+    [AllowAnonymous]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(404)]
+    public async Task GenerateQuestionWithAudio(
+        Guid id,
+        [FromBody] GenerateQuestionRequest request)
+    {
+        var context = await _domainFacade.LoadInterviewRuntimeContextAsync(id);
+        if (context == null)
+        {
+            Response.StatusCode = 404;
+            Response.ContentType = "application/json";
+            await Response.WriteAsJsonAsync(new { error = "Interview has no template assigned or template not found." });
+            return;
+        }
+
+        var competency = context.Competencies.FirstOrDefault(c => c.Id == request.CompetencyId);
+        if (competency == null)
+        {
+            Response.StatusCode = 404;
+            Response.ContentType = "application/json";
+            await Response.WriteAsJsonAsync(new { error = $"Competency {request.CompetencyId} not found." });
+            return;
+        }
+
+        var systemPrompt = context.Agent != null
+            ? _domainFacade.BuildInterviewSystemPrompt(context)
+            : "";
+
+        var question = await _domainFacade.GeneratePrimaryQuestionAsync(
+            systemPrompt,
+            competency,
+            context.Role.RoleName,
+            context.Role.Industry,
+            context.JobTitle,
+            context.ApplicantName,
+            includeTransition: request.IncludeTransition,
+            previousCompetencyName: request.PreviousCompetencyName,
+            cancellationToken: HttpContext.RequestAborted
+        );
+
+        if (string.IsNullOrWhiteSpace(question))
+            question = competency.CanonicalExample ?? $"Tell me about your experience with {competency.Name}.";
+
+        var voiceId = context.Agent?.ElevenlabsVoiceId ?? "21m00Tcm4TlvDq8ikWAM";
+
+        Response.ContentType = "audio/mpeg";
+        Response.Headers.Append("Cache-Control", "no-cache");
+        Response.Headers.Append("X-Generated-Question", Uri.EscapeDataString(question));
+        Response.Headers.Append("X-Competency-Id", competency.Id.ToString());
+        Response.Headers.Append("Access-Control-Expose-Headers", "X-Generated-Question, X-Competency-Id");
+        await Response.Body.FlushAsync(HttpContext.RequestAborted);
+
+        try
+        {
+            await foreach (var chunk in _domainFacade.StreamVoiceAsync(voiceId, question, HttpContext.RequestAborted))
+            {
+                await Response.Body.WriteAsync(chunk, HttpContext.RequestAborted);
+                await Response.Body.FlushAsync(HttpContext.RequestAborted);
+            }
+        }
+        catch (Exception) when (Response.HasStarted)
+        {
+            Response.Body.Close();
+        }
+    }
+
+    /// <summary>
+    /// LATENCY-CRITICAL: Streaming conversation turn endpoint. Generates an AI response to the
+    /// candidate's answer and streams TTS audio back in real time. Replaces the sequential
+    /// classify → evaluate → TTS round trips with a single streaming pipeline.
+    /// Response text and type are returned in headers; audio/mpeg streams in the body.
+    /// </summary>
+    [HttpPost("{id}/runtime/respond-to-turn")]
+    [AllowAnonymous]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(404)]
+    public async Task RespondToTurn(Guid id, [FromBody] RespondToTurnResource request)
+    {
+        var context = await _domainFacade.LoadInterviewRuntimeContextAsync(id);
+        if (context == null)
+        {
+            Response.StatusCode = 404;
+            Response.ContentType = "application/json";
+            await Response.WriteAsJsonAsync(new { error = "Interview has no template assigned or template not found." });
+            return;
+        }
+
+        var competency = context.Competencies.FirstOrDefault(c => c.Id == request.CompetencyId);
+        if (competency == null)
+        {
+            Response.StatusCode = 404;
+            Response.ContentType = "application/json";
+            await Response.WriteAsJsonAsync(new { error = $"Competency {request.CompetencyId} not found." });
+            return;
+        }
+
+        var domainRequest = new RespondToTurnRequest
+        {
+            CandidateTranscript = request.CandidateTranscript,
+            CompetencyId = request.CompetencyId,
+            CompetencyName = request.CompetencyName,
+            CurrentQuestion = request.CurrentQuestion,
+            Phase = request.Phase,
+            FollowUpCount = request.FollowUpCount,
+            AccumulatedTranscript = request.AccumulatedTranscript,
+            PreviousFollowUpTarget = request.PreviousFollowUpTarget,
+            RepeatsRemaining = request.RepeatsRemaining,
+            Language = request.Language,
+            PreviousAiResponse = request.PreviousAiResponse,
+            IsLastCompetency = request.IsLastCompetency
+        };
+
+        // LATENCY-CRITICAL: Set response content type and headers before streaming audio.
+        // The onMetadataReady callback fires after the LLM response is buffered but before
+        // TTS audio starts, letting us set headers with the response text and type.
+        Response.ContentType = "audio/mpeg";
+        Response.Headers.Append("Cache-Control", "no-cache");
+
+        bool headersSet = false;
+
+        void OnMetadataReady(TurnResponseMetadata metadata)
+        {
+            Response.Headers.Append("X-Response-Text", Uri.EscapeDataString(metadata.SpokenText));
+            Response.Headers.Append("X-Response-Type", metadata.ResponseType);
+            if (!string.IsNullOrWhiteSpace(metadata.FollowUpTarget))
+                Response.Headers.Append("X-Follow-Up-Target", metadata.FollowUpTarget);
+            if (!string.IsNullOrWhiteSpace(metadata.LanguageCode))
+                Response.Headers.Append("X-Language-Code", metadata.LanguageCode);
+            Response.Headers.Append("Access-Control-Expose-Headers",
+                "X-Response-Text, X-Response-Type, X-Follow-Up-Target, X-Language-Code");
+            headersSet = true;
+        }
+
+        try
+        {
+            await foreach (var chunk in _domainFacade.RespondToTurnAsync(
+                context, domainRequest, OnMetadataReady, HttpContext.RequestAborted))
+            {
+                await Response.Body.WriteAsync(chunk, HttpContext.RequestAborted);
+                await Response.Body.FlushAsync(HttpContext.RequestAborted);
+            }
+        }
+        catch (Exception) when (Response.HasStarted)
+        {
+            Response.Body.Close();
+        }
+    }
+
+    /// <summary>
+    /// Calculates the final interview score from recorded competency responses (weighted average).
+    /// </summary>
+    [HttpPost("{id}/runtime/finalize")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(InterviewResultResource), 200)]
     [ProducesResponseType(404)]
-    public async Task<ActionResult<InterviewResultResource>> ScoreTestInterview(Guid id, [FromBody] ScoreTestInterviewRequest request)
+    public async Task<ActionResult<InterviewResultResource>> FinalizeInterview(Guid id)
     {
-        var result = await _domainFacade.ScoreTestInterview(id, request.InterviewConfigurationId);
+        var result = await _domainFacade.ScoreInterviewFromCompetencyResponses(id);
         return Ok(InterviewMapper.ToResultResource(result));
     }
 

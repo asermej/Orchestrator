@@ -98,7 +98,7 @@ internal class WebhookManager : IDisposable
                 summary = result.Summary,
                 strengths = result.Strengths,
                 areasForImprovement = result.AreasForImprovement,
-                score = result.Score,
+                score = result.OverallScoreDisplay ?? result.Score,
                 recommendation = result.Recommendation
             }
         };

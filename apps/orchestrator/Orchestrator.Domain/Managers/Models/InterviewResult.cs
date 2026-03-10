@@ -37,15 +37,43 @@ public class InterviewResult : Entity
 
     [Column("question_scores")]
     public string? QuestionScores { get; set; }
+
+    [Column("overall_score_display")]
+    public int? OverallScoreDisplay { get; set; }
+
+    [Column("recommendation_tier")]
+    public string? RecommendationTier { get; set; }
 }
 
 /// <summary>
-/// Interview recommendation constants
+/// Recommendation tier constants derived from overall_score_display and thresholds.
 /// </summary>
-public static class InterviewRecommendation
+public static class RecommendationTiers
 {
-    public const string StronglyRecommend = "strongly_recommend";
-    public const string Recommend = "recommend";
-    public const string Neutral = "neutral";
-    public const string NotRecommended = "not_recommended";
+    public const string StronglyRecommend = "Strongly Recommend";
+    public const string Recommend = "Recommend";
+    public const string Consider = "Consider";
+    public const string DoNotRecommend = "Do Not Recommend";
+}
+
+/// <summary>
+/// Represents the single-row global recommendation threshold settings.
+/// </summary>
+[Table("recommendation_threshold_defaults")]
+public class RecommendationThresholdDefaults
+{
+    [Column("id")]
+    public Guid Id { get; set; }
+
+    [Column("strongly_recommend_min")]
+    public int StronglyRecommendMin { get; set; } = 80;
+
+    [Column("recommend_min")]
+    public int RecommendMin { get; set; } = 65;
+
+    [Column("consider_min")]
+    public int ConsiderMin { get; set; } = 50;
+
+    [Column("do_not_recommend_min")]
+    public int DoNotRecommendMin { get; set; } = 0;
 }

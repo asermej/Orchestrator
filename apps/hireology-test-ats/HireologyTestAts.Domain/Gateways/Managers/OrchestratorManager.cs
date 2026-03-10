@@ -277,18 +277,18 @@ internal sealed class OrchestratorManager : IDisposable
     }
 
     /// <summary>
-    /// Lists available interview guides from Orchestrator.
+    /// Lists available interview templates from Orchestrator.
     /// Returns an empty list if no API key is available.
     /// </summary>
-    public async Task<IReadOnlyList<OrchestratorInterviewGuide>> GetInterviewGuides(string? groupApiKey)
+    public async Task<IReadOnlyList<OrchestratorInterviewTemplate>> GetInterviewTemplates(string? groupApiKey)
     {
         var apiKey = ResolveApiKey(groupApiKey);
-        if (string.IsNullOrEmpty(apiKey)) return Array.Empty<OrchestratorInterviewGuide>();
+        if (string.IsNullOrEmpty(apiKey)) return Array.Empty<OrchestratorInterviewTemplate>();
 
         try
         {
             var client = CreateHttpClientWithApiKey(apiKey);
-            var response = await client.GetAsync("/api/v1/ats/interview-guides").ConfigureAwait(false);
+            var response = await client.GetAsync("/api/v1/ats/templates").ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -298,10 +298,10 @@ internal sealed class OrchestratorManager : IDisposable
             }
 
             var responseContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-            var responseResource = JsonSerializer.Deserialize<List<OrchestratorInterviewGuideResponse>>(
+            var responseResource = JsonSerializer.Deserialize<List<OrchestratorInterviewTemplateResponse>>(
                 responseContent, JsonOptions);
 
-            return OrchestratorMapper.ToInterviewGuides(responseResource);
+            return OrchestratorMapper.ToInterviewTemplates(responseResource);
         }
         catch (HttpRequestException ex)
         {
@@ -426,7 +426,7 @@ internal sealed class OrchestratorManager : IDisposable
     /// Throws OrchestratorConnectionException if no API key is available.
     /// </summary>
     public async Task<OrchestratorCreateInterviewResult> CreateInterview(
-        string externalApplicantId, string externalJobId, Guid agentId, Guid interviewGuideId, string? groupApiKey)
+        string externalApplicantId, string externalJobId, Guid interviewTemplateId, string? groupApiKey, Guid? agentId = null)
     {
         var apiKey = ResolveApiKey(groupApiKey);
         if (string.IsNullOrEmpty(apiKey))
@@ -436,7 +436,7 @@ internal sealed class OrchestratorManager : IDisposable
         {
             var client = CreateHttpClientWithApiKey(apiKey);
             var requestResource = OrchestratorMapper.ToCreateInterviewRequest(
-                externalApplicantId, externalJobId, agentId, interviewGuideId);
+                externalApplicantId, externalJobId, interviewTemplateId, agentId);
             var jsonContent = JsonSerializer.Serialize(requestResource);
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 

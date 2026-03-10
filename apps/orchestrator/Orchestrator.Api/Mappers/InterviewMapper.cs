@@ -17,6 +17,7 @@ public static class InterviewMapper
             AgentId = interview.AgentId,
             InterviewConfigurationId = interview.InterviewConfigurationId,
             InterviewGuideId = interview.InterviewGuideId,
+            InterviewTemplateId = interview.InterviewTemplateId,
             Token = interview.Token,
             Status = interview.Status,
             InterviewType = interview.InterviewType,
@@ -91,7 +92,9 @@ public static class InterviewMapper
             InterviewId = result.InterviewId,
             Summary = result.Summary,
             Score = result.Score,
+            OverallScoreDisplay = result.OverallScoreDisplay,
             Recommendation = result.Recommendation,
+            RecommendationTier = result.RecommendationTier,
             Strengths = result.Strengths,
             AreasForImprovement = result.AreasForImprovement,
             FullTranscriptUrl = result.FullTranscriptUrl,
@@ -143,6 +146,47 @@ public static class InterviewMapper
             Recommendation = resource.Recommendation,
             Strengths = resource.Strengths,
             AreasForImprovement = resource.AreasForImprovement
+        };
+    }
+
+    public static CompetencyResponseResource ToResource(CompetencyResponse response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        return new CompetencyResponseResource
+        {
+            Id = response.Id,
+            InterviewId = response.InterviewId,
+            CompetencyId = response.CompetencyId,
+            CompetencyScore = response.CompetencyScore,
+            CompetencyRationale = response.CompetencyRationale,
+            FollowUpCount = response.FollowUpCount,
+            ScoringWeight = response.ScoringWeight,
+            CompetencyTranscript = response.CompetencyTranscript,
+            GeneratedQuestionText = response.GeneratedQuestionText,
+            QuestionsAsked = response.QuestionsAsked,
+            ResponseText = response.ResponseText,
+            ResponseAudioUrl = response.ResponseAudioUrl,
+            CompetencySkipped = response.CompetencySkipped,
+            SkipReason = response.SkipReason,
+            CreatedAt = response.CreatedAt,
+            UpdatedAt = response.UpdatedAt
+        };
+    }
+
+    public static CompetencyResponse ToCompetencyResponseDomain(UpsertCompetencyResponseResource resource, Guid interviewId)
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+        return new CompetencyResponse
+        {
+            InterviewId = interviewId,
+            CompetencyId = resource.CompetencyId,
+            CompetencyScore = resource.CompetencyScore,
+            CompetencyRationale = resource.CompetencyRationale,
+            FollowUpCount = resource.FollowUpCount,
+            ScoringWeight = resource.ScoringWeight,
+            QuestionsAsked = resource.QuestionsAsked,
+            ResponseText = resource.ResponseText,
+            ResponseAudioUrl = resource.ResponseAudioUrl
         };
     }
 }

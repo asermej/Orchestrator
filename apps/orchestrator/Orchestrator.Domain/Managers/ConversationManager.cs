@@ -260,7 +260,7 @@ internal sealed class ConversationManager : IDisposable
         var topicContexts = new List<(string TopicName, string Content)>();
 
         var systemPrompt = BuildSystemPrompt(agent, generalTraining, topicContexts);
-        return await GatewayFacade.GenerateChatCompletion(systemPrompt, chatHistory).ConfigureAwait(false);
+        return await GatewayFacade.GenerateAnthropicCompletion(systemPrompt, chatHistory).ConfigureAwait(false);
     }
 
     /// <summary>

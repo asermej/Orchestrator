@@ -142,6 +142,9 @@ internal sealed class ElevenLabsManager : IDisposable
     /// Makes the HTTP request to ElevenLabs and returns the response stream.
     /// Handles all HTTP-level errors with proper exception wrapping.
     /// </summary>
+    private const int MaxRetries = 3;
+    private static readonly int[] RetryDelaysMs = { 1000, 2000, 4000 };
+
     private async Task<(HttpResponseMessage response, Stream stream)> GetStreamingResponseAsync(
         string text,
         string? voiceId,
@@ -150,61 +153,74 @@ internal sealed class ElevenLabsManager : IDisposable
         CancellationToken cancellationToken)
     {
         var effectiveVoiceId = voiceId ?? Config.DefaultVoiceId;
-        
-        var request = new ElevenLabsTtsRequest
+        var url = $"/v1/text-to-speech/{effectiveVoiceId}/stream";
+
+        for (int attempt = 0; attempt <= MaxRetries; attempt++)
         {
-            Text = text,
-            ModelId = Config.ModelId,
-            VoiceSettings = new ElevenLabsVoiceSettings
+            var request = new ElevenLabsTtsRequest
             {
-                Stability = stability,
-                SimilarityBoost = similarityBoost
-            }
-        };
+                Text = text,
+                ModelId = Config.ModelId,
+                VoiceSettings = new ElevenLabsVoiceSettings
+                {
+                    Stability = stability,
+                    SimilarityBoost = similarityBoost
+                }
+            };
 
-        var jsonContent = JsonSerializer.Serialize(request);
-        var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+            var jsonContent = JsonSerializer.Serialize(request);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-        HttpResponseMessage? response = null;
-        try
-        {
-            var url = $"/v1/text-to-speech/{effectiveVoiceId}/stream";
-            response = await HttpClient.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
-
-            if (!response.IsSuccessStatusCode)
+            HttpResponseMessage? response = null;
+            try
             {
+                response = await HttpClient.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                    return (response, stream);
+                }
+
                 var errorContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                var statusCode = (int)response.StatusCode;
                 response.Dispose();
+
+                if (statusCode == 429 && attempt < MaxRetries)
+                {
+                    await Task.Delay(RetryDelaysMs[attempt], cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
                 throw new ElevenLabsApiException($"ElevenLabs API returned error: {response.StatusCode} - {errorContent}");
             }
+            catch (HttpRequestException ex)
+            {
+                response?.Dispose();
+                throw new ElevenLabsConnectionException($"Failed to connect to ElevenLabs API: {ex.Message}", ex);
+            }
+            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                response?.Dispose();
+                throw new ElevenLabsConnectionException($"ElevenLabs API request timed out: {ex.Message}", ex);
+            }
+            catch (ElevenLabsApiException)
+            {
+                throw;
+            }
+            catch (OperationCanceledException)
+            {
+                response?.Dispose();
+                throw;
+            }
+            catch (Exception ex)
+            {
+                response?.Dispose();
+                throw new ElevenLabsApiException($"Unexpected error calling ElevenLabs API: {ex.Message}", ex);
+            }
+        }
 
-            var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            return (response, stream);
-        }
-        catch (HttpRequestException ex)
-        {
-            response?.Dispose();
-            throw new ElevenLabsConnectionException($"Failed to connect to ElevenLabs API: {ex.Message}", ex);
-        }
-        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
-        {
-            response?.Dispose();
-            throw new ElevenLabsConnectionException($"ElevenLabs API request timed out: {ex.Message}", ex);
-        }
-        catch (ElevenLabsApiException)
-        {
-            throw;
-        }
-        catch (OperationCanceledException)
-        {
-            response?.Dispose();
-            throw;
-        }
-        catch (Exception ex)
-        {
-            response?.Dispose();
-            throw new ElevenLabsApiException($"Unexpected error calling ElevenLabs API: {ex.Message}", ex);
-        }
+        throw new ElevenLabsApiException("ElevenLabs API rate limit exceeded after retries");
     }
 
     /// <summary>

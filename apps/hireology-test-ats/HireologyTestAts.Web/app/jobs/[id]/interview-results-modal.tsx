@@ -46,9 +46,10 @@ function ScoreIndicator({ score }: { score: number }) {
 
 function RecommendationBadge({ recommendation }: { recommendation: string }) {
   const config: Record<string, { label: string; className: string }> = {
-    hire: { label: "Hire", className: "bg-green-100 text-green-800" },
-    no_hire: { label: "No Hire", className: "bg-red-100 text-red-800" },
-    further_review: { label: "Further Review", className: "bg-amber-100 text-amber-800" },
+    "Strongly Recommend": { label: "Strongly Recommend", className: "bg-emerald-100 text-emerald-800" },
+    "Recommend": { label: "Recommend", className: "bg-green-100 text-green-800" },
+    "Consider": { label: "Consider", className: "bg-amber-100 text-amber-800" },
+    "Do Not Recommend": { label: "Do Not Recommend", className: "bg-red-100 text-red-800" },
   };
 
   const c = config[recommendation] || { label: recommendation, className: "bg-slate-100 text-slate-700" };

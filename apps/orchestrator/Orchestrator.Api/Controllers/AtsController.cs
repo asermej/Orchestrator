@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Orchestrator.Domain;
 using Orchestrator.Api.ResourcesModels;
@@ -323,38 +324,43 @@ public class AtsController : ControllerBase
         return Ok(resources);
     }
 
-    // Interview Guide Endpoints
+    // Interview Template Endpoints
 
     /// <summary>
-    /// Lists interview guides available for the authenticated group
+    /// Lists interview templates available for the authenticated group.
+    /// Each template defines the agent, interview content, and opening/closing templates.
     /// </summary>
-    [HttpGet("interview-guides")]
-    [ProducesResponseType(typeof(IEnumerable<AtsInterviewGuideResource>), 200)]
+    [HttpGet("templates")]
+    [ProducesResponseType(typeof(IEnumerable<AtsInterviewTemplateResource>), 200)]
     [ProducesResponseType(401)]
-    public async Task<ActionResult<IEnumerable<AtsInterviewGuideResource>>> ListInterviewGuides()
+    public async Task<ActionResult<IEnumerable<AtsInterviewTemplateResource>>> ListInterviewTemplates()
     {
         var groupId = GetGroupId();
-        var result = await _domainFacade.SearchInterviewGuides(
-            groupId, null, true, null, 1, 100);
+        var result = await _domainFacade.SearchInterviewTemplates(
+            groupId, null, null, true, null, 1, 100);
 
-        var resources = result.Items.Select(g => new AtsInterviewGuideResource
+        var agentIds = result.Items.Where(t => t.AgentId.HasValue).Select(t => t.AgentId!.Value).Distinct().ToList();
+        var agentNames = new Dictionary<Guid, string>();
+        foreach (var agentId in agentIds)
         {
-            Id = g.Id,
-            Name = g.Name,
-            Description = g.Description,
-            QuestionCount = g.QuestionCount,
-            IsActive = g.IsActive
+            var agent = await _domainFacade.GetAgentById(agentId);
+            if (agent != null) agentNames[agentId] = agent.DisplayName;
+        }
+
+        var resources = result.Items.Select(t => new AtsInterviewTemplateResource
+        {
+            Id = t.Id,
+            Name = t.Name,
+            Description = t.Description,
+            AgentId = t.AgentId,
+            AgentDisplayName = t.AgentId.HasValue ? agentNames.GetValueOrDefault(t.AgentId.Value) : null
         });
 
         return Ok(resources);
     }
 
-    // Interview Configuration Endpoints
+    // Interview Configuration Endpoints (legacy, will be removed)
 
-    /// <summary>
-    /// Lists interview configurations available for the authenticated group.
-    /// Each configuration defines the agent, questions, and scoring rubric for an interview.
-    /// </summary>
     [HttpGet("configurations")]
     [ProducesResponseType(typeof(IEnumerable<AtsInterviewConfigurationResource>), 200)]
     [ProducesResponseType(401)]
@@ -418,14 +424,23 @@ public class AtsController : ControllerBase
             resource.ApplicantEmail,
             resource.ApplicantPhone);
 
-        // Resolve agent and interview guide from configuration or direct IDs
+        // Resolve agent from template, configuration, or direct IDs
         Guid agentId = resource.AgentId;
         Guid? interviewConfigurationId = resource.InterviewConfigurationId;
         Guid? interviewGuideId = resource.InterviewGuideId;
+        Guid? interviewTemplateId = resource.InterviewTemplateId;
 
-        if (interviewConfigurationId.HasValue)
+        if (interviewTemplateId.HasValue)
         {
-            // Use the configuration to determine agent, guide, and questions
+            var template = await _domainFacade.GetInterviewTemplateById(interviewTemplateId.Value);
+            if (template == null || template.GroupId != groupId)
+            {
+                return BadRequest($"Interview template with ID {interviewTemplateId} not found or does not belong to this group.");
+            }
+            if (template.AgentId.HasValue) agentId = template.AgentId.Value;
+        }
+        else if (interviewConfigurationId.HasValue)
+        {
             var config = await _domainFacade.GetInterviewConfigurationById(interviewConfigurationId.Value);
             if (config == null || config.GroupId != groupId)
             {
@@ -436,21 +451,19 @@ public class AtsController : ControllerBase
         }
 
         // Validate agent exists and belongs to group
+        if (agentId == Guid.Empty)
+        {
+            return BadRequest(
+                "No agent is assigned to this interview template. Assign an agent to the template in Orchestrator, or provide an agent when creating the interview.");
+        }
+
         var agent = await _domainFacade.GetAgentById(agentId);
         if (agent == null || agent.GroupId != groupId)
         {
             return BadRequest($"Agent with ID {agentId} not found or does not belong to this group.");
         }
 
-        // Validate interview guide if provided
-        if (interviewGuideId.HasValue)
-        {
-            var guide = await _domainFacade.GetInterviewGuideById(interviewGuideId.Value);
-            if (guide == null || guide.GroupId != groupId)
-            {
-                return BadRequest($"Interview guide with ID {interviewGuideId} not found or does not belong to this group.");
-            }
-        }
+        // InterviewGuideId is deprecated — skip guide validation
 
         // Create interview
         var interview = new Interview
@@ -460,6 +473,7 @@ public class AtsController : ControllerBase
             AgentId = agentId,
             InterviewConfigurationId = interviewConfigurationId,
             InterviewGuideId = interviewGuideId,
+            InterviewTemplateId = interviewTemplateId,
             InterviewType = resource.InterviewType,
             ScheduledAt = resource.ScheduledAt
         };
@@ -598,6 +612,101 @@ public class AtsController : ControllerBase
 
         var responses = await _domainFacade.GetInterviewResponsesByInterviewId(id);
         return Ok(responses.Select(InterviewMapper.ToResponseResource).ToList());
+    }
+
+    /// <summary>
+    /// Gets competency-based responses for an interview with holistic scores, paired Q&A exchanges, and audio URLs.
+    /// Returns data from competency_responses (template-based interviews).
+    /// </summary>
+    [HttpGet("interviews/{id}/competency-responses")]
+    [ProducesResponseType(typeof(IReadOnlyList<AtsCompetencyResponseResource>), 200)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(401)]
+    public async Task<ActionResult<IReadOnlyList<AtsCompetencyResponseResource>>> GetInterviewCompetencyResponses(Guid id)
+    {
+        var interview = await _domainFacade.GetInterviewById(id);
+        if (interview == null)
+        {
+            return NotFound($"Interview with ID {id} not found");
+        }
+
+        var competencyResponses = await _domainFacade.GetCompetencyResponsesByInterviewId(id);
+        if (competencyResponses.Count == 0)
+        {
+            return Ok(new List<AtsCompetencyResponseResource>());
+        }
+
+        var competencyNames = new Dictionary<Guid, string>();
+        if (interview.InterviewTemplateId.HasValue)
+        {
+            var template = await _domainFacade.GetInterviewTemplateById(interview.InterviewTemplateId.Value);
+            if (template?.RoleTemplateId != null)
+            {
+                var roleTemplate = await _domainFacade.GetRoleTemplateWithFullDetailsByIdAsync(template.RoleTemplateId.Value);
+                if (roleTemplate != null)
+                {
+                    foreach (var c in roleTemplate.Competencies)
+                    {
+                        competencyNames[c.Id] = c.Name;
+                    }
+                }
+            }
+        }
+
+        var resources = competencyResponses.Select(cr =>
+        {
+            var exchanges = BuildExchanges(cr.QuestionsAsked, cr.ResponseText);
+
+            return new AtsCompetencyResponseResource
+            {
+                CompetencyId = cr.CompetencyId,
+                CompetencyName = competencyNames.GetValueOrDefault(cr.CompetencyId, "Unknown Competency"),
+                ScoringWeight = cr.ScoringWeight,
+                CompetencyScore = cr.CompetencyScore,
+                CompetencyRationale = cr.CompetencyRationale,
+                FollowUpCount = cr.FollowUpCount,
+                CompetencyTranscript = cr.CompetencyTranscript,
+                Exchanges = exchanges,
+                AudioUrl = cr.ResponseAudioUrl,
+                CompetencySkipped = cr.CompetencySkipped,
+                SkipReason = cr.SkipReason,
+            };
+        }).ToList();
+
+        return Ok(resources);
+    }
+
+    private static List<CompetencyExchangeResource> BuildExchanges(string? questionsAskedJson, string? responseText)
+    {
+        var exchanges = new List<CompetencyExchangeResource>();
+
+        List<string> questions;
+        try
+        {
+            questions = string.IsNullOrWhiteSpace(questionsAskedJson)
+                ? new List<string>()
+                : JsonSerializer.Deserialize<List<string>>(questionsAskedJson) ?? new List<string>();
+        }
+        catch (JsonException)
+        {
+            questions = new List<string>();
+        }
+
+        var responses = string.IsNullOrWhiteSpace(responseText)
+            ? Array.Empty<string>()
+            : responseText.Split("\n\n");
+
+        for (var i = 0; i < questions.Count; i++)
+        {
+            exchanges.Add(new CompetencyExchangeResource
+            {
+                Question = questions[i],
+                Response = i < responses.Length ? responses[i] : "",
+                Label = i == 0 ? "Q" : $"F{i}",
+            });
+        }
+
+        return exchanges;
     }
 
 }

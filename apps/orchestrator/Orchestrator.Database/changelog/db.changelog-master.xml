@@ -131,4 +131,71 @@
 
     <!-- Add interview_guide_id to interviews table for direct guide reference -->
     <include file="changes/20260217120000-add-interview-guide-id-to-interviews.xml" relativeToChangelogFile="true"/>
+
+    <!-- Question Package Library: structured assessment framework -->
+    <include file="changes/20260302120000-create-role-templates-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260302120001-create-competencies-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260302120002-create-dimensions-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260302120003-create-rubric-levels-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260302120004-create-question-packages-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260302120005-create-follow-up-rules-table.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260302120006-seed-question-package-library.xml" relativeToChangelogFile="true"/>
+
+    <!-- User-Created Question Packages: add source, group_id, organization_id to role_templates -->
+    <include file="changes/20260303120000-add-source-to-role-templates.xml" relativeToChangelogFile="true"/>
+    <include file="changes/20260303130000-add-description-to-competencies.xml" relativeToChangelogFile="true"/>
+
+    <!-- Question packages: identify by id only; allow duplicate labels per competency -->
+    <include file="changes/20260306120000-drop-question-packages-competency-key-unique.xml" relativeToChangelogFile="true"/>
+
+    <!-- Universal rubric: drop per-competency rubric_levels table -->
+    <include file="changes/20260307120000-drop-rubric-levels-table.xml" relativeToChangelogFile="true"/>
+
+    <!-- Follow-up rules: one per dimension (dimension_id), exactly 3 per package -->
+    <include file="changes/20260307120001-add-dimension-id-to-follow-up-rules.xml" relativeToChangelogFile="true"/>
+
+    <!-- Competency responses: per-competency score and dimensions surfaced for AI interviews -->
+    <include file="changes/20260307120002-create-competency-responses-table.xml" relativeToChangelogFile="true"/>
+
+    <!-- Remove pre-built follow-up rules; AI generates follow-ups from dimensions only -->
+    <include file="changes/20260307130000-drop-follow-up-rules-table.xml" relativeToChangelogFile="true"/>
+
+    <!-- Add dimensions_probed to competency_responses (which dimensions AI probed with follow-ups) -->
+    <include file="changes/20260307130001-add-dimensions-probed-to-competency-responses.xml" relativeToChangelogFile="true"/>
+
+    <!-- Interview System Redesign: Agent behavioral fields -->
+    <include file="changes/20260308120000-add-agent-behavioral-fields.xml" relativeToChangelogFile="true"/>
+
+    <!-- Interview System Redesign: Interview Templates (replaces Interview Configurations) -->
+    <include file="changes/20260308120001-create-interview-templates-table.xml" relativeToChangelogFile="true"/>
+
+    <!-- Interview System Redesign: Add scoring_weight to competency_responses -->
+    <include file="changes/20260308120002-add-scoring-weight-to-competency-responses.xml" relativeToChangelogFile="true"/>
+
+    <!-- Interview Content Question Model: canonical_example on competencies, generated_question_text on responses -->
+    <include file="changes/20260309120000-add-canonical-example-to-competencies.xml" relativeToChangelogFile="true"/>
+
+    <!-- Drop question_packages; competencies use canonical_example only -->
+    <include file="changes/20260309120003-drop-question-packages-table.xml" relativeToChangelogFile="true"/>
+
+    <!-- Interview Content Inheritance: org-level visibility scope on role_templates -->
+    <include file="changes/20260309130000-add-visibility-scope-to-role-templates.xml" relativeToChangelogFile="true"/>
+
+    <!-- Replace dimensions-based evaluation with STAR scoring methodology -->
+    <include file="changes/20260309140000-replace-dimensions-with-star-scoring.xml" relativeToChangelogFile="true"/>
+
+    <!-- Replace individual STAR component scores with holistic competency scoring -->
+    <include file="changes/20260310120000-replace-star-scores-with-holistic.xml" relativeToChangelogFile="true"/>
+
+    <!-- Add competency_transcript column for storing full accumulated candidate transcript per competency -->
+    <include file="changes/20260310120001-add-competency-transcript-to-competency-responses.xml" relativeToChangelogFile="true"/>
+
+    <!-- Add overall_score_display (0-100) and recommendation_tier to interview_results; backfill existing -->
+    <include file="changes/20260310120002-add-display-score-and-recommendation-tier.xml" relativeToChangelogFile="true"/>
+
+    <!-- Create recommendation_threshold_defaults table with seed data -->
+    <include file="changes/20260310120003-create-recommendation-threshold-defaults.xml" relativeToChangelogFile="true"/>
+
+    <!-- Add competency_skipped and skip_reason to competency_responses for off-script response handling -->
+    <include file="changes/20260309150000-add-competency-skipped-to-competency-responses.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog> 

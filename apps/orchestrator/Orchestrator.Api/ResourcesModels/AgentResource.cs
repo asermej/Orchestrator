@@ -40,49 +40,18 @@ public class AgentResource
     /// </summary>
     public string? ProfileImageUrl { get; set; }
 
-    /// <summary>
-    /// The system prompt for the agent's AI behavior
-    /// </summary>
-    public string? SystemPrompt { get; set; }
+    public string? Tone { get; set; }
+    public string? Pace { get; set; }
+    public string? AcknowledgmentStyle { get; set; }
+    public string? AdditionalInstructions { get; set; }
 
-    /// <summary>
-    /// The interview guidelines for the agent
-    /// </summary>
-    public string? InterviewGuidelines { get; set; }
-
-    /// <summary>
-    /// The ElevenLabs voice ID for text-to-speech
-    /// </summary>
     public string? ElevenlabsVoiceId { get; set; }
-
-    /// <summary>
-    /// The voice stability setting (0.0 to 1.0)
-    /// </summary>
     public decimal VoiceStability { get; set; }
-
-    /// <summary>
-    /// The voice similarity boost setting (0.0 to 1.0)
-    /// </summary>
     public decimal VoiceSimilarityBoost { get; set; }
-
-    /// <summary>
-    /// The voice provider (e.g., ElevenLabs)
-    /// </summary>
     public string? VoiceProvider { get; set; }
-
-    /// <summary>
-    /// The voice type (e.g., cloned, preset)
-    /// </summary>
     public string? VoiceType { get; set; }
-
-    /// <summary>
-    /// The voice name
-    /// </summary>
     public string? VoiceName { get; set; }
 
-    /// <summary>
-    /// When this Agent was created
-    /// </summary>
     public DateTime CreatedAt { get; set; }
 
     /// <summary>
@@ -127,49 +96,16 @@ public class CreateAgentResource
     [Required(ErrorMessage = "DisplayName is required")]
     public string DisplayName { get; set; } = string.Empty;
 
-    /// <summary>
-    /// The profile image URL for this agent
-    /// </summary>
     public string? ProfileImageUrl { get; set; }
-
-    /// <summary>
-    /// The system prompt for the agent's AI behavior
-    /// </summary>
-    public string? SystemPrompt { get; set; }
-
-    /// <summary>
-    /// The interview guidelines for the agent
-    /// </summary>
-    public string? InterviewGuidelines { get; set; }
-
-    /// <summary>
-    /// The ElevenLabs voice ID for text-to-speech
-    /// </summary>
+    public string? Tone { get; set; }
+    public string? Pace { get; set; }
+    public string? AcknowledgmentStyle { get; set; }
+    public string? AdditionalInstructions { get; set; }
     public string? ElevenlabsVoiceId { get; set; }
-
-    /// <summary>
-    /// The voice stability setting (0.0 to 1.0)
-    /// </summary>
     public decimal VoiceStability { get; set; } = 0.50m;
-
-    /// <summary>
-    /// The voice similarity boost setting (0.0 to 1.0)
-    /// </summary>
     public decimal VoiceSimilarityBoost { get; set; } = 0.75m;
-
-    /// <summary>
-    /// The voice provider (e.g., ElevenLabs)
-    /// </summary>
     public string? VoiceProvider { get; set; }
-
-    /// <summary>
-    /// The voice type (e.g., cloned, preset)
-    /// </summary>
     public string? VoiceType { get; set; }
-
-    /// <summary>
-    /// The voice name
-    /// </summary>
     public string? VoiceName { get; set; }
 }
 
@@ -178,59 +114,18 @@ public class CreateAgentResource
 /// </summary>
 public class UpdateAgentResource
 {
-    /// <summary>
-    /// The display name of the agent
-    /// </summary>
     public string? DisplayName { get; set; }
-
-    /// <summary>
-    /// The visibility scope for this agent (organization_only, organization_and_descendants, descendants_only)
-    /// </summary>
     public string? VisibilityScope { get; set; }
-
-    /// <summary>
-    /// The profile image URL for this agent
-    /// </summary>
     public string? ProfileImageUrl { get; set; }
-
-    /// <summary>
-    /// The system prompt for the agent's AI behavior
-    /// </summary>
-    public string? SystemPrompt { get; set; }
-
-    /// <summary>
-    /// The interview guidelines for the agent
-    /// </summary>
-    public string? InterviewGuidelines { get; set; }
-
-    /// <summary>
-    /// The ElevenLabs voice ID for text-to-speech
-    /// </summary>
+    public string? Tone { get; set; }
+    public string? Pace { get; set; }
+    public string? AcknowledgmentStyle { get; set; }
+    public string? AdditionalInstructions { get; set; }
     public string? ElevenlabsVoiceId { get; set; }
-
-    /// <summary>
-    /// The voice stability setting (0.0 to 1.0)
-    /// </summary>
     public decimal? VoiceStability { get; set; }
-
-    /// <summary>
-    /// The voice similarity boost setting (0.0 to 1.0)
-    /// </summary>
     public decimal? VoiceSimilarityBoost { get; set; }
-
-    /// <summary>
-    /// The voice provider (e.g., ElevenLabs)
-    /// </summary>
     public string? VoiceProvider { get; set; }
-
-    /// <summary>
-    /// The voice type (e.g., cloned, preset)
-    /// </summary>
     public string? VoiceType { get; set; }
-
-    /// <summary>
-    /// The voice name
-    /// </summary>
     public string? VoiceName { get; set; }
 }
 

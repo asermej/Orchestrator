@@ -46,4 +46,16 @@ public class Agent : Entity
 
     [Column("visibility_scope")]
     public string VisibilityScope { get; set; } = Domain.VisibilityScope.OrganizationOnly;
+
+    [Column("tone")]
+    public string? Tone { get; set; }
+
+    [Column("pace")]
+    public string? Pace { get; set; }
+
+    [Column("acknowledgment_style")]
+    public string? AcknowledgmentStyle { get; set; }
+
+    [Column("additional_instructions")]
+    public string? AdditionalInstructions { get; set; }
 }

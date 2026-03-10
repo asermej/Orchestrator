@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260307120001-add-dimension-id-to-follow-up-rules" author="system">
+        <comment>Each follow-up rule is mapped to exactly one dimension; exactly 3 per package (one per dimension).</comment>
+        <addColumn tableName="follow_up_rules">
+            <column name="dimension_id" type="uuid">
+                <constraints nullable="true" foreignKeyName="fk_follow_up_rules_dimension" references="dimensions(id)"/>
+            </column>
+        </addColumn>
+        <createIndex tableName="follow_up_rules" indexName="idx_follow_up_rules_dimension_id">
+            <column name="dimension_id"/>
+        </createIndex>
+        <addUniqueConstraint tableName="follow_up_rules"
+            columnNames="question_package_id, dimension_id"
+            constraintName="uk_follow_up_rules_package_dimension"/>
+    </changeSet>
+
+    <changeSet id="20260307120001-drop-package-priority-unique" author="system">
+        <comment>Allow multiple rules per package with same priority; uniqueness is per dimension.</comment>
+        <dropUniqueConstraint tableName="follow_up_rules" constraintName="uk_follow_up_rules_package_priority"/>
+    </changeSet>
+</databaseChangeLog>

@@ -30,7 +30,9 @@ export interface InterviewResult {
   interviewId: string;
   summary?: string;
   score?: number;
+  overallScoreDisplay?: number;
   recommendation?: string;
+  recommendationTier?: string;
   strengths?: string;
   areasForImprovement?: string;
   questionScores?: QuestionScore[];

@@ -47,21 +47,22 @@ public static class InterviewRequestMapper
         return agents.Select(ToAgentResource).ToList();
     }
 
-    public static InterviewGuideResource ToInterviewGuideResource(OrchestratorInterviewGuide guide)
+    public static InterviewTemplateResource ToInterviewTemplateResource(OrchestratorInterviewTemplate template)
     {
-        return new InterviewGuideResource
+        return new InterviewTemplateResource
         {
-            Id = guide.Id,
-            Name = guide.Name,
-            Description = guide.Description,
-            QuestionCount = guide.QuestionCount,
-            IsActive = guide.IsActive
+            Id = template.Id,
+            Name = template.Name,
+            Description = template.Description,
+            AgentId = template.AgentId,
+            AgentDisplayName = template.AgentDisplayName,
+            IsActive = template.IsActive
         };
     }
 
-    public static IReadOnlyList<InterviewGuideResource> ToInterviewGuideResource(IEnumerable<OrchestratorInterviewGuide> guides)
+    public static IReadOnlyList<InterviewTemplateResource> ToInterviewTemplateResource(IEnumerable<OrchestratorInterviewTemplate> templates)
     {
-        return guides.Select(ToInterviewGuideResource).ToList();
+        return templates.Select(ToInterviewTemplateResource).ToList();
     }
 
     public static InterviewConfigurationResource ToConfigurationResource(OrchestratorInterviewConfiguration config)

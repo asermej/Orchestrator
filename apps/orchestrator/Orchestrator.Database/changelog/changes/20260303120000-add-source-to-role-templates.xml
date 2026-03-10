@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260303120000-add-source-group-org-to-role-templates" author="system">
+        <addColumn tableName="role_templates">
+            <column name="source" type="varchar(20)" defaultValue="system">
+                <constraints nullable="false"/>
+            </column>
+            <column name="group_id" type="uuid">
+                <constraints nullable="true"/>
+            </column>
+            <column name="organization_id" type="uuid">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+
+        <addForeignKeyConstraint
+            baseTableName="role_templates"
+            baseColumnNames="group_id"
+            constraintName="fk_role_templates_group_id"
+            referencedTableName="groups"
+            referencedColumnNames="id"/>
+
+        <createIndex tableName="role_templates" indexName="idx_role_templates_source">
+            <column name="source"/>
+        </createIndex>
+
+        <createIndex tableName="role_templates" indexName="idx_role_templates_group_id">
+            <column name="group_id"/>
+        </createIndex>
+
+        <createIndex tableName="role_templates" indexName="idx_role_templates_organization_id">
+            <column name="organization_id"/>
+        </createIndex>
+
+        <!-- Drop the existing unique constraint on role_key (system-only) and replace with a
+             composite unique that allows the same role_key across different groups -->
+        <dropUniqueConstraint tableName="role_templates" constraintName="uk_role_templates_role_key"/>
+
+        <addUniqueConstraint tableName="role_templates"
+            columnNames="role_key, group_id"
+            constraintName="uk_role_templates_role_key_group"/>
+    </changeSet>
+
+</databaseChangeLog>

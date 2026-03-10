@@ -155,37 +155,37 @@ internal sealed class VoiceManager : IDisposable
         var config = GatewayFacade.GetElevenLabsConfig();
         var voiceId = agent.ElevenlabsVoiceId ?? config.DefaultVoiceId;
         
-        // Load questions from the interview guide (direct reference or via configuration fallback)
-        List<InterviewGuideQuestion> guideQuestions;
-        if (interview.InterviewGuideId.HasValue)
+        // Load question texts from competencies' canonical examples (for warm-up; actual question is generated at runtime)
+        var questionTexts = new List<string>();
+        if (interview.InterviewTemplateId.HasValue)
         {
-            guideQuestions = await DataFacade.GetInterviewGuideQuestions(interview.InterviewGuideId.Value).ConfigureAwait(false);
-        }
-        else if (interview.InterviewConfigurationId.HasValue)
-        {
-            var interviewConfig = await DataFacade.GetInterviewConfigurationById(interview.InterviewConfigurationId.Value).ConfigureAwait(false);
-            if (interviewConfig == null)
+            var template = await DataFacade.GetInterviewTemplateById(interview.InterviewTemplateId.Value).ConfigureAwait(false);
+            if (template?.RoleTemplateId != null)
             {
-                return result;
+                var competencies = await DataFacade.GetCompetenciesByRoleTemplateId(template.RoleTemplateId.Value).ConfigureAwait(false);
+                foreach (var comp in competencies)
+                {
+                    if (!string.IsNullOrWhiteSpace(comp.CanonicalExample))
+                        questionTexts.Add(comp.CanonicalExample);
+                    else
+                        questionTexts.Add($"Tell me about your experience with {comp.Name}.");
+                }
             }
-            guideQuestions = await DataFacade.GetInterviewGuideQuestions(interviewConfig.InterviewGuideId).ConfigureAwait(false);
         }
-        else
-        {
-            return result; // No guide or configuration, no questions to warm up
-        }
-        result.TotalQuestions = guideQuestions.Count;
 
-        // Pre-generate audio for each question
-        foreach (var question in guideQuestions)
+        if (questionTexts.Count == 0)
+            return result;
+
+        result.TotalQuestions = questionTexts.Count;
+
+        foreach (var questionText in questionTexts)
         {
             if (cancellationToken.IsCancellationRequested) break;
             
             try
             {
-                // Generate audio (the cache manager handles checking/storing cache)
                 await GatewayFacade.GenerateSpeechAsync(
-                    question.Question,
+                    questionText,
                     voiceId,
                     0.5m,
                     0.75m,

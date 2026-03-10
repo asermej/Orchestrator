@@ -23,7 +23,7 @@ internal sealed class InterviewRequestManager : IDisposable
     /// <summary>
     /// Sends an interview request: syncs applicant, creates interview in Orchestrator, saves local record
     /// </summary>
-    public async Task<InterviewRequest> SendInterviewRequest(Guid applicantId, Guid agentId, Guid interviewGuideId)
+    public async Task<InterviewRequest> SendInterviewRequest(Guid applicantId, Guid interviewTemplateId, Guid? agentId = null)
     {
         var applicant = await _dataFacade.GetApplicantById(applicantId).ConfigureAwait(false);
         if (applicant == null) throw new ApplicantNotFoundException();
@@ -39,9 +39,9 @@ internal sealed class InterviewRequestManager : IDisposable
         var result = await _gatewayFacade.CreateInterview(
             applicant.Id.ToString(),
             job.ExternalJobId,
-            agentId,
-            interviewGuideId,
-            apiKey).ConfigureAwait(false);
+            interviewTemplateId,
+            apiKey,
+            agentId).ConfigureAwait(false);
 
         var request = new InterviewRequest
         {
@@ -212,11 +212,11 @@ internal sealed class InterviewRequestManager : IDisposable
     }
 
     /// <summary>
-    /// Gets available interview guides from Orchestrator for a specific group
+    /// Gets available interview templates from Orchestrator for a specific group
     /// </summary>
-    public async Task<IReadOnlyList<OrchestratorInterviewGuide>> GetInterviewGuides(string? groupApiKey)
+    public async Task<IReadOnlyList<OrchestratorInterviewTemplate>> GetInterviewTemplates(string? groupApiKey)
     {
-        return await _gatewayFacade.GetInterviewGuides(groupApiKey).ConfigureAwait(false);
+        return await _gatewayFacade.GetInterviewTemplates(groupApiKey).ConfigureAwait(false);
     }
 
     private async Task<string?> ResolveApiKeyForJob(Job job)

@@ -3,12 +3,15 @@ using Npgsql;
 
 namespace Orchestrator.Domain;
 
-/// <summary>
-/// Manages data access for InterviewResult entities
-/// </summary>
 internal sealed class InterviewResultDataManager
 {
     private readonly string _dbConnectionString;
+
+    private const string SelectColumns = @"
+        id, interview_id, summary, score, recommendation, strengths, areas_for_improvement,
+        full_transcript_url, webhook_sent_at, webhook_response, question_scores,
+        overall_score_display, recommendation_tier,
+        created_at, updated_at, is_deleted";
 
     public InterviewResultDataManager(string dbConnectionString)
     {
@@ -18,20 +21,14 @@ internal sealed class InterviewResultDataManager
 
     public async Task<InterviewResult?> GetById(Guid id)
     {
-        const string sql = @"
-            SELECT id, interview_id, summary, score, recommendation, strengths, areas_for_improvement, full_transcript_url, webhook_sent_at, webhook_response, question_scores, created_at, updated_at, is_deleted
-            FROM interview_results
-            WHERE id = @id AND is_deleted = false";
+        var sql = $@"SELECT {SelectColumns} FROM interview_results WHERE id = @id AND is_deleted = false";
         using var connection = new NpgsqlConnection(_dbConnectionString);
         return await connection.QueryFirstOrDefaultAsync<InterviewResult>(sql, new { id });
     }
 
     public async Task<InterviewResult?> GetByInterviewId(Guid interviewId)
     {
-        const string sql = @"
-            SELECT id, interview_id, summary, score, recommendation, strengths, areas_for_improvement, full_transcript_url, webhook_sent_at, webhook_response, question_scores, created_at, updated_at, is_deleted
-            FROM interview_results
-            WHERE interview_id = @InterviewId AND is_deleted = false";
+        var sql = $@"SELECT {SelectColumns} FROM interview_results WHERE interview_id = @InterviewId AND is_deleted = false";
         using var connection = new NpgsqlConnection(_dbConnectionString);
         return await connection.QueryFirstOrDefaultAsync<InterviewResult>(sql, new { InterviewId = interviewId });
     }
@@ -43,10 +40,16 @@ internal sealed class InterviewResultDataManager
             result.Id = Guid.NewGuid();
         }
 
-        const string sql = @"
-            INSERT INTO interview_results (id, interview_id, summary, score, recommendation, strengths, areas_for_improvement, full_transcript_url, question_scores, created_by)
-            VALUES (@Id, @InterviewId, @Summary, @Score, @Recommendation, @Strengths, @AreasForImprovement, @FullTranscriptUrl, @QuestionScores, @CreatedBy)
-            RETURNING id, interview_id, summary, score, recommendation, strengths, areas_for_improvement, full_transcript_url, webhook_sent_at, webhook_response, question_scores, created_at, updated_at, is_deleted";
+        var sql = $@"
+            INSERT INTO interview_results (
+                id, interview_id, summary, score, recommendation, strengths, areas_for_improvement,
+                full_transcript_url, question_scores, overall_score_display, recommendation_tier, created_by
+            )
+            VALUES (
+                @Id, @InterviewId, @Summary, @Score, @Recommendation, @Strengths, @AreasForImprovement,
+                @FullTranscriptUrl, @QuestionScores, @OverallScoreDisplay, @RecommendationTier, @CreatedBy
+            )
+            RETURNING {SelectColumns}";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var newItem = await connection.QueryFirstOrDefaultAsync<InterviewResult>(sql, result);
@@ -55,7 +58,7 @@ internal sealed class InterviewResultDataManager
 
     public async Task<InterviewResult> Update(InterviewResult result)
     {
-        const string sql = @"
+        var sql = $@"
             UPDATE interview_results
             SET
                 summary = @Summary,
@@ -67,10 +70,12 @@ internal sealed class InterviewResultDataManager
                 webhook_sent_at = @WebhookSentAt,
                 webhook_response = @WebhookResponse,
                 question_scores = @QuestionScores,
+                overall_score_display = @OverallScoreDisplay,
+                recommendation_tier = @RecommendationTier,
                 updated_at = CURRENT_TIMESTAMP,
                 updated_by = @UpdatedBy
             WHERE id = @Id AND is_deleted = false
-            RETURNING id, interview_id, summary, score, recommendation, strengths, areas_for_improvement, full_transcript_url, webhook_sent_at, webhook_response, question_scores, created_at, updated_at, is_deleted";
+            RETURNING {SelectColumns}";
 
         using var connection = new NpgsqlConnection(_dbConnectionString);
         var updatedItem = await connection.QueryFirstOrDefaultAsync<InterviewResult>(sql, result);

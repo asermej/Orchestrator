@@ -16,7 +16,6 @@ public class DomainFacadeTestsInterviewConfiguration
     private DomainFacade _domainFacade = null!;
     private Guid _testGroupId;
     private Guid _testAgentId;
-    private Guid _testInterviewGuideId;
 
     private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max];
 
@@ -43,13 +42,7 @@ public class DomainFacadeTestsInterviewConfiguration
         });
         _testAgentId = agent.Id;
 
-        var guide = await _domainFacade.CreateInterviewGuide(new InterviewGuide
-        {
-            GroupId = _testGroupId,
-            Name = Truncate($"TestGuide_IC_{Guid.NewGuid():N}", 80),
-            IsActive = true
-        });
-        _testInterviewGuideId = guide.Id;
+        // InterviewGuides have been removed; use a placeholder GUID for legacy InterviewGuideId field
     }
 
     [TestCleanup]
@@ -74,7 +67,7 @@ public class DomainFacadeTestsInterviewConfiguration
         var config = new InterviewConfiguration
         {
             GroupId = _testGroupId,
-            InterviewGuideId = _testInterviewGuideId,
+            InterviewGuideId = Guid.NewGuid(),
             AgentId = _testAgentId,
             Name = Truncate($"TestConfig{suffix}_{Guid.NewGuid():N}", 80),
             Description = null,
@@ -91,7 +84,7 @@ public class DomainFacadeTestsInterviewConfiguration
         var config = new InterviewConfiguration
         {
             GroupId = _testGroupId,
-            InterviewGuideId = _testInterviewGuideId,
+            InterviewGuideId = Guid.NewGuid(),
             AgentId = _testAgentId,
             Name = Truncate($"Config_{Guid.NewGuid():N}", 80),
             IsActive = true
@@ -111,7 +104,7 @@ public class DomainFacadeTestsInterviewConfiguration
         var config = new InterviewConfiguration
         {
             GroupId = _testGroupId,
-            InterviewGuideId = _testInterviewGuideId,
+            InterviewGuideId = Guid.NewGuid(),
             AgentId = _testAgentId,
             Name = "", // Required
             IsActive = true

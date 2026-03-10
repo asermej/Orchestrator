@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260309130000-add-visibility-scope-to-role-templates" author="system">
+        <comment>Add visibility_scope to role_templates for org-level inheritance (matching agents pattern)</comment>
+
+        <addColumn tableName="role_templates">
+            <column name="visibility_scope" type="varchar(50)" defaultValue="organization_only">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+
+        <sql>
+            ALTER TABLE role_templates
+            ADD CONSTRAINT chk_role_templates_visibility_scope
+            CHECK (visibility_scope IN ('organization_only', 'organization_and_descendants', 'descendants_only'));
+        </sql>
+
+        <createIndex tableName="role_templates" indexName="idx_role_templates_visibility_scope">
+            <column name="visibility_scope"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="20260309130000-update-role-templates-unique-constraint" author="system">
+        <comment>Replace (role_key, group_id) unique with (role_key, organization_id) to allow same role_key across orgs within a group</comment>
+
+        <dropUniqueConstraint tableName="role_templates" constraintName="uk_role_templates_role_key_group"/>
+
+        <sql>
+            CREATE UNIQUE INDEX uk_role_templates_role_key_org
+            ON role_templates (role_key, organization_id)
+            WHERE organization_id IS NOT NULL AND is_deleted = false;
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

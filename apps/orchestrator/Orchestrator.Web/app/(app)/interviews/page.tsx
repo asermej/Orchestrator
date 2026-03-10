@@ -396,12 +396,12 @@ export default function InterviewsPage() {
                           <span>{getDuration(interview.startedAt, interview.completedAt)}</span>
                         </div>
 
-                        {interview.result?.recommendation && (
+                        {(interview.result?.recommendationTier || interview.result?.recommendation) && (
                           <>
                             <div className="w-px h-3 bg-border/60" />
                             <div className="flex items-center gap-1.5">
                               <TrendingUp className="h-3 w-3" />
-                              <span className="font-medium">{interview.result.recommendation}</span>
+                              <span className="font-medium">{interview.result.recommendationTier || interview.result.recommendation}</span>
                             </div>
                           </>
                         )}

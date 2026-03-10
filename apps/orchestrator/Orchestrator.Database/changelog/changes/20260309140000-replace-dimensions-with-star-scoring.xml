@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260309140000-drop-dimensions-table" author="system">
+        <comment>Drop the dimensions table entirely — replaced by STAR scoring methodology</comment>
+        <dropTable tableName="dimensions" cascadeConstraints="true"/>
+    </changeSet>
+
+    <changeSet id="20260309140000-remove-dimension-columns-from-competency-responses" author="system">
+        <comment>Remove dimension surfacing columns from competency_responses</comment>
+        <dropColumn tableName="competency_responses" columnName="dimensions_surfaced"/>
+        <dropColumn tableName="competency_responses" columnName="dimensions_probed"/>
+    </changeSet>
+
+    <changeSet id="20260309140000-add-star-scoring-columns" author="system">
+        <comment>Add STAR (Situation, Task, Action, Result) scoring columns to competency_responses</comment>
+        <addColumn tableName="competency_responses">
+            <column name="star_situation_score" type="integer">
+                <constraints nullable="true"/>
+            </column>
+            <column name="star_task_score" type="integer">
+                <constraints nullable="true"/>
+            </column>
+            <column name="star_action_score" type="integer">
+                <constraints nullable="true"/>
+            </column>
+            <column name="star_result_score" type="integer">
+                <constraints nullable="true"/>
+            </column>
+            <column name="star_overall_score" type="numeric(3,2)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

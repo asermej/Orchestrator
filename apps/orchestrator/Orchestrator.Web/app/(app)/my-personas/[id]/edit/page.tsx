@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -208,7 +208,10 @@ export default function EditAgent() {
     }
   };
 
+  const testVoiceInFlightRef = useRef(false);
   const handleTestVoice = async () => {
+    if (testVoiceInFlightRef.current) return;
+    testVoiceInFlightRef.current = true;
     setTestVoiceLoading(true);
     try {
       const res = await fetch(`/api/agents/${agentId}/voice/test`, {
@@ -230,6 +233,7 @@ export default function EditAgent() {
       console.error("Test voice error", err);
       toast.error("Failed to play test");
     } finally {
+      testVoiceInFlightRef.current = false;
       setTestVoiceLoading(false);
     }
   };

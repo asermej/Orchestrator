@@ -19,6 +19,10 @@ internal sealed class OpenAIChatCompletionRequest
 
     [JsonPropertyName("max_tokens")]
     public int MaxTokens { get; set; }
+
+    [JsonPropertyName("stream")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Stream { get; set; }
 }
 
 /// <summary>

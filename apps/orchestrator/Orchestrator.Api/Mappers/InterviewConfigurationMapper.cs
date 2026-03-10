@@ -26,7 +26,6 @@ public static class InterviewConfigurationMapper
             Description = config.Description,
             IsActive = config.IsActive,
             QuestionCount = config.QuestionCount,
-            InterviewGuide = config.InterviewGuide != null ? InterviewGuideMapper.ToResource(config.InterviewGuide) : null,
             Agent = config.Agent != null ? AgentMapper.ToResource(config.Agent) : null,
             CreatedAt = config.CreatedAt,
             UpdatedAt = config.UpdatedAt,

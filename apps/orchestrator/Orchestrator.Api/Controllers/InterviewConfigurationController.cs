@@ -73,10 +73,6 @@ public class InterviewConfigurationController : ControllerBase
         var agent = await _domainFacade.GetAgentById(config.AgentId);
         config.Agent = agent;
 
-        // Load the interview guide with questions
-        var guide = await _domainFacade.GetInterviewGuideByIdWithQuestions(config.InterviewGuideId);
-        config.InterviewGuide = guide;
-
         var response = InterviewConfigurationMapper.ToResource(config);
         
         return Ok(response);

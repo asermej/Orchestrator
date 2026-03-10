@@ -3,17 +3,12 @@
 import { useEffect, useState } from "react";
 import { testAtsApi } from "@/lib/test-ats-api";
 
-interface AgentItem {
-  id: string;
-  displayName: string;
-  profileImageUrl?: string | null;
-}
-
-interface InterviewGuideItem {
+interface InterviewTemplateItem {
   id: string;
   name: string;
   description?: string | null;
-  questionCount: number;
+  agentId?: string | null;
+  agentDisplayName?: string | null;
   isActive: boolean;
 }
 
@@ -49,10 +44,8 @@ interface Props {
 }
 
 export function SendInterviewModal({ applicant, onClose, onSent }: Props) {
-  const [agents, setAgents] = useState<AgentItem[]>([]);
-  const [guides, setGuides] = useState<InterviewGuideItem[]>([]);
-  const [selectedAgentId, setSelectedAgentId] = useState<string>("");
-  const [selectedGuideId, setSelectedGuideId] = useState<string>("");
+  const [templates, setTemplates] = useState<InterviewTemplateItem[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,19 +56,14 @@ export function SendInterviewModal({ applicant, onClose, onSent }: Props) {
     let cancelled = false;
     async function loadData() {
       try {
-        const [agentsData, guidesData] = await Promise.all([
-          testAtsApi.get<AgentItem[]>("/api/v1/agents"),
-          testAtsApi.get<InterviewGuideItem[]>("/api/v1/interview-guides"),
-        ]);
+        const templatesData = await testAtsApi.get<InterviewTemplateItem[]>("/api/v1/interview-templates");
         if (!cancelled) {
-          setAgents(agentsData);
-          setGuides(guidesData);
-          if (agentsData.length > 0) setSelectedAgentId(agentsData[0].id);
-          if (guidesData.length > 0) setSelectedGuideId(guidesData[0].id);
+          setTemplates(templatesData);
+          if (templatesData.length > 0) setSelectedTemplateId(templatesData[0].id);
         }
       } catch (e) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load agents and interview guides");
+          setError(e instanceof Error ? e.message : "Failed to load interview templates");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -85,16 +73,19 @@ export function SendInterviewModal({ applicant, onClose, onSent }: Props) {
     return () => { cancelled = true; };
   }, []);
 
-  const selectedGuide = guides.find((g) => g.id === selectedGuideId);
+  const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
 
   const handleSend = async () => {
-    if (!selectedAgentId || !selectedGuideId) return;
+    if (!selectedTemplateId) return;
     setSending(true);
     setError(null);
     try {
       const data = await testAtsApi.post<InterviewRequestItem>(
         `/api/v1/applicants/${applicant.id}/interview`,
-        { agentId: selectedAgentId, interviewGuideId: selectedGuideId }
+        {
+          interviewTemplateId: selectedTemplateId,
+          ...(selectedTemplate?.agentId && { agentId: selectedTemplate.agentId }),
+        }
       );
       setResult(data);
       onSent(data);
@@ -113,7 +104,7 @@ export function SendInterviewModal({ applicant, onClose, onSent }: Props) {
     }
   };
 
-  const canSend = selectedAgentId && selectedGuideId && agents.length > 0 && guides.length > 0;
+  const canSend = selectedTemplateId && templates.length > 0 && !!selectedTemplate?.agentId;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -171,53 +162,45 @@ export function SendInterviewModal({ applicant, onClose, onSent }: Props) {
         ) : (
           <div>
             {loading ? (
-              <div className="text-sm text-slate-500 mb-4">Loading agents and interview guides...</div>
-            ) : agents.length === 0 || guides.length === 0 ? (
+              <div className="text-sm text-slate-500 mb-4">Loading interview templates...</div>
+            ) : templates.length === 0 ? (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-amber-800 text-sm">
-                {agents.length === 0 && "No agents found. "}
-                {guides.length === 0 && "No interview guides found. "}
-                Please create agents and interview guides in the Orchestrator first.
+                No interview templates found. Please create interview templates in the Orchestrator first.
               </div>
             ) : (
               <>
-                {/* Agent selector */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Agent
-                  </label>
-                  <select
-                    value={selectedAgentId}
-                    onChange={(e) => setSelectedAgentId(e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    {agents.map((agent) => (
-                      <option key={agent.id} value={agent.id}>
-                        {agent.displayName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Interview Guide selector */}
+                {/* Interview Template selector */}
                 <div className="mb-5">
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Interview Guide
+                    Interview Template
                   </label>
                   <select
-                    value={selectedGuideId}
-                    onChange={(e) => setSelectedGuideId(e.target.value)}
+                    value={selectedTemplateId}
+                    onChange={(e) => setSelectedTemplateId(e.target.value)}
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   >
-                    {guides.map((guide) => (
-                      <option key={guide.id} value={guide.id}>
-                        {guide.name} {`\u2014 ${guide.questionCount} questions`}
+                    {templates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.name}
+                        {template.agentDisplayName ? ` \u2014 ${template.agentDisplayName}` : ""}
                       </option>
                     ))}
                   </select>
 
-                  {selectedGuide && selectedGuide.description && (
-                    <div className="mt-2 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600">
-                      {selectedGuide.description}
+                  {selectedTemplate && (
+                    <div className="mt-2 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 space-y-1">
+                      {selectedTemplate.description && <p>{selectedTemplate.description}</p>}
+                      {selectedTemplate.agentDisplayName && (
+                        <p>
+                          <span className="font-medium text-slate-700">Agent:</span>{" "}
+                          {selectedTemplate.agentDisplayName}
+                        </p>
+                      )}
+                      {!selectedTemplate.agentId && (
+                        <p className="text-amber-700 font-medium">
+                          This template has no agent assigned. Assign an agent in Orchestrator to send an interview.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

@@ -58,31 +58,21 @@ public sealed partial class DomainFacade
     public async Task<Interview> CompleteInterview(Guid interviewId)
     {
         var interview = await InterviewManager.CompleteInterview(interviewId).ConfigureAwait(false);
-        
-        // Auto-score the interview if it has a guide (direct or via configuration)
-        Guid? guideIdForScoring = interview.InterviewGuideId;
-        if (!guideIdForScoring.HasValue && interview.InterviewConfigurationId.HasValue)
-        {
-            var config = await InterviewConfigurationManager.GetConfigurationById(interview.InterviewConfigurationId.Value).ConfigureAwait(false);
-            guideIdForScoring = config?.InterviewGuideId;
-        }
 
-        if (guideIdForScoring.HasValue)
+        // Auto-score using competency responses if template-based
+        if (interview.InterviewTemplateId.HasValue)
         {
             try
             {
-                await ScoreInterview(interview.Id, guideIdForScoring.Value).ConfigureAwait(false);
+                await ScoreInterviewFromCompetencyResponses(interview.Id).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                // Log but don't fail interview completion if scoring fails
                 System.Diagnostics.Debug.WriteLine($"Auto-scoring failed for interview {interview.Id}: {ex.Message}");
             }
         }
-        
-        // Send webhook notification (will now include the score if auto-scoring succeeded)
+
         await SendInterviewWebhookAsync(interview, WebhookEventTypes.InterviewCompleted);
-        
         return interview;
     }
 
@@ -188,25 +178,41 @@ public sealed partial class DomainFacade
         return await InterviewManager.UpdateResult(result).ConfigureAwait(false);
     }
 
+    // Competency responses (per-competency holistic scores for AI interviews)
+
+    /// <summary>
+    /// Gets all competency responses for an interview.
+    /// </summary>
+    public async Task<List<CompetencyResponse>> GetCompetencyResponsesByInterviewId(Guid interviewId)
+    {
+        return await InterviewManager.GetCompetencyResponsesByInterviewId(interviewId).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Creates or updates a competency response for an interview (upsert by interview_id + competency_id).
+    /// </summary>
+    public async Task<CompetencyResponse> UpsertCompetencyResponse(CompetencyResponse response)
+    {
+        return await InterviewManager.UpsertCompetencyResponse(response).ConfigureAwait(false);
+    }
+
     // Test Interview Methods
 
     /// <summary>
-    /// Creates a test interview from an interview configuration
+    /// Creates a test interview from an interview template
     /// </summary>
-    public async Task<Interview> CreateTestInterview(Guid interviewConfigurationId, string? testUserName = null)
+    public async Task<Interview> CreateTestInterviewFromTemplate(Guid interviewTemplateId, string? testUserName = null)
     {
-        // Get the configuration
-        var config = await InterviewConfigurationManager.GetConfigurationById(interviewConfigurationId).ConfigureAwait(false);
-        if (config == null)
+        var template = await InterviewTemplateManager.GetTemplateById(interviewTemplateId).ConfigureAwait(false);
+        if (template == null)
         {
-            throw new InterviewConfigurationNotFoundException($"Interview configuration with ID {interviewConfigurationId} not found");
+            throw new InterviewTemplateNotFoundException($"Interview template with ID {interviewTemplateId} not found");
         }
 
-        // Create a test applicant (or use a placeholder)
         var testApplicantId = Guid.NewGuid().ToString("N");
         var testApplicant = new Applicant
         {
-            GroupId = config.GroupId,
+            GroupId = template.GroupId,
             ExternalApplicantId = $"test-{testApplicantId}",
             FirstName = testUserName ?? "Test",
             LastName = "User",
@@ -214,25 +220,22 @@ public sealed partial class DomainFacade
         };
         var createdApplicant = await ApplicantManager.CreateApplicant(testApplicant).ConfigureAwait(false);
 
-        // Create a test job (or use a placeholder)
         var testJobId = Guid.NewGuid().ToString("N");
         var testJob = new Job
         {
-            GroupId = config.GroupId,
+            GroupId = template.GroupId,
             ExternalJobId = $"test-job-{testJobId}",
-            Title = $"Test Interview - {config.Name}",
+            Title = $"Test Interview - {template.Name}",
             Status = "active"
         };
         var createdJob = await JobManager.CreateJob(testJob).ConfigureAwait(false);
 
-        // Create the interview
         var interview = new Interview
         {
             JobId = createdJob.Id,
             ApplicantId = createdApplicant.Id,
-            AgentId = config.AgentId,
-            InterviewConfigurationId = interviewConfigurationId,
-            InterviewGuideId = config.InterviewGuideId,
+            AgentId = template.AgentId ?? Guid.Empty,
+            InterviewTemplateId = interviewTemplateId,
             Status = InterviewStatus.Pending,
             InterviewType = InterviewType.Voice,
             Token = Guid.NewGuid().ToString("N")
@@ -242,178 +245,97 @@ public sealed partial class DomainFacade
     }
 
     /// <summary>
-    /// Scores a completed test interview using AI (legacy: resolves guide from configuration)
+    /// Scores a completed interview using competency responses (weighted average).
+    /// Computes overall_score_display (0-100) and recommendation_tier from global thresholds.
     /// </summary>
-    public async Task<InterviewResult> ScoreTestInterview(Guid interviewId, Guid interviewConfigurationId)
+    public async Task<InterviewResult> ScoreInterviewFromCompetencyResponses(Guid interviewId)
     {
-        var config = await InterviewConfigurationManager.GetConfigurationById(interviewConfigurationId).ConfigureAwait(false);
-        if (config == null)
-        {
-            throw new InterviewConfigurationNotFoundException($"Interview configuration with ID {interviewConfigurationId} not found");
-        }
-
-        return await ScoreInterview(interviewId, config.InterviewGuideId).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Scores a completed interview using the questions from the given interview guide
-    /// </summary>
-    public async Task<InterviewResult> ScoreInterview(Guid interviewId, Guid interviewGuideId)
-    {
-        // Get the interview
         var interview = await InterviewManager.GetInterviewById(interviewId).ConfigureAwait(false);
         if (interview == null)
         {
             throw new InterviewNotFoundException($"Interview with ID {interviewId} not found");
         }
 
-        // Get the guide's questions
-        var guideQuestions = await InterviewGuideManager.GetQuestionsByGuideId(interviewGuideId).ConfigureAwait(false);
-
-        // Get the responses
-        var responses = await InterviewManager.GetResponsesByInterviewId(interviewId).ConfigureAwait(false);
-
-        // Calculate scores based on responses and guide questions
-        var questionScores = new List<QuestionScore>();
-        decimal totalWeightedScore = 0;
-        decimal totalWeight = 0;
-
-        foreach (var question in guideQuestions.OrderBy(q => q.DisplayOrder))
+        var competencyResponses = await InterviewManager.GetCompetencyResponsesByInterviewId(interviewId).ConfigureAwait(false);
+        if (competencyResponses.Count == 0)
         {
-            var response = responses.FirstOrDefault(r => r.ResponseOrder == question.DisplayOrder);
-            
-            decimal score = 0;
-            string feedback = "The candidate did not provide a response to this question.";
-
-            if (response != null && !string.IsNullOrWhiteSpace(response.Transcript))
-            {
-                var transcript = response.Transcript.Trim();
-                var responseLength = transcript.Length;
-                var wordCount = transcript.Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Length;
-
-                // Score based on response depth (word count is a better proxy than char count)
-                if (wordCount >= 50)
-                {
-                    score = 8 + Math.Min((wordCount - 50) / 25m, 2m);
-                }
-                else if (wordCount >= 25)
-                {
-                    score = 6 + ((wordCount - 25) / 12.5m);
-                }
-                else if (wordCount >= 10)
-                {
-                    score = 4 + ((wordCount - 10) / 7.5m);
-                }
-                else
-                {
-                    score = Math.Max(1, wordCount / 2.5m);
-                }
-
-                score = Math.Min(10, Math.Max(0, score));
-
-                // Generate meaningful feedback based on score tier
-                if (score >= 8)
-                {
-                    feedback = $"Strong response. The candidate provided a detailed answer with specific examples ({wordCount} words).";
-                }
-                else if (score >= 6)
-                {
-                    feedback = $"Adequate response. The candidate addressed the question but could have provided more detail or specific examples ({wordCount} words).";
-                }
-                else if (score >= 4)
-                {
-                    feedback = $"Brief response. The candidate gave a short answer that lacks depth or specificity ({wordCount} words). A stronger answer would include concrete examples.";
-                }
-                else
-                {
-                    feedback = $"Minimal response. The candidate's answer was very brief and did not meaningfully address the question ({wordCount} words).";
-                }
-            }
-
-            questionScores.Add(new QuestionScore
-            {
-                QuestionIndex = question.DisplayOrder,
-                Question = question.Question,
-                Score = score,
-                MaxScore = 10,
-                Weight = question.ScoringWeight,
-                Feedback = feedback
-            });
-
-            totalWeightedScore += score * question.ScoringWeight;
-            totalWeight += question.ScoringWeight;
+            throw new InvalidOperationException("No competency responses found for this interview.");
         }
 
-        var overallScore = totalWeight > 0 ? totalWeightedScore / totalWeight : 0;
+        var scoredResponses = competencyResponses.Where(cr => !cr.CompetencySkipped).ToList();
+        var skippedCount = competencyResponses.Count - scoredResponses.Count;
 
-        // Check if a result already exists for this interview (re-scoring case)
+        decimal weightedSum = 0;
+        decimal totalWeight = 0;
+        foreach (var cr in scoredResponses)
+        {
+            var weight = cr.ScoringWeight ?? 0;
+            weightedSum += cr.CompetencyScore * weight;
+            totalWeight += weight;
+        }
+
+        var weightedAverage = totalWeight > 0 ? weightedSum / totalWeight : 0;
+        var scoreRaw = (int)Math.Round(weightedAverage * 100);
+        var displayScore = (int)Math.Round((weightedAverage / 5.0m) * 100);
+
+        var thresholds = await InterviewManager.GetRecommendationThresholds().ConfigureAwait(false);
+        var recommendationTier = DeriveRecommendationTier(displayScore, thresholds);
+
+        var summary = skippedCount > 0
+            ? $"Weighted score across {scoredResponses.Count} of {competencyResponses.Count} competencies: {displayScore} / 100 ({skippedCount} competenc{(skippedCount == 1 ? "y" : "ies")} skipped)"
+            : $"Weighted score across {competencyResponses.Count} competencies: {displayScore} / 100";
+
         var existingResult = await InterviewManager.GetResultByInterviewId(interviewId).ConfigureAwait(false);
-
         if (existingResult != null)
         {
-            // Update the existing result
-            existingResult.Score = (int)Math.Round(overallScore * 10);
-            existingResult.Summary = GenerateInterviewSummary(overallScore, questionScores);
-            existingResult.Recommendation = GenerateRecommendation(overallScore);
-            existingResult.Strengths = string.Join("; ", questionScores.Where(q => q.Score >= 7).Select(q => q.Question.Substring(0, Math.Min(50, q.Question.Length))));
-            existingResult.AreasForImprovement = string.Join("; ", questionScores.Where(q => q.Score < 5).Select(q => q.Question.Substring(0, Math.Min(50, q.Question.Length))));
-            existingResult.QuestionScores = System.Text.Json.JsonSerializer.Serialize(questionScores);
-
+            existingResult.Score = scoreRaw;
+            existingResult.OverallScoreDisplay = displayScore;
+            existingResult.Summary = summary;
+            existingResult.Recommendation = recommendationTier;
+            existingResult.RecommendationTier = recommendationTier;
             return await InterviewManager.UpdateResult(existingResult).ConfigureAwait(false);
         }
 
-        // Create a new result
         var result = new InterviewResult
         {
             InterviewId = interviewId,
-            Score = (int)Math.Round(overallScore * 10), // Convert to 0-100 scale
-            Summary = GenerateInterviewSummary(overallScore, questionScores),
-            Recommendation = GenerateRecommendation(overallScore),
-            Strengths = string.Join("; ", questionScores.Where(q => q.Score >= 7).Select(q => q.Question.Substring(0, Math.Min(50, q.Question.Length)))),
-            AreasForImprovement = string.Join("; ", questionScores.Where(q => q.Score < 5).Select(q => q.Question.Substring(0, Math.Min(50, q.Question.Length)))),
-            QuestionScores = System.Text.Json.JsonSerializer.Serialize(questionScores)
+            Score = scoreRaw,
+            OverallScoreDisplay = displayScore,
+            Summary = summary,
+            Recommendation = recommendationTier,
+            RecommendationTier = recommendationTier
         };
 
         return await InterviewManager.CreateResult(result).ConfigureAwait(false);
     }
 
-    private string GenerateInterviewSummary(decimal overallScore, List<QuestionScore> questionScores)
+    /// <summary>
+    /// Derives the recommendation tier from a 0-100 display score and the global thresholds.
+    /// </summary>
+    private static string DeriveRecommendationTier(int displayScore, RecommendationThresholdDefaults thresholds)
     {
-        var strongAreas = questionScores.Where(q => q.Score >= 7).Select(q => q.Question).Take(3).ToList();
-        var weakAreas = questionScores.Where(q => q.Score < 5).Select(q => q.Question).Take(3).ToList();
-
-        var summary = $"The candidate achieved an overall score of {overallScore:F1}/10. ";
-        
-        if (strongAreas.Any())
-        {
-            summary += $"Strong performance was noted in: {string.Join(", ", strongAreas.Select(q => $"\"{q.Substring(0, Math.Min(50, q.Length))}...\""))}. ";
-        }
-        
-        if (weakAreas.Any())
-        {
-            summary += $"Areas for improvement include: {string.Join(", ", weakAreas.Select(q => $"\"{q.Substring(0, Math.Min(50, q.Length))}...\""))}. ";
-        }
-
-        return summary;
+        if (displayScore >= thresholds.StronglyRecommendMin)
+            return RecommendationTiers.StronglyRecommend;
+        if (displayScore >= thresholds.RecommendMin)
+            return RecommendationTiers.Recommend;
+        if (displayScore >= thresholds.ConsiderMin)
+            return RecommendationTiers.Consider;
+        return RecommendationTiers.DoNotRecommend;
     }
 
-    private string GenerateRecommendation(decimal overallScore)
+    /// <summary>
+    /// Gets the global recommendation thresholds.
+    /// </summary>
+    public async Task<RecommendationThresholdDefaults> GetRecommendationThresholds()
     {
-        if (overallScore >= 8)
-        {
-            return "Strong Recommend - Excellent overall";
-        }
-        else if (overallScore >= 6)
-        {
-            return "Recommend - Good with minor gaps";
-        }
-        else if (overallScore >= 4)
-        {
-            return "Consider - Needs more evaluation";
-        }
-        else
-        {
-            return "Do Not Recommend - Below expectations";
-        }
+        return await InterviewManager.GetRecommendationThresholds().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Updates the global recommendation thresholds.
+    /// </summary>
+    public async Task<RecommendationThresholdDefaults> UpdateRecommendationThresholds(RecommendationThresholdDefaults thresholds)
+    {
+        return await InterviewManager.UpdateRecommendationThresholds(thresholds).ConfigureAwait(false);
     }
 }

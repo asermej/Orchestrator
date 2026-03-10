@@ -15,23 +15,10 @@ public static class CandidateMapper
             Agent = result.Agent != null ? ToAgentResource(result.Agent) : null,
             Job = result.Job != null ? ToJobResource(result.Job) : null,
             Applicant = result.Applicant != null ? ToApplicantResource(result.Applicant) : null,
-            Questions = result.Questions
-                .OrderBy(q => q.DisplayOrder)
-                .Select(ToQuestionResource)
-                .ToList(),
-        };
-    }
-
-    public static CandidateQuestionResource ToQuestionResource(InterviewGuideQuestion question)
-    {
-        ArgumentNullException.ThrowIfNull(question);
-        return new CandidateQuestionResource
-        {
-            Id = question.Id,
-            Text = question.Question,
-            DisplayOrder = question.DisplayOrder,
-            FollowUpsEnabled = question.FollowUpsEnabled,
-            MaxFollowUps = question.MaxFollowUps,
+            Questions = ToQuestionResources(result.Competencies),
+            InterviewTemplateId = result.InterviewTemplate?.Id,
+            OpeningTemplate = result.InterviewTemplate?.OpeningTemplate ?? InterviewTemplate.DefaultOpeningTemplate,
+            ClosingTemplate = result.InterviewTemplate?.ClosingTemplate ?? InterviewTemplate.DefaultClosingTemplate,
         };
     }
 
@@ -57,7 +44,23 @@ public static class CandidateMapper
             Id = agent.Id,
             DisplayName = agent.DisplayName,
             ProfileImageUrl = agent.ProfileImageUrl,
+            ElevenlabsVoiceId = agent.ElevenlabsVoiceId,
         };
+    }
+
+    public static List<CandidateQuestionResource> ToQuestionResources(List<Competency>? competencies)
+    {
+        if (competencies == null || competencies.Count == 0)
+            return new List<CandidateQuestionResource>();
+
+        return competencies.Select((c, index) => new CandidateQuestionResource
+        {
+            Id = c.Id,
+            Text = c.CanonicalExample ?? $"Tell me about your experience with {c.Name}.",
+            DisplayOrder = c.DisplayOrder,
+            FollowUpsEnabled = true,
+            MaxFollowUps = 2,
+        }).ToList();
     }
 
     public static CandidateJobResource ToJobResource(Job job)

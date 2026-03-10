@@ -43,14 +43,14 @@ public class InterviewRequestController : ControllerBase
     }
 
     /// <summary>
-    /// Lists available interview guides from Orchestrator
+    /// Lists available interview templates from Orchestrator
     /// </summary>
-    [HttpGet("interview-guides")]
-    [ProducesResponseType(typeof(IReadOnlyList<InterviewGuideResource>), 200)]
-    public async Task<ActionResult<IReadOnlyList<InterviewGuideResource>>> ListInterviewGuides()
+    [HttpGet("interview-templates")]
+    [ProducesResponseType(typeof(IReadOnlyList<InterviewTemplateResource>), 200)]
+    public async Task<ActionResult<IReadOnlyList<InterviewTemplateResource>>> ListInterviewTemplates()
     {
-        var guides = await _domainFacade.GetInterviewGuides();
-        return Ok(InterviewRequestMapper.ToInterviewGuideResource(guides));
+        var templates = await _domainFacade.GetInterviewTemplates();
+        return Ok(InterviewRequestMapper.ToInterviewTemplateResource(templates));
     }
 
     /// <summary>
@@ -62,17 +62,12 @@ public class InterviewRequestController : ControllerBase
     [ProducesResponseType(404)]
     public async Task<ActionResult<InterviewRequestResource>> SendInterview(Guid applicantId, [FromBody] SendInterviewRequestResource resource)
     {
-        if (resource.AgentId == Guid.Empty)
+        if (resource.InterviewTemplateId == Guid.Empty)
         {
-            return BadRequest("AgentId is required");
+            return BadRequest("InterviewTemplateId is required");
         }
 
-        if (resource.InterviewGuideId == Guid.Empty)
-        {
-            return BadRequest("InterviewGuideId is required");
-        }
-
-        var request = await _domainFacade.SendInterviewRequest(applicantId, resource.AgentId, resource.InterviewGuideId);
+        var request = await _domainFacade.SendInterviewRequest(applicantId, resource.InterviewTemplateId, resource.AgentId);
         return Created($"/api/v1/interview-requests/{request.Id}", InterviewRequestMapper.ToResource(request));
     }
 

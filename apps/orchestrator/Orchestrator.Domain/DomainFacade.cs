@@ -30,8 +30,8 @@ public sealed partial class DomainFacade : IDisposable
     private InterviewManager InterviewManager => _interviewManager ??= new InterviewManager(_serviceLocator);
     private InterviewConfigurationManager? _interviewConfigurationManager;
     private InterviewConfigurationManager InterviewConfigurationManager => _interviewConfigurationManager ??= new InterviewConfigurationManager(_serviceLocator);
-    private InterviewGuideManager? _interviewGuideManager;
-    private InterviewGuideManager InterviewGuideManager => _interviewGuideManager ??= new InterviewGuideManager(_serviceLocator);
+    private InterviewTemplateManager? _interviewTemplateManager;
+    private InterviewTemplateManager InterviewTemplateManager => _interviewTemplateManager ??= new InterviewTemplateManager(_serviceLocator);
     private InterviewInviteManager? _interviewInviteManager;
     private InterviewInviteManager InterviewInviteManager => _interviewInviteManager ??= new InterviewInviteManager(_serviceLocator);
     private CandidateSessionManager? _candidateSessionManager;
@@ -73,12 +73,18 @@ public sealed partial class DomainFacade : IDisposable
             _jobManager?.Dispose();
             _interviewManager?.Dispose();
             _interviewConfigurationManager?.Dispose();
-            _interviewGuideManager?.Dispose();
+            _interviewTemplateManager?.Dispose();
             _interviewInviteManager?.Dispose();
             _candidateSessionManager?.Dispose();
             _webhookManager?.Dispose();
             _conversationManager?.Dispose();
             _voiceManager?.Dispose();
+            _phoneCallManager?.Dispose();
+            _questionPackageLibraryManager?.Dispose();
+            _questionPackageAIManager?.Dispose();
+            _interviewRuntimeManager?.Dispose();
+            _interviewConversationManager?.Dispose();
+            _responseClassifier?.Dispose();
             _disposed = true;
         }
     }

@@ -56,6 +56,9 @@ public static class TestDataCleanup
             const string testInterviewIds =
                 "SELECT id FROM interviews WHERE job_id IN (" + testJobIds + ")";
 
+            const string testInterviewTemplateIds =
+                "SELECT id FROM interview_templates WHERE group_id IN (" + testGroupIds + ")";
+
             const string testInterviewGuideIds =
                 "SELECT id FROM interview_guides WHERE group_id IN (" + testGroupIds + ")";
 
@@ -100,9 +103,17 @@ public static class TestDataCleanup
             TryExecute(connection,
                 "DELETE FROM interview_results WHERE interview_id IN (" + testInterviewIds + ")");
 
+            // 4b. Competency responses → interviews
+            TryExecute(connection,
+                "DELETE FROM competency_responses WHERE interview_id IN (" + testInterviewIds + ")");
+
             // 5. Interviews → jobs, applicants, agents
             TryExecute(connection,
                 "DELETE FROM interviews WHERE job_id IN (" + testJobIds + ")");
+
+            // 5b. Interview templates → groups, agents, role_templates
+            TryExecute(connection,
+                "DELETE FROM interview_templates WHERE group_id IN (" + testGroupIds + ")");
 
             // 6. Interview configurations → groups, agents, interview_guides
             TryExecute(connection,
@@ -131,6 +142,14 @@ public static class TestDataCleanup
             // 11. Agents → groups
             TryExecute(connection,
                 "DELETE FROM agents WHERE group_id IN (" + testGroupIds + ")");
+
+            // 11b. Question Package Library custom test data (group-scoped)
+            const string testRoleTemplateIds =
+                "SELECT id FROM role_templates WHERE group_id IN (" + testGroupIds + ")";
+            TryExecute(connection,
+                "DELETE FROM competencies WHERE role_template_id IN (" + testRoleTemplateIds + ")");
+            TryExecute(connection,
+                "DELETE FROM role_templates WHERE group_id IN (" + testGroupIds + ")");
 
             // 12. Groups (root — Orchestrator test groups + ATS-synced test groups)
             TryExecute(connection,

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260310120002-add-display-score-and-recommendation-tier" author="system">
+        <addColumn tableName="interview_results" schemaName="public">
+            <column name="overall_score_display" type="integer">
+                <constraints nullable="true"/>
+            </column>
+            <column name="recommendation_tier" type="varchar(50)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+
+        <!-- Backfill overall_score_display from existing score (which stores weighted_avg * 100) -->
+        <sql>
+            UPDATE interview_results
+            SET overall_score_display = ROUND((score::decimal / 500.0) * 100)
+            WHERE score IS NOT NULL AND overall_score_display IS NULL;
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

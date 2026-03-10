@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="20260302120004-create-question-packages-table" author="system">
+        <createTable tableName="question_packages">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="competency_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_question_packages_competency" references="competencies(id)"/>
+            </column>
+            <column name="package_key" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="label" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_default" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <column name="best_for" type="jsonb">
+                <constraints nullable="true"/>
+            </column>
+            <column name="primary_question_text" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="primary_question_design_note" type="text">
+                <constraints nullable="true"/>
+            </column>
+            <!-- Audit fields -->
+            <column name="created_at" type="timestamp" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="created_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="updated_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_deleted" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="timestamp">
+                <constraints nullable="true"/>
+            </column>
+            <column name="deleted_by" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="question_packages" indexName="idx_question_packages_competency_id">
+            <column name="competency_id"/>
+        </createIndex>
+
+        <createIndex tableName="question_packages" indexName="idx_question_packages_is_deleted">
+            <column name="is_deleted"/>
+        </createIndex>
+
+        <addUniqueConstraint tableName="question_packages"
+            columnNames="competency_id, package_key"
+            constraintName="uk_question_packages_competency_key"/>
+    </changeSet>
+
+</databaseChangeLog>

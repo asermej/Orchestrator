@@ -23,6 +23,9 @@ public class Interview : Entity
     [Column("interview_guide_id")]
     public Guid? InterviewGuideId { get; set; }
 
+    [Column("interview_template_id")]
+    public Guid? InterviewTemplateId { get; set; }
+
     [Column("token")]
     public string Token { get; set; } = string.Empty;
 

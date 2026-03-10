@@ -1,9 +1,12 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   InterviewExperience,
   InterviewQuestion,
+  CompetencyData,
+  CompetencyCompleteResult,
+  ClassifyAndEvaluateResult,
 } from "@/components/interview-experience";
 
 interface CandidateInterview {
@@ -38,6 +41,25 @@ interface CandidateQuestionResponse {
   maxFollowUps: number;
 }
 
+interface RuntimeContextResponse {
+  interviewId: string;
+  agentName: string;
+  applicantName: string;
+  jobTitle: string;
+  roleName: string;
+  industry: string;
+  openingText: string;
+  closingText: string;
+  competencies: {
+    competencyId: string;
+    name: string;
+    description?: string;
+    scoringWeight: number;
+    displayOrder: number;
+    primaryQuestion: string;
+  }[];
+}
+
 interface CandidateInterviewClientProps {
   interview: CandidateInterview;
   agent?: CandidateAgent;
@@ -45,13 +67,10 @@ interface CandidateInterviewClientProps {
   applicant?: CandidateApplicant;
   questions?: CandidateQuestionResponse[];
   token: string;
+  openingTemplate?: string | null;
+  closingTemplate?: string | null;
 }
 
-/**
- * Client component for the candidate interview experience.
- * Uses the candidate session JWT (passed as prop for initial render,
- * then relies on httpOnly cookie for subsequent API calls via Next.js API routes).
- */
 export function CandidateInterviewClient({
   interview,
   agent,
@@ -59,10 +78,14 @@ export function CandidateInterviewClient({
   applicant,
   questions: apiQuestions,
   token,
+  openingTemplate,
+  closingTemplate,
 }: CandidateInterviewClientProps) {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
-  // Map API questions to the InterviewQuestion format used by the experience component
+  const [runtimeContext, setRuntimeContext] = useState<RuntimeContextResponse | null>(null);
+  const [isLoadingRuntime, setIsLoadingRuntime] = useState(true);
+
   const questions: InterviewQuestion[] = (apiQuestions || [])
     .sort((a, b) => a.displayOrder - b.displayOrder)
     .map((q) => ({
@@ -71,10 +94,8 @@ export function CandidateInterviewClient({
       maxFollowUps: q.followUpsEnabled ? q.maxFollowUps : 0,
     }));
 
-  // Set session cookie and warmup audio cache on mount
   useEffect(() => {
     const init = async () => {
-      // Set the httpOnly session cookie via Route Handler
       try {
         await fetch("/api/candidate/set-session", {
           method: "POST",
@@ -85,36 +106,35 @@ export function CandidateInterviewClient({
         console.warn("Failed to set session cookie:", err);
       }
 
-      // Warmup audio cache
+      // Try to load runtime context for competency-based flow
       try {
         const response = await fetch(
-          `${apiUrl}/api/v1/candidate/interview/audio/warmup`,
+          `${apiUrl}/api/v1/interview/${interview.id}/runtime`,
           {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { Authorization: `Bearer ${token}` },
           }
         );
         if (response.ok) {
-          const result = await response.json();
-          console.log("Audio warmup complete:", result);
+          const ctx: RuntimeContextResponse = await response.json();
+          if (ctx.competencies && ctx.competencies.length > 0) {
+            setRuntimeContext(ctx);
+          }
         }
-      } catch (err) {
-        console.warn("Audio warmup failed:", err);
+      } catch {
+        // No runtime context — fall back to question mode
       }
+
+      setIsLoadingRuntime(false);
     };
 
     init();
-  }, [apiUrl, token]);
+  }, [apiUrl, token, interview.id]);
 
   const handleBegin = useCallback(async () => {
     try {
       await fetch(`${apiUrl}/api/v1/candidate/interview/start`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
     } catch (err) {
       console.error("Failed to start interview:", err);
@@ -130,9 +150,7 @@ export function CandidateInterviewClient({
         `${apiUrl}/api/v1/candidate/interview/audio/upload`,
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
           body: formData,
         }
       );
@@ -186,18 +204,114 @@ export function CandidateInterviewClient({
     [apiUrl, token]
   );
 
-  const handleComplete = useCallback(async () => {
-    try {
-      await fetch(`${apiUrl}/api/v1/candidate/interview/complete`, {
+  // ───── Competency Mode Callbacks ─────
+
+  const handleGenerateQuestion = useCallback(async (competencyId: string, includeTransition?: boolean, previousCompetencyName?: string): Promise<string> => {
+    const response = await fetch(
+      `${apiUrl}/api/v1/interview/${interview.id}/runtime/generate-question`,
+      {
         method: "POST",
         headers: {
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify({ competencyId, includeTransition: includeTransition || false, previousCompetencyName }),
+      }
+    );
+    if (!response.ok) throw new Error("Failed to generate question");
+    const data = await response.json();
+    return data.question;
+  }, [apiUrl, token, interview.id]);
+
+  const handleCompleteCompetency = useCallback(async (
+    competencyId: string,
+    primaryQuestion: string,
+    candidateResponse: string,
+    followUpExchanges?: { question: string; response: string }[],
+    evaluation?: { competencyScore: number; rationale: string }
+  ): Promise<CompetencyCompleteResult> => {
+    const response = await fetch(
+      `${apiUrl}/api/v1/interview/${interview.id}/runtime/competency`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          competencyId,
+          primaryQuestion,
+          candidateResponse,
+          followUpExchanges,
+          competencyScore: evaluation?.competencyScore,
+          rationale: evaluation?.rationale,
+        }),
+      }
+    );
+    if (!response.ok) throw new Error("Failed to complete competency");
+    return response.json();
+  }, [apiUrl, token, interview.id]);
+
+  const handleClassifyAndEvaluate = useCallback(async (
+    competencyId: string,
+    candidateResponse: string,
+    currentQuestion: string,
+    competencyTranscript: string,
+    previousFollowUpTarget?: string
+  ): Promise<ClassifyAndEvaluateResult> => {
+    const response = await fetch(
+      `${apiUrl}/api/v1/interview/${interview.id}/runtime/classify-and-evaluate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ competencyId, candidateResponse, currentQuestion, competencyTranscript, previousFollowUpTarget }),
+      }
+    );
+    if (!response.ok) throw new Error("Failed to classify and evaluate response");
+    return response.json();
+  }, [apiUrl, token, interview.id]);
+
+  const handleSkipCompetency = useCallback(async (
+    competencyId: string,
+    primaryQuestion: string,
+    skipReason: string
+  ): Promise<void> => {
+    const response = await fetch(
+      `${apiUrl}/api/v1/interview/${interview.id}/runtime/skip-competency`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ competencyId, primaryQuestion, skipReason }),
+      }
+    );
+    if (!response.ok) throw new Error("Failed to skip competency");
+  }, [apiUrl, token, interview.id]);
+
+  const handleComplete = useCallback(async () => {
+    try {
+      if (runtimeContext) {
+        await fetch(
+          `${apiUrl}/api/v1/interview/${interview.id}/runtime/finalize`,
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+      }
+      await fetch(`${apiUrl}/api/v1/candidate/interview/complete`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
       });
     } catch (err) {
       console.error("Failed to complete interview:", err);
     }
-  }, [apiUrl, token]);
+  }, [apiUrl, token, interview.id, runtimeContext]);
 
   if (interview.status === "completed") {
     return (
@@ -215,6 +329,51 @@ export function CandidateInterviewClient({
     );
   }
 
+  if (isLoadingRuntime) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-white/60 text-sm">Loading interview...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Competency mode: use runtime context
+  if (runtimeContext && runtimeContext.competencies.length > 0) {
+    const competencies: CompetencyData[] = runtimeContext.competencies.map(c => ({
+      competencyId: c.competencyId,
+      name: c.name,
+      description: c.description,
+      scoringWeight: c.scoringWeight,
+      displayOrder: c.displayOrder,
+      primaryQuestion: c.primaryQuestion,
+    }));
+
+    return (
+      <InterviewExperience
+        competencies={competencies}
+        interviewId={interview.id}
+        agentId={agent?.id}
+        agentName={runtimeContext.agentName || agent?.displayName || "AI Interviewer"}
+        agentImageUrl={agent?.profileImageUrl}
+        applicantName={runtimeContext.applicantName || applicant?.firstName || "there"}
+        jobTitle={runtimeContext.jobTitle || job?.title}
+        openingTemplate={runtimeContext.openingText || openingTemplate}
+        closingTemplate={runtimeContext.closingText || closingTemplate}
+        onBegin={handleBegin}
+        onUploadAudio={handleUploadAudio}
+        onGenerateQuestion={handleGenerateQuestion}
+        onCompleteCompetency={handleCompleteCompetency}
+        onClassifyAndEvaluate={handleClassifyAndEvaluate}
+        onSkipCompetency={handleSkipCompetency}
+        onComplete={handleComplete}
+      />
+    );
+  }
+
+  // Question mode: legacy flow
   return (
     <InterviewExperience
       questions={questions}
@@ -223,6 +382,8 @@ export function CandidateInterviewClient({
       agentImageUrl={agent?.profileImageUrl}
       applicantName={applicant?.firstName || "there"}
       jobTitle={job?.title}
+      openingTemplate={openingTemplate}
+      closingTemplate={closingTemplate}
       onBegin={handleBegin}
       onSaveResponse={handleSaveResponse}
       onUploadAudio={handleUploadAudio}

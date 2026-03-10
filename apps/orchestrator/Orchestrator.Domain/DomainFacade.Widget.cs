@@ -52,7 +52,7 @@ public sealed partial class DomainFacade
             historySnapshot = history.TakeLast(20).ToList();
         }
 
-        var response = await GatewayFacade.GenerateChatCompletion(systemPrompt, historySnapshot).ConfigureAwait(false);
+        var response = await GatewayFacade.GenerateAnthropicCompletion(systemPrompt, historySnapshot).ConfigureAwait(false);
 
         // Add AI response to history
         lock (history)

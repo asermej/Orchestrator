@@ -47,6 +47,21 @@ internal static class AgentValidator
             }
         }
 
+        if (!AgentTone.IsValid(agent.Tone))
+        {
+            errors.Add($"Tone must be one of: {string.Join(", ", AgentTone.AllValues)}.");
+        }
+
+        if (!AgentPace.IsValid(agent.Pace))
+        {
+            errors.Add($"Pace must be one of: {string.Join(", ", AgentPace.AllValues)}.");
+        }
+
+        if (!AgentAcknowledgmentStyle.IsValid(agent.AcknowledgmentStyle))
+        {
+            errors.Add($"AcknowledgmentStyle must be one of: {string.Join(", ", AgentAcknowledgmentStyle.AllValues)}.");
+        }
+
         if (errors.Any())
         {
             throw new AgentValidationException(string.Join("; ", errors));

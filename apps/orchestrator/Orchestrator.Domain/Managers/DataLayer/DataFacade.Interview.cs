@@ -5,6 +5,8 @@ internal sealed partial class DataFacade
     private InterviewDataManager InterviewDataManager => new(_dbConnectionString);
     private InterviewResponseDataManager InterviewResponseDataManager => new(_dbConnectionString);
     private InterviewResultDataManager InterviewResultDataManager => new(_dbConnectionString);
+    private CompetencyResponseDataManager CompetencyResponseDataManager => new(_dbConnectionString);
+    private RecommendationThresholdDataManager RecommendationThresholdDataManager => new(_dbConnectionString);
 
     // Interview
     public Task<Interview> AddInterview(Interview interview)
@@ -77,5 +79,27 @@ internal sealed partial class DataFacade
     public Task<InterviewResult> UpdateInterviewResult(InterviewResult result)
     {
         return InterviewResultDataManager.Update(result);
+    }
+
+    // Competency responses (per-competency holistic scores)
+    public Task<List<CompetencyResponse>> GetCompetencyResponsesByInterviewId(Guid interviewId)
+    {
+        return CompetencyResponseDataManager.GetByInterviewId(interviewId);
+    }
+
+    public Task<CompetencyResponse> UpsertCompetencyResponse(CompetencyResponse response)
+    {
+        return CompetencyResponseDataManager.Upsert(response);
+    }
+
+    // Recommendation Thresholds
+    public Task<RecommendationThresholdDefaults> GetRecommendationThresholds()
+    {
+        return RecommendationThresholdDataManager.Get();
+    }
+
+    public Task<RecommendationThresholdDefaults> UpdateRecommendationThresholds(RecommendationThresholdDefaults thresholds)
+    {
+        return RecommendationThresholdDataManager.Update(thresholds);
     }
 }

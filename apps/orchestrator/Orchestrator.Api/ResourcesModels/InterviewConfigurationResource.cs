@@ -56,11 +56,6 @@ public class InterviewConfigurationResource
     public int QuestionCount { get; set; }
 
     /// <summary>
-    /// The interview guide resource (populated when requested)
-    /// </summary>
-    public InterviewGuideResource? InterviewGuide { get; set; }
-
-    /// <summary>
     /// The agent resource (populated when requested)
     /// </summary>
     public AgentResource? Agent { get; set; }
