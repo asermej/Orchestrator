@@ -8,9 +8,13 @@ internal sealed class AnthropicMessagesRequest
     [JsonPropertyName("model")]
     public string Model { get; set; } = string.Empty;
 
+    /// <summary>
+    /// System prompt — accepts either a plain string or a List&lt;AnthropicSystemBlock&gt;
+    /// for prompt caching. JsonSerializer handles both correctly at runtime.
+    /// </summary>
     [JsonPropertyName("system")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? System { get; set; }
+    public object? System { get; set; }
 
     [JsonPropertyName("messages")]
     public List<AnthropicMessage> Messages { get; set; } = new List<AnthropicMessage>();
@@ -34,4 +38,23 @@ internal sealed class AnthropicMessage
 
     [JsonPropertyName("content")]
     public string Content { get; set; } = string.Empty;
+}
+
+internal sealed class AnthropicSystemBlock
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "text";
+
+    [JsonPropertyName("text")]
+    public string Text { get; set; } = string.Empty;
+
+    [JsonPropertyName("cache_control")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AnthropicCacheControl? CacheControl { get; set; }
+}
+
+internal sealed class AnthropicCacheControl
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "ephemeral";
 }

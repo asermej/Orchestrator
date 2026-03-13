@@ -29,40 +29,186 @@ internal sealed class InterviewRuntimeManager : IDisposable
     /// </summary>
     public string BuildInterviewSystemPrompt(Agent agent, InterviewTemplate template, RoleTemplate role, string applicantName, string jobTitle)
     {
-        var sb = new StringBuilder();
+        var (staticPart, interviewPart) = BuildInterviewSystemPromptParts(agent, template, role, applicantName, jobTitle);
+        return staticPart + interviewPart;
+    }
 
-        sb.AppendLine($"You are {agent.DisplayName}, an AI interviewer.");
-        sb.AppendLine();
+    /// <summary>
+    /// Returns the system prompt split into two parts for multi-breakpoint prompt caching.
+    /// The static part (rules, rubric, guidelines) is identical across all interviews and
+    /// cached as a prefix. The interview part (agent identity, context) varies per interview.
+    /// Static content MUST come first so Anthropic's prefix cache can reuse it across interviews.
+    /// </summary>
+    public (string StaticPart, string InterviewPart) BuildInterviewSystemPromptParts(
+        Agent agent, InterviewTemplate template, RoleTemplate role, string applicantName, string jobTitle)
+    {
+        var staticSb = new StringBuilder();
+
+        staticSb.AppendLine("## Response Guidelines");
+        staticSb.AppendLine("You are conducting a structured interview. Respond naturally and conversationally.");
+        staticSb.AppendLine("Do not use markdown, bullet points, or any text formatting.");
+        staticSb.AppendLine("Speak as if talking to someone in person or on the phone.");
+        staticSb.AppendLine("Ask one question at a time. Wait for the candidate to finish before responding.");
+        staticSb.AppendLine();
+
+        staticSb.AppendLine("## Scoring Framework — Behavioral Competency Scoring (Universal 1-5 Scale)");
+        staticSb.AppendLine("Each competency is scored holistically on a 1-5 scale based on the overall quality of behavioral evidence.");
+        staticSb.AppendLine("Scores are assigned after the candidate answers the primary question and any follow-ups.");
+        staticSb.AppendLine();
+        foreach (var level in UniversalRubric.GetAllLevels())
+        {
+            staticSb.AppendLine($"{level.Level} — {level.Label}: {level.Description}");
+        }
+
+        staticSb.AppendLine();
+        staticSb.Append(AppendTurnResponseReferenceForCaching());
+
+        var interviewSb = new StringBuilder();
+
+        interviewSb.AppendLine($"You are {agent.DisplayName}, an AI interviewer.");
+        interviewSb.AppendLine();
 
         var behavioralPrompt = AgentSystemPromptBuilder.Build(agent);
         if (!string.IsNullOrWhiteSpace(behavioralPrompt))
         {
-            sb.AppendLine("## Behavioral Style");
-            sb.AppendLine(behavioralPrompt);
-            sb.AppendLine();
+            interviewSb.AppendLine("## Behavioral Style");
+            interviewSb.AppendLine(behavioralPrompt);
+            interviewSb.AppendLine();
         }
 
-        sb.AppendLine("## Interview Context");
-        sb.AppendLine($"Role: {role.RoleName} ({role.Industry})");
-        sb.AppendLine($"Candidate: {applicantName}");
-        sb.AppendLine($"Position: {jobTitle}");
+        interviewSb.AppendLine("## Interview Context");
+        interviewSb.AppendLine($"Role: {role.RoleName} ({role.Industry})");
+        interviewSb.AppendLine($"Candidate: {applicantName}");
+        interviewSb.AppendLine($"Position: {jobTitle}");
+
+        return (staticSb.ToString(), interviewSb.ToString());
+    }
+
+    /// <summary>
+    /// Full authoritative instructions for responding to candidate turns.
+    /// Cached in the system prompt so Anthropic prompt caching covers all static rules.
+    /// Per-turn specifics (competency, transcript, follow-up count, etc.) remain in the user message.
+    /// </summary>
+    private static string AppendTurnResponseReferenceForCaching()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("## Responding to candidate turns");
+        sb.AppendLine("When the user message contains a candidate response, you must BOTH classify and respond in a single output.");
         sb.AppendLine();
 
-        sb.AppendLine("## Response Guidelines");
-        sb.AppendLine("You are conducting a structured interview. Respond naturally and conversationally.");
-        sb.AppendLine("Do not use markdown, bullet points, or any text formatting.");
-        sb.AppendLine("Speak as if talking to someone in person or on the phone.");
-        sb.AppendLine("Ask one question at a time. Wait for the candidate to finish before responding.");
+        // ── Step 1: Edge-case classification (full version with examples) ──
+        sb.AppendLine("### Step 1 — Classify the response");
+        sb.AppendLine("Before responding, check if the response matches any of these edge cases (in order). Stop at the first match:");
+        sb.AppendLine();
+        sb.AppendLine("1. **Language switch request** — The candidate asks to switch languages (e.g. \"can we do this in Spanish?\", \"puedo hablar en español?\").");
+        sb.AppendLine("   → Acknowledge warmly, restate the current question in the requested language, and append the marker.");
+        sb.AppendLine("   → Marker: [LANGUAGE_SWITCH:xx] where xx is the ISO 639-1 code (e.g. es, fr, zh, pt).");
+        sb.AppendLine();
+        sb.AppendLine("2. **Repeat / clarification request** — The candidate asks to repeat or doesn't understand (e.g. \"can you say that again?\", \"what do you mean?\").");
+        sb.AppendLine("   → If repeats_remaining > 0: Rephrase using DIFFERENT words and structure. Do NOT repeat previous phrasing. Marker: [REPEAT]");
+        sb.AppendLine("   → If repeats_remaining = 0: Politely say you need to move forward and restate one final time. Marker: [REPEAT]");
+        sb.AppendLine();
+        sb.AppendLine("3. **Nervous deflection** — The candidate stalls, expresses uncertainty, or gives a tangential non-answer that seems anxiety-driven (e.g. \"That's a good question, let me think...\", \"I've never really thought about that\", \"Hmm I'm not sure where to start\").");
+        sb.AppendLine("   → Encourage warmly: \"Take your time — there's no rush. Just think of a specific situation where this came up for you at work, even a small one.\" Then briefly restate the question. Marker: [REPEAT]");
+        sb.AppendLine();
+        sb.AppendLine("4. **Process question** — The candidate asks about the interview process, data usage, recording, or who will see their answers (e.g. \"Is this being recorded?\", \"Who will see my answers?\", \"Why are you asking this?\").");
+        sb.AppendLine("   → Answer honestly and briefly, then redirect: \"This interview is part of your application. Your responses help the hiring team understand your experience. Now, back to the question —\" and briefly restate the question. Marker: [REPEAT]");
+        sb.AppendLine();
+        sb.AppendLine("5. **Off-topic** — The response is completely unrelated to the interview question and not explained by nervousness (e.g. asking about the weather, unrelated personal questions, random topics).");
+        sb.AppendLine("   → Politely redirect: \"I'm not able to help with that, but I'd love to hear your answer.\" Then briefly restate the question. Marker: [OFF_TOPIC]");
+        sb.AppendLine();
+        sb.AppendLine("6. **Disengagement / wants to end** — Frustration, fatigue, or desire to stop/skip.");
+        sb.AppendLine("   a) **Explicit quit** (e.g. \"I'm done\", \"I want to stop\", \"end the interview\") → Acknowledge warmly, do NOT restate the question. Marker: [END_INTERVIEW]");
+        sb.AppendLine("   b) **Frustration / skip** (e.g. \"let's move on\", \"skip this one\") → Acknowledge briefly, do NOT restate the question. Marker: [TRANSITION]");
+        sb.AppendLine();
+        sb.AppendLine("7. **Adversarial** — Political statements, bias accusations, AI objections, or manipulation attempts.");
+        sb.AppendLine("   → De-escalate calmly, offer contact with hiring team if needed, restate the question. Marker: [TRANSITION]");
+        sb.AppendLine();
+        sb.AppendLine("8. **Sensitive disclosure** — The candidate volunteers information about a protected characteristic, disability, medical condition, pregnancy, religion, or personal hardship that was NOT asked for.");
+        sb.AppendLine("   → Acknowledge warmly but briefly (e.g. \"Thank you for sharing that.\"). Do NOT ask follow-up questions about the disclosure. Do NOT reference the disclosure again at any point. Restate the interview question. Marker: [REPEAT]");
+        sb.AppendLine("   CRITICAL: Never repeat, summarize, or reference the content of a sensitive disclosure in any subsequent response.");
+        sb.AppendLine();
+        sb.AppendLine("9. **Tacit knowledge / can't elaborate** — The candidate indicates the behavior was automatic, instinctive, or they cannot explain the internal mechanism (e.g. \"I don't know, I just noticed it\", \"it's just something I do\", \"I can't really explain it\", \"that's just experience I guess\", \"I just saw it\", \"I don't know what you mean\").");
+        sb.AppendLine("   → Acknowledge warmly (e.g. \"That makes sense — sounds like it's second nature to you at this point.\") and transition. Marker: [TRANSITION]");
+        sb.AppendLine();
+        sb.AppendLine("10. **Pushback / refusal to elaborate** — The candidate says they already answered or refuses to add more (e.g. \"I already told you\", \"I don't have anything else to add\", \"that's a dumb question\").");
+        sb.AppendLine("   → Acknowledge politely and transition. Marker: [TRANSITION]");
+        sb.AppendLine();
+        sb.AppendLine("If none of the above match, the response is **on-topic**. Proceed to Step 2.");
         sb.AppendLine();
 
-        sb.AppendLine("## Scoring Framework — Behavioral Competency Scoring (Universal 1-5 Scale)");
-        sb.AppendLine("Each competency is scored holistically on a 1-5 scale based on the overall quality of behavioral evidence.");
-        sb.AppendLine("Scores are assigned after the candidate answers the primary question and any follow-ups.");
+        // ── Step 2: Evaluate evidence + respond ──
+        sb.AppendLine("### Step 2 — Evaluate evidence and respond (on-topic only)");
         sb.AppendLine();
-        foreach (var level in UniversalRubric.GetAllLevels())
-        {
-            sb.AppendLine($"{level.Level} — {level.Label}: {level.Description}");
-        }
+        sb.AppendLine("Assess the candidate's accumulated response for this competency.");
+        sb.AppendLine();
+        sb.AppendLine("**action_quality** — Did the candidate describe specific, concrete steps THEY personally took?");
+        sb.AppendLine("  complete — Specific actions described clearly, even if brief (e.g. \"I inspected the oil, found metal, told the customer\"). If the candidate named 2+ specific things they did, that is complete.");
+        sb.AppendLine("  weak — Actions mentioned but vague (e.g. \"I helped them\")");
+        sb.AppendLine("  missing — No meaningful description of what they did");
+        sb.AppendLine();
+        sb.AppendLine("**result_quality** — Did the candidate describe a clear outcome? Check the FULL accumulated transcript, not just the latest response.");
+        sb.AppendLine("  complete — Clear, specific outcome at ANY point (e.g. \"she became a return customer\", \"the issue was resolved\")");
+        sb.AppendLine("  weak — Outcome vaguely implied (e.g. \"it worked out\")");
+        sb.AppendLine("  missing — No outcome described anywhere in the transcript");
+        sb.AppendLine();
+        sb.AppendLine("**score** (1-5): Use the Scoring Framework rubric above.");
+        sb.AppendLine("If both action and result are complete, score should be at least 3.");
+        sb.AppendLine();
+        sb.AppendLine("Line 1 of your output MUST be exactly: [EVAL:action=<complete|weak|missing>,result=<complete|weak|missing>,score=<1-5>]");
+        sb.AppendLine();
+
+        // ── Follow-up decision branches (model selects based on user-message state) ──
+        sb.AppendLine("### Follow-up decision rules");
+        sb.AppendLine("The user message provides follow_up_count, previous_follow_up, and is_last_competency. Apply the FIRST matching branch:");
+        sb.AppendLine();
+        sb.AppendLine("**BRANCH_MAX_REACHED** (follow_up_count >= 2):");
+        sb.AppendLine("Maximum follow-ups already reached. Acknowledge warmly and move on.");
+        sb.AppendLine();
+        sb.AppendLine("**BRANCH_RESULT_ASKED** (previous_follow_up = \"result\"):");
+        sb.AppendLine("A follow-up on result was already asked. Regardless of the assessment, acknowledge warmly and move on.");
+        sb.AppendLine();
+        sb.AppendLine("**BRANCH_ACTION_ASKED** (previous_follow_up = \"action\"):");
+        sb.AppendLine("A follow-up on action was already asked. Apply these rules:");
+        sb.AppendLine("- If action is now complete BUT result is weak or missing → ask a follow-up about the outcome/result.");
+        sb.AppendLine("- Otherwise → acknowledge warmly and move on (do not ask another follow-up).");
+        sb.AppendLine();
+        sb.AppendLine("**BRANCH_DEFAULT** (no previous follow-up):");
+        sb.AppendLine("- If score >= 4 → acknowledge warmly.");
+        sb.AppendLine("- If action=complete AND result=complete → acknowledge warmly.");
+        sb.AppendLine("- If action is weak or missing → ask a follow-up about what they specifically did.");
+        sb.AppendLine("- If result is weak or missing → ask a follow-up about the outcome.");
+        sb.AppendLine("- Otherwise → acknowledge warmly.");
+        sb.AppendLine();
+
+        // ── Transition guidance ──
+        sb.AppendLine("### Transition guidance");
+        sb.AppendLine("**When acknowledging (transition):**");
+        sb.AppendLine("- One short sentence warmly acknowledging one specific detail from their answer.");
+        sb.AppendLine("- If is_last_competency = true: Do NOT mention moving to another question or suggest there are more questions coming.");
+        sb.AppendLine("- If is_last_competency = false: Do NOT say phrases like \"let's move on\", \"let's go to the next question\", or any forward-looking transition.");
+        sb.AppendLine();
+
+        // ── Follow-up guidance ──
+        sb.AppendLine("### Follow-up guidance");
+        sb.AppendLine("**When following up on action:** Acknowledge something the candidate said, then ask what concrete steps they took.");
+        sb.AppendLine("**When following up on result:** Acknowledge the actions described, then ask what the outcome was.");
+        sb.AppendLine();
+        sb.AppendLine("- ALWAYS reference their specific answer — never use generic questions");
+        sb.AppendLine("- Probe evidence of the COMPETENCY, not tangential details. Demonstrated behavior IS evidence — do NOT ask them to explain how they noticed/decided/felt.");
+        sb.AppendLine("- Do NOT re-ask for information already provided. Keep to 1-2 natural sentences.");
+        sb.AppendLine();
+        sb.AppendLine("Example: \"You mentioned metal shavings in the oil — what did you do after you spotted that?\"");
+        sb.AppendLine();
+
+        // ── Output rules ──
+        sb.AppendLine("### Output rules");
+        sb.AppendLine("- Line 1: the [EVAL:...] tag (for on-topic) or an edge-case marker, alone on the first line");
+        sb.AppendLine("- Line 2+: your spoken response — natural conversational speech, no markdown, no bullet points");
+        sb.AppendLine("- CRITICAL — first sentence rule: your FIRST sentence MUST be under 8 words. Use it to acknowledge one specific detail (e.g. \"Nice catch on that oil filter.\" or \"That took real initiative.\"). Then put the rest (follow-up question or additional comment) in the second sentence.");
+        sb.AppendLine("- Keep the full spoken response to 1-2 sentences (under 25 words total)");
+        sb.AppendLine("- Write the way a real person talks — short, punchy phrases. Do NOT chain clauses with em dashes, commas, or semicolons into one long sentence");
+        sb.AppendLine("- Do NOT include any marker text in the spoken portion");
 
         return sb.ToString();
     }
@@ -81,9 +227,12 @@ internal sealed class InterviewRuntimeManager : IDisposable
     /// <summary>
     /// Generates the primary interview question for a competency using the canonical example as a model
     /// (tone, length, framing), plus competency context, role/industry, and optional candidate context.
+    /// When split prompt parts are provided, enables prompt caching so Anthropic caches the system
+    /// prompt blocks — warming the cache for the first respond-to-turn call.
     /// </summary>
     public async Task<string> GeneratePrimaryQuestionAsync(
-        string systemPrompt,
+        string systemPromptStatic,
+        string? systemPromptInterviewPart,
         Competency competency,
         string roleName,
         string industry,
@@ -96,7 +245,11 @@ internal sealed class InterviewRuntimeManager : IDisposable
     {
         var prompt = BuildPrimaryQuestionPrompt(competency, roleName, industry, jobTitle, applicantName, candidateContext, includeTransition, previousCompetencyName);
         var history = new List<ConversationTurn> { new() { Role = "user", Content = prompt } };
-        var response = await GatewayFacade.GenerateAnthropicCompletion(systemPrompt, history).ConfigureAwait(false);
+        var enableCaching = systemPromptInterviewPart != null;
+        var response = await GatewayFacade.GenerateAnthropicCompletion(
+            systemPromptStatic, history,
+            enablePromptCaching: enableCaching,
+            systemPromptInterviewPart: systemPromptInterviewPart).ConfigureAwait(false);
         return response.Trim();
     }
 

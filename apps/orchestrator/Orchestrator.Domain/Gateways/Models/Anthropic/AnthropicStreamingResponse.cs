@@ -13,6 +13,15 @@ internal sealed class AnthropicStreamingEvent
 
     [JsonPropertyName("delta")]
     public AnthropicStreamingDelta? Delta { get; set; }
+
+    [JsonPropertyName("message")]
+    public AnthropicStreamingMessage? Message { get; set; }
+}
+
+internal sealed class AnthropicStreamingMessage
+{
+    [JsonPropertyName("usage")]
+    public AnthropicUsage? Usage { get; set; }
 }
 
 internal sealed class AnthropicStreamingDelta

@@ -37,6 +37,23 @@ public sealed partial class DomainFacade
     }
 
     /// <summary>
+    /// Returns the system prompt split into static + interview parts for prompt caching.
+    /// </summary>
+    public (string StaticPart, string InterviewPart) BuildInterviewSystemPromptParts(InterviewRuntimeContext context)
+    {
+        if (context.Agent == null)
+            throw new InvalidOperationException("Cannot build system prompt: no agent assigned to this interview template.");
+
+        return InterviewRuntimeManager.BuildInterviewSystemPromptParts(
+            context.Agent,
+            context.Template,
+            context.Role,
+            context.ApplicantName,
+            context.JobTitle
+        );
+    }
+
+    /// <summary>
     /// Resolves the opening template text with actual values.
     /// </summary>
     public string ResolveOpeningTemplate(InterviewRuntimeContext context)
@@ -90,9 +107,12 @@ public sealed partial class DomainFacade
 
     /// <summary>
     /// Generates the primary interview question for a competency from the canonical example and context.
+    /// When systemPromptInterviewPart is provided, enables Anthropic prompt caching to warm the
+    /// cache ahead of the first respond-to-turn call.
     /// </summary>
     public async Task<string> GeneratePrimaryQuestionAsync(
-        string systemPrompt,
+        string systemPromptStatic,
+        string? systemPromptInterviewPart,
         Competency competency,
         string roleName,
         string industry,
@@ -104,7 +124,8 @@ public sealed partial class DomainFacade
         CancellationToken cancellationToken = default)
     {
         return await InterviewRuntimeManager.GeneratePrimaryQuestionAsync(
-            systemPrompt, competency, roleName, industry, jobTitle, applicantName, candidateContext, includeTransition, previousCompetencyName, cancellationToken
+            systemPromptStatic, systemPromptInterviewPart, competency, roleName, industry,
+            jobTitle, applicantName, candidateContext, includeTransition, previousCompetencyName, cancellationToken
         ).ConfigureAwait(false);
     }
 

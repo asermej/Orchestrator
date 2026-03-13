@@ -167,6 +167,8 @@ export function InterviewExperience({
   const [transcript, setTranscript] = useState("");
   const [interimText, setInterimText] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
+  const isPlayingRef = useRef(false);
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
   const [currentSpokenText, setCurrentSpokenText] = useState<string | null>(null);
   const [processingMessage, setProcessingMessage] = useState<string>("Thinking...");
   const [isTextResponseMode, setIsTextResponseMode] = useState(false);
@@ -212,6 +214,8 @@ export function InterviewExperience({
 
   const stateMachine = useInterviewStateMachine();
   const { state } = stateMachine;
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
 
   const supportsMediaSource = typeof window !== "undefined" && "MediaSource" in window;
 
@@ -251,6 +255,8 @@ export function InterviewExperience({
 
   const stopPlaybackRef = useRef<(() => void) | null>(null);
 
+  const turnTimingRef = useRef<{ sttDoneAt: number } | null>(null);
+
   const handleDeepgramFinal = useCallback((text: string) => {
     if (silenceHandledRef.current) return;
     silenceHandledRef.current = true;
@@ -260,6 +266,9 @@ export function InterviewExperience({
       silenceHandledRef.current = false;
       return;
     }
+
+    turnTimingRef.current = { sttDoneAt: performance.now() };
+    console.log("[TIMING][FE] STT final received — processing starts");
 
     transcriptRef.current = message;
     setTranscript(message);
@@ -424,8 +433,8 @@ export function InterviewExperience({
   // below and always sees current state.
 
   const startListeningRef = useRef<(() => void) | null>(null);
-  const startNextCompetencyRef = useRef<((index: number) => Promise<void>) | null>(null);
-  const pregenFirstQuestionRef = useRef<((index: number) => void) | null>(null);
+  const startNextCompetencyRef = useRef<((index: number, skipTransition?: boolean) => Promise<void>) | null>(null);
+  const pregenFirstQuestionRef = useRef<((index: number, skipTransition?: boolean) => void) | null>(null);
   const currentCompetencyIndexRef = useRef(0);
   const onTTSPlaybackCompleteRef = useRef<(() => void) | null>(null);
 
@@ -451,14 +460,14 @@ export function InterviewExperience({
 
     const handleEnded = () => {
       if (streamingOwnsPlaybackRef.current) return;
-      if (state === InterviewState.AI_SPEAKING && isPlaying) {
+      if (stateRef.current === InterviewState.AI_SPEAKING && isPlayingRef.current) {
         onTTSPlaybackCompleteRef.current?.();
       }
     };
 
     audio.addEventListener("ended", handleEnded);
     return () => audio.removeEventListener("ended", handleEnded);
-  }, [state, stateMachine, isPlaying, isCompetencyMode]);
+  }, []);
 
   // ───── Reset state on new turn ─────
 
@@ -508,6 +517,7 @@ export function InterviewExperience({
 
   // LATENCY-CRITICAL: Calls the streaming respond-to-turn endpoint and plays audio
   // via MediaSource as chunks arrive. Returns metadata (response text, type, follow-up target).
+  // Spoken text is delivered as trailing JSON after audio (not in HTTP headers).
   // Waits for actual audio playback to finish (not just buffering) before resolving.
   const streamRespondToTurn = useCallback(async (
     turnPayload: {
@@ -527,27 +537,38 @@ export function InterviewExperience({
     },
     onMetadata?: (meta: { responseText: string; responseType: string; followUpTarget?: string; languageCode?: string }) => void,
   ): Promise<{ responseText: string; responseType: string; followUpTarget?: string; languageCode?: string }> => {
+    const fetchStart = performance.now();
+    const sttDoneAt = turnTimingRef.current?.sttDoneAt ?? fetchStart;
+
+    console.log(`[TIMING][FE] fetch start — ${Math.round(fetchStart - sttDoneAt)}ms after STT final`);
+
     const response = await fetch("/api/voice/respond-to-turn", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(turnPayload),
     });
 
+    const headersMs = Math.round(performance.now() - fetchStart);
+
     if (!response.ok) {
+      console.error(`[TIMING][FE] respond-to-turn failed: ${response.status} after ${headersMs}ms`);
       throw new Error(`respond-to-turn failed: ${response.status}`);
     }
 
-    const responseText = decodeURIComponent(response.headers.get("X-Response-Text") || "");
-    const responseType = response.headers.get("X-Response-Type") || "transition";
-    const followUpTarget = response.headers.get("X-Follow-Up-Target") || undefined;
-    const languageCode = response.headers.get("X-Language-Code") || undefined;
+    let responseType = response.headers.get("X-Response-Type") || "transition";
+    let followUpTarget: string | undefined = response.headers.get("X-Follow-Up-Target") || undefined;
+    let languageCode: string | undefined = response.headers.get("X-Language-Code") || undefined;
 
-    onMetadata?.({ responseText, responseType, followUpTarget, languageCode });
+    console.log(`[TIMING][FE] headers received: ${headersMs}ms | type=${responseType}`);
 
-    // Stream audio via MediaSource if body is available
+    if (responseType !== "pending") {
+      onMetadata?.({ responseText: "", responseType, followUpTarget, languageCode });
+    }
+
+    let parsedResponseText = "";
+
     if (response.body && supportsMediaSource && audioRef.current) {
       streamingOwnsPlaybackRef.current = true;
-      setCurrentSpokenText(responseText);
       setIsPlaying(true);
 
       const audio = audioRef.current;
@@ -556,15 +577,21 @@ export function InterviewExperience({
       audio.src = URL.createObjectURL(mediaSource);
 
       await new Promise<void>((resolve, reject) => {
-        const onPlaybackEnded = () => {
+        let resolved = false;
+        const safeResolve = () => {
+          if (resolved) return;
+          resolved = true;
           audio.removeEventListener("ended", onPlaybackEnded);
-          // Keep streamingOwnsPlaybackRef true so the useEffect "ended"
-          // handler (which may fire for the same event in a different
-          // listener-registration order after React re-renders) still
-          // sees the guard and returns early. Cleared after the await.
           setIsPlaying(false);
           setCurrentSpokenText(null);
           resolve();
+        };
+
+        const onPlaybackEnded = () => {
+          const totalMs = Math.round(performance.now() - fetchStart);
+          const e2eMs = Math.round(performance.now() - sttDoneAt);
+          console.log(`[TIMING][FE] playback ended — fetch=${totalMs}ms, e2e(STT→playback_end)=${e2eMs}ms`);
+          safeResolve();
         };
         audio.addEventListener("ended", onPlaybackEnded);
 
@@ -573,23 +600,161 @@ export function InterviewExperience({
             const sourceBuffer = mediaSource.addSourceBuffer("audio/mpeg");
             const reader = response.body!.getReader();
             let playbackStarted = false;
+            let playFailed = false;
+            let chunkCount = 0;
+            const lastChunks: Uint8Array[] = [];
+            let carryOver: Uint8Array | null = null;
+            const DELIM_LEN = 8;
+
             while (true) {
-              const { done, value } = await reader.read();
+              let { done, value } = await reader.read();
               if (done) break;
+
+              // Prepend any carried-over bytes (trailing nulls from previous chunk)
+              if (carryOver && carryOver.length > 0) {
+                const combined = new Uint8Array(carryOver.length + value.length);
+                combined.set(carryOver);
+                combined.set(value, carryOver.length);
+                value = combined;
+                carryOver = null;
+              }
+
+              // Scan backwards for trailing JSON delimiter (8 null bytes + JSON starting with {)
+              let trailerStart = -1;
+              for (let i = value.length - DELIM_LEN; i >= 0; i--) {
+                if (value[i] === 0 && value[i + 1] === 0 && value[i + 2] === 0 && value[i + 3] === 0 &&
+                    value[i + 4] === 0 && value[i + 5] === 0 && value[i + 6] === 0 && value[i + 7] === 0) {
+                  const candidate = value.slice(i + DELIM_LEN);
+                  if (candidate.length > 0 && candidate[0] === 0x7B) {
+                    trailerStart = i;
+                    break;
+                  }
+                }
+              }
+
+              if (trailerStart >= 0) {
+                if (trailerStart > 0) {
+                  chunkCount++;
+                  const audioSlice = value.slice(0, trailerStart);
+                  if (sourceBuffer.updating) {
+                    await new Promise<void>(r => sourceBuffer.addEventListener("updateend", () => r(), { once: true }));
+                  }
+                  sourceBuffer.appendBuffer(audioSlice);
+                  // Ensure last slice is decoded before we call endOfStream later
+                  await new Promise<void>(r => sourceBuffer.addEventListener("updateend", () => r(), { once: true }));
+                }
+                try {
+                  const trailerStr = new TextDecoder().decode(value.slice(trailerStart + DELIM_LEN));
+                  const trailer = JSON.parse(trailerStr);
+                  parsedResponseText = trailer.spokenText || "";
+                  setCurrentSpokenText(parsedResponseText);
+                  if (trailer.responseType) {
+                    responseType = trailer.responseType;
+                    followUpTarget = trailer.followUpTarget || undefined;
+                    languageCode = trailer.languageCode || undefined;
+                    onMetadata?.({ responseText: parsedResponseText, responseType, followUpTarget, languageCode });
+                  }
+                } catch (e) {
+                  console.warn("[TIMING][FE] Failed to parse trailing JSON:", e);
+                }
+                continue;
+              }
+
+              // No delimiter in this chunk. Avoid appending trailing nulls that might be
+              // the start of a split delimiter — carry them to the next read.
+              let trailingNulls = 0;
+              for (let i = value.length - 1; i >= 0 && value[i] === 0; i--) trailingNulls++;
+              if (trailingNulls > 0) {
+                const toAppend = value.slice(0, value.length - trailingNulls);
+                carryOver = value.slice(value.length - trailingNulls);
+                value = toAppend;
+              }
+
+              lastChunks.push(value);
+              if (lastChunks.length > 2) lastChunks.shift();
+
+              chunkCount++;
+              if (chunkCount === 1) {
+                const firstChunkMs = Math.round(performance.now() - fetchStart);
+                const e2eFirstChunk = Math.round(performance.now() - sttDoneAt);
+                console.log(`[TIMING][FE] first audio chunk: ${firstChunkMs}ms from fetch, ${e2eFirstChunk}ms from STT final`);
+              }
               if (sourceBuffer.updating) {
                 await new Promise<void>(r => sourceBuffer.addEventListener("updateend", () => r(), { once: true }));
               }
               sourceBuffer.appendBuffer(value);
               if (!playbackStarted && audio) {
                 await new Promise<void>(r => sourceBuffer.addEventListener("updateend", () => r(), { once: true }));
-                audio.play().catch(console.error);
+                const playStartMs = Math.round(performance.now() - fetchStart);
+                console.log(`[TIMING][FE] audio.play() called: ${playStartMs}ms from fetch`);
+                try {
+                  await audio.play();
+                } catch (playErr) {
+                  console.error("[TIMING][FE] audio.play() FAILED:", playErr);
+                  playFailed = true;
+                }
                 playbackStarted = true;
               }
             }
+
+            // Fallback: if trailer wasn't detected (e.g., split across chunk boundary),
+            // scan the last 2 raw chunks (and any carryOver) concatenated together, backwards.
+            if (!parsedResponseText && (lastChunks.length > 0 || carryOver)) {
+              const chunksToCombine = [...lastChunks];
+              if (carryOver && carryOver.length > 0) chunksToCombine.push(carryOver);
+              const totalLen = chunksToCombine.reduce((s, c) => s + c.length, 0);
+              const combined = new Uint8Array(totalLen);
+              let off = 0;
+              for (const c of chunksToCombine) { combined.set(c, off); off += c.length; }
+              const FB_DELIM = 8;
+              for (let i = combined.length - FB_DELIM; i >= 0; i--) {
+                if (combined[i] === 0 && combined[i + 1] === 0 && combined[i + 2] === 0 && combined[i + 3] === 0 &&
+                    combined[i + 4] === 0 && combined[i + 5] === 0 && combined[i + 6] === 0 && combined[i + 7] === 0) {
+                  const candidate = combined.slice(i + FB_DELIM);
+                  if (candidate.length > 0 && candidate[0] === 0x7B) {
+                    try {
+                      const trailerStr = new TextDecoder().decode(candidate);
+                      const trailer = JSON.parse(trailerStr);
+                      parsedResponseText = trailer.spokenText || "";
+                      setCurrentSpokenText(parsedResponseText);
+                      if (trailer.responseType) {
+                        responseType = trailer.responseType;
+                        followUpTarget = trailer.followUpTarget || undefined;
+                        languageCode = trailer.languageCode || undefined;
+                        onMetadata?.({ responseText: parsedResponseText, responseType, followUpTarget, languageCode });
+                      }
+                    } catch (e) { /* best-effort */ }
+                    break;
+                  }
+                }
+              }
+            }
+
+            const streamDoneMs = Math.round(performance.now() - fetchStart);
+            console.log(`[TIMING][FE] stream done: ${streamDoneMs}ms, ${chunkCount} audio chunks, playFailed=${playFailed}, text=${parsedResponseText ? "ok" : "MISSING"}`);
             if (sourceBuffer.updating) {
               await new Promise<void>(r => sourceBuffer.addEventListener("updateend", () => r(), { once: true }));
             }
             if (mediaSource.readyState === "open") mediaSource.endOfStream();
+
+            // When the proxy buffers the entire response, audio + trailer can
+            // arrive in a single read().  The trailer branch uses `continue`,
+            // which skips the normal play() call — start playback here instead.
+            if (!playbackStarted && !playFailed && audio) {
+              try {
+                await audio.play();
+                playbackStarted = true;
+              } catch (playErr) {
+                console.error("[TIMING][FE] audio.play() FAILED (post-stream):", playErr);
+                playFailed = true;
+              }
+            }
+
+            // If play() failed, the ended event will never fire — resolve now
+            if (playFailed) {
+              console.warn("[TIMING][FE] play() failed — resolving without playback");
+              safeResolve();
+            }
           } catch (err) {
             audio.removeEventListener("ended", onPlaybackEnded);
             streamingOwnsPlaybackRef.current = false;
@@ -598,17 +763,49 @@ export function InterviewExperience({
         }, { once: true });
       });
       streamingOwnsPlaybackRef.current = false;
-    } else if (responseText) {
-      // No audio body — display text with a reading delay
-      setCurrentSpokenText(responseText);
-      setIsPlaying(true);
-      const readingTime = Math.max(2000, responseText.length * 50);
-      await new Promise<void>(resolve => setTimeout(resolve, readingTime));
-      setIsPlaying(false);
-      setCurrentSpokenText(null);
+    } else if (response.body) {
+      // No MediaSource — read entire body to extract trailing JSON
+      const reader = response.body.getReader();
+      let lastChunk: Uint8Array | null = null;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        lastChunk = value;
+      }
+      if (lastChunk && lastChunk.length >= 8) {
+        const NMS_DELIM = 8;
+        for (let i = lastChunk.length - NMS_DELIM; i >= 0; i--) {
+          if (lastChunk[i] === 0 && lastChunk[i + 1] === 0 && lastChunk[i + 2] === 0 && lastChunk[i + 3] === 0 &&
+              lastChunk[i + 4] === 0 && lastChunk[i + 5] === 0 && lastChunk[i + 6] === 0 && lastChunk[i + 7] === 0) {
+            const candidate = lastChunk.slice(i + NMS_DELIM);
+            if (candidate.length > 0 && candidate[0] === 0x7B) {
+              try {
+                const trailerStr = new TextDecoder().decode(candidate);
+                const trailer = JSON.parse(trailerStr);
+                parsedResponseText = trailer.spokenText || "";
+                if (trailer.responseType) {
+                  responseType = trailer.responseType;
+                  followUpTarget = trailer.followUpTarget || undefined;
+                  languageCode = trailer.languageCode || undefined;
+                  onMetadata?.({ responseText: parsedResponseText, responseType, followUpTarget, languageCode });
+                }
+              } catch (e) { /* best-effort */ }
+              break;
+            }
+          }
+        }
+      }
+      if (parsedResponseText) {
+        setCurrentSpokenText(parsedResponseText);
+        setIsPlaying(true);
+        const readingTime = Math.max(2000, parsedResponseText.length * 50);
+        await new Promise<void>(resolve => setTimeout(resolve, readingTime));
+        setIsPlaying(false);
+        setCurrentSpokenText(null);
+      }
     }
 
-    return { responseText, responseType, followUpTarget, languageCode };
+    return { responseText: parsedResponseText, responseType, followUpTarget, languageCode };
   }, [supportsMediaSource]);
 
   // ───── Competency Mode: Process Response ─────
@@ -710,7 +907,7 @@ export function InterviewExperience({
             isLastCompetency,
           }, (meta) => {
             if (meta.responseType === "transition" && !isLastCompetency) {
-              pregenFirstQuestionRef.current?.(currentCompetencyIndex + 1);
+              pregenFirstQuestionRef.current?.(currentCompetencyIndex + 1, true);
             }
           });
           if (responseText) lastAiResponseRef.current = responseText;
@@ -764,7 +961,7 @@ export function InterviewExperience({
             if (responseText) addAiMessage(responseText, true);
             stateMachine.onTTSEnd();
             setTimeout(() => startListeningRef.current?.(), 100);
-          } else if (responseType === "follow_up" && responseText) {
+          } else if (responseType === "follow_up") {
             const evaluation: CompetencyEvaluation = {
               competencyScore: 0,
               rationale: "",
@@ -777,7 +974,7 @@ export function InterviewExperience({
             setCompetencyPhase("followup");
             setTranscript("");
             transcriptRef.current = "";
-            addAiMessage(responseText, true);
+            if (responseText) addAiMessage(responseText, true);
             stateMachine.onTTSEnd();
             setTimeout(() => startListeningRef.current?.(), 100);
           } else {
@@ -874,7 +1071,7 @@ export function InterviewExperience({
               isLastCompetency,
             }, (meta) => {
               if (meta.responseType === "transition" && !isLastCompetency) {
-                pregenFirstQuestionRef.current?.(currentCompetencyIndex + 1);
+                pregenFirstQuestionRef.current?.(currentCompetencyIndex + 1, true);
               }
             });
             if (responseText) lastAiResponseRef.current = responseText;
@@ -925,7 +1122,7 @@ export function InterviewExperience({
               if (responseText) addAiMessage(responseText, true);
               stateMachine.onTTSEnd();
               setTimeout(() => startListeningRef.current?.(), 100);
-            } else if (responseType === "follow_up" && responseText) {
+            } else if (responseType === "follow_up") {
               const evaluation: CompetencyEvaluation = {
                 competencyScore: 0,
                 rationale: "",
@@ -937,7 +1134,7 @@ export function InterviewExperience({
               setCompetencyFollowUpCount(competencyFollowUpCount + 1);
               setTranscript("");
               transcriptRef.current = "";
-              addAiMessage(responseText, true);
+              if (responseText) addAiMessage(responseText, true);
               stateMachine.onTTSEnd();
               setTimeout(() => startListeningRef.current?.(), 100);
             } else {
@@ -1094,7 +1291,7 @@ export function InterviewExperience({
         stateMachine.finishThinking(false);
         await new Promise<void>(resolve => queueMicrotask(resolve));
       }
-      await startNextCompetency(nextIndex);
+      await startNextCompetency(nextIndex, alreadyTransitioned);
     }
   }, [isLastCompetency, currentCompetencyIndex, onCompleteCompetency, stateMachine, scoreInBackground]);
 
@@ -1127,11 +1324,12 @@ export function InterviewExperience({
     lastAiResponseRef.current = null;
   }, []);
 
-  const startNextCompetency = useCallback(async (index: number) => {
+  const startNextCompetency = useCallback(async (index: number, skipTransition = false) => {
     const comp = competencies![index];
     setProcessingMessage("Thinking...");
 
     const isFirstCompetency = index === 0;
+    const needsTransition = !isFirstCompetency && !skipTransition;
     const previousCompetencyName = !isFirstCompetency ? competencies![index - 1]?.name : undefined;
     let question = comp.primaryQuestion;
 
@@ -1142,7 +1340,7 @@ export function InterviewExperience({
       pregenQuestionRef.current = null;
     } else if (onGenerateQuestion) {
       try {
-        question = await onGenerateQuestion(comp.competencyId, !isFirstCompetency, previousCompetencyName);
+        question = await onGenerateQuestion(comp.competencyId, needsTransition, previousCompetencyName);
       } catch (err) {
         console.warn("Failed to generate question, using canonical example:", err);
       }
@@ -1154,14 +1352,21 @@ export function InterviewExperience({
 
     // Check if we already pre-generated the TTS audio for this question
     if (pregenAudioRef.current && pregenAudioRef.current.text === question) {
-      setCurrentSpokenText(question);
-      setIsPlaying(true);
-      if (audioRef.current) {
-        audioRef.current.src = pregenAudioRef.current.url;
-        await audioRef.current.play();
-      }
+      const pregenUrl = pregenAudioRef.current.url;
       pregenAudioRef.current = null;
-      return;
+      try {
+        setCurrentSpokenText(question);
+        setIsPlaying(true);
+        if (audioRef.current) {
+          audioRef.current.src = pregenUrl;
+          await audioRef.current.play();
+        }
+        return;
+      } catch (err) {
+        console.warn("Pre-generated audio play() failed, falling back to speakText:", err);
+        setIsPlaying(false);
+        setCurrentSpokenText(null);
+      }
     }
 
     // Try combined generate-and-stream endpoint for non-pre-generated questions
@@ -1173,7 +1378,7 @@ export function InterviewExperience({
           body: JSON.stringify({
             interviewId,
             competencyId: comp.competencyId,
-            includeTransition: !isFirstCompetency,
+            includeTransition: needsTransition,
             previousCompetencyName,
           }),
         });
@@ -1193,7 +1398,6 @@ export function InterviewExperience({
             });
           }
 
-          // Stream audio directly
           const blob = await res.blob();
           const audioUrl = URL.createObjectURL(blob);
           setCurrentSpokenText(question);
@@ -1315,7 +1519,16 @@ export function InterviewExperience({
       : `Thank you for completing this interview, ${applicantName}! We appreciate your time and will be in touch soon with next steps. Have a great day!`;
 
     addAiMessage(closing);
-    await speakText(closing);
+
+    // Prevent the global audio "ended" handler from firing onTTSPlaybackComplete
+    // (which would transition to LISTENING and try to start the mic). We own
+    // this playback lifecycle and will call stateMachine.complete() ourselves.
+    streamingOwnsPlaybackRef.current = true;
+    try {
+      await speakText(closing);
+    } finally {
+      streamingOwnsPlaybackRef.current = false;
+    }
     await completePromise;
     stateMachine.complete();
   }, [applicantName, agentName, jobTitle, closingTemplate, onComplete, stateMachine, addAiMessage, destroyDeepgramConnection]);
@@ -1661,16 +1874,17 @@ export function InterviewExperience({
 
   // ───── Pipelining: pre-generate question + TTS during greeting ─────
 
-  const pregenFirstQuestionForCompetency = useCallback(async (index: number) => {
+  const pregenFirstQuestionForCompetency = useCallback(async (index: number, skipTransition = false) => {
     if (!onGenerateQuestion || !competencies || index >= competencies.length) return;
     pregenQuestionAbortRef.current?.abort();
     pregenQuestionAbortRef.current = new AbortController();
 
     const comp = competencies[index];
     const isFirst = index === 0;
+    const needsTransition = !isFirst && !skipTransition;
     const previousCompetencyName = !isFirst ? competencies[index - 1]?.name : undefined;
     try {
-      const question = await onGenerateQuestion(comp.competencyId, !isFirst, previousCompetencyName);
+      const question = await onGenerateQuestion(comp.competencyId, needsTransition, previousCompetencyName);
       if (pregenQuestionAbortRef.current?.signal.aborted) return;
       pregenQuestionRef.current = { competencyIndex: index, text: question };
       preGenerateAudio(question);
@@ -1766,56 +1980,10 @@ export function InterviewExperience({
     }
   }, [agentId, getGreetingText, questionsArray.length, isCompetencyMode, competencies?.length]);
 
-  const playAcknowledgment = useCallback(async (candidateMessage: string): Promise<void> => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-
-    // Build a short, contextual acknowledgment from what the candidate said
-    const firstWords = candidateMessage.split(/\s+/).slice(0, 5).join(" ");
-    const hasEnough = candidateMessage.split(/\s+/).length > 8;
-
-    const templates = hasEnough
-      ? [
-          `Okay, I hear you on ${firstWords}...`,
-          `Right, interesting point about ${firstWords}...`,
-          `Got it.`,
-          `Okay, let me think about that.`,
-        ]
-      : [
-          `Okay.`,
-          `Got it, let me think.`,
-          `Alright.`,
-        ];
-
-    const ack = templates[Math.floor(Math.random() * templates.length)];
-
-    try {
-      let voices = window.speechSynthesis.getVoices();
-      if (voices.length === 0) {
-        await new Promise<void>(r => {
-          window.speechSynthesis.addEventListener("voiceschanged", () => r(), { once: true });
-          setTimeout(r, 500);
-        });
-        voices = window.speechSynthesis.getVoices();
-      }
-
-      await new Promise<void>((resolve) => {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(ack);
-        utterance.rate = 1.1;
-        utterance.pitch = 1.0;
-        utterance.volume = 0.85;
-        if (voices.length > 0) {
-          const preferred = voices.find(v => v.lang.startsWith("en") && v.localService) || voices[0];
-          utterance.voice = preferred;
-        }
-        utterance.onend = () => resolve();
-        utterance.onerror = () => resolve();
-        setTimeout(resolve, 2500);
-        window.speechSynthesis.speak(utterance);
-      });
-    } catch {
-      // Acknowledgment is optional -- never block the flow
-    }
+  const playAcknowledgment = useCallback(async (_candidateMessage: string): Promise<void> => {
+    // No-op: browser speechSynthesis used a different voice than ElevenLabs,
+    // causing a jarring voice switch. The streaming path handles responses
+    // directly; the legacy fallback is better silent than mismatched.
   }, []);
 
   // ───── Render ─────

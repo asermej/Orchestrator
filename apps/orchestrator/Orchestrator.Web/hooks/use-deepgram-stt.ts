@@ -216,17 +216,16 @@ export function useDeepgramStt({
       }
     }
 
-    // endpointing controls when Deepgram finalizes a transcript segment (speech_final).
-    // We do NOT use speech_final for turn completion — only for transcript accumulation.
-    // utterance_end_ms is the silence duration that triggers UtteranceEnd, which is our
-    // sole Deepgram-side turn-completion signal.
+    // speech_final (endpointing=800ms) is the primary turn-completion signal.
+    // UtteranceEnd (utterance_end_ms=2000ms) is the fallback for noisy environments
+    // where endpointing doesn't trigger cleanly.
     const params = new URLSearchParams({
       model: "nova-3",
       encoding: "linear16",
       sample_rate: String(SAMPLE_RATE),
       interim_results: "true",
-      endpointing: "2000",
-      utterance_end_ms: "2500",
+      endpointing: "1100",
+      utterance_end_ms: "2000",
       channels: "1",
     });
 
@@ -252,6 +251,7 @@ export function useDeepgramStt({
         if (data.type === "UtteranceEnd") {
           const fullTranscript = accumulatedTranscriptRef.current.trim();
           if (fullTranscript) {
+            console.log(`[TIMING][STT] UtteranceEnd fallback fired — ${fullTranscript.split(/\s+/).length} words`);
             onFinalTranscriptRef.current(fullTranscript);
             stopListening();
           }
@@ -262,6 +262,7 @@ export function useDeepgramStt({
 
         const transcript = data.channel?.alternatives?.[0]?.transcript || "";
         const isFinal: boolean = data.is_final === true;
+        const speechFinal: boolean = data.speech_final === true;
 
         if (transcript.trim().length >= BARGE_IN_MIN_CHARS && !bargeInFiredRef.current) {
           bargeInFiredRef.current = true;
@@ -278,11 +279,14 @@ export function useDeepgramStt({
           onInterimTranscriptRef.current?.(display);
         }
 
-        // speech_final only means the current transcript *segment* is finalized —
-        // it does NOT mean the speaker is done. Deepgram can fire it at clause
-        // boundaries while the candidate is still mid-thought. Turn completion
-        // is handled exclusively by UtteranceEnd (silence-based) and the local
-        // silence-detection fallback.
+        if (speechFinal) {
+          const fullTranscript = accumulatedTranscriptRef.current.trim();
+          if (fullTranscript) {
+            console.log(`[TIMING][STT] speech_final fired — ${fullTranscript.split(/\s+/).length} words`);
+            onFinalTranscriptRef.current(fullTranscript);
+            stopListening();
+          }
+        }
       };
 
       ws.onerror = () => {

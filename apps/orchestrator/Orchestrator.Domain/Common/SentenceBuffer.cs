@@ -16,7 +16,9 @@ internal static class SentenceBuffer
     };
 
     /// <summary>
-    /// Finds the index of a sentence-ending character (., !, ?) that is not part of an abbreviation.
+    /// Finds the index of a sentence/clause-ending character (., !, ?, — or --) that is not
+    /// part of an abbreviation. Em-dashes are treated as primary boundaries so TTS can start
+    /// on the first clause while the LLM is still generating the rest.
     /// Returns -1 if no sentence end is found.
     /// </summary>
     public static int FindSentenceEnd(string text)
@@ -24,14 +26,21 @@ internal static class SentenceBuffer
         for (int i = 0; i < text.Length; i++)
         {
             char c = text[i];
-            if (c != '.' && c != '!' && c != '?')
-                continue;
 
-            if (c == '.' && IsAbbreviation(text, i))
-                continue;
+            if (c == '.' || c == '!' || c == '?')
+            {
+                if (c == '.' && IsAbbreviation(text, i))
+                    continue;
+                return i;
+            }
 
-            return i;
+            if (c == '\u2014') // —
+                return i;
+
+            if (c == '-' && i + 1 < text.Length && text[i + 1] == '-')
+                return i;
         }
+
         return -1;
     }
 

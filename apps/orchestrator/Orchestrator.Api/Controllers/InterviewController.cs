@@ -575,12 +575,23 @@ public class InterviewController : ControllerBase
         if (competency == null)
             return NotFound($"Competency {request.CompetencyId} not found in this interview's role.");
 
-        var systemPrompt = context.Agent != null
-            ? _domainFacade.BuildInterviewSystemPrompt(context)
-            : "";
+        string systemPromptStatic;
+        string? systemPromptInterviewPart;
+        if (context.Agent != null)
+        {
+            var parts = _domainFacade.BuildInterviewSystemPromptParts(context);
+            systemPromptStatic = parts.StaticPart;
+            systemPromptInterviewPart = parts.InterviewPart;
+        }
+        else
+        {
+            systemPromptStatic = "";
+            systemPromptInterviewPart = null;
+        }
 
         var question = await _domainFacade.GeneratePrimaryQuestionAsync(
-            systemPrompt,
+            systemPromptStatic,
+            systemPromptInterviewPart,
             competency,
             context.Role.RoleName,
             context.Role.Industry,
@@ -884,12 +895,23 @@ public class InterviewController : ControllerBase
             return;
         }
 
-        var systemPrompt = context.Agent != null
-            ? _domainFacade.BuildInterviewSystemPrompt(context)
-            : "";
+        string systemPromptStatic;
+        string? systemPromptInterviewPart;
+        if (context.Agent != null)
+        {
+            var parts = _domainFacade.BuildInterviewSystemPromptParts(context);
+            systemPromptStatic = parts.StaticPart;
+            systemPromptInterviewPart = parts.InterviewPart;
+        }
+        else
+        {
+            systemPromptStatic = "";
+            systemPromptInterviewPart = null;
+        }
 
         var question = await _domainFacade.GeneratePrimaryQuestionAsync(
-            systemPrompt,
+            systemPromptStatic,
+            systemPromptInterviewPart,
             competency,
             context.Role.RoleName,
             context.Role.Industry,
@@ -938,7 +960,12 @@ public class InterviewController : ControllerBase
     [ProducesResponseType(404)]
     public async Task RespondToTurn(Guid id, [FromBody] RespondToTurnResource request)
     {
+        var requestSw = Stopwatch.StartNew();
+
+        var ctxSw = Stopwatch.StartNew();
         var context = await _domainFacade.LoadInterviewRuntimeContextAsync(id);
+        ctxSw.Stop();
+
         if (context == null)
         {
             Response.StatusCode = 404;
@@ -956,6 +983,8 @@ public class InterviewController : ControllerBase
             return;
         }
 
+        Console.WriteLine($"[INTERVIEW][TIMING][API] Context load: {ctxSw.ElapsedMilliseconds}ms | interview={id}, competency={request.CompetencyName}");
+
         var domainRequest = new RespondToTurnRequest
         {
             CandidateTranscript = request.CandidateTranscript,
@@ -972,38 +1001,36 @@ public class InterviewController : ControllerBase
             IsLastCompetency = request.IsLastCompetency
         };
 
-        // LATENCY-CRITICAL: Set response content type and headers before streaming audio.
-        // The onMetadataReady callback fires after the LLM response is buffered but before
-        // TTS audio starts, letting us set headers with the response text and type.
         Response.ContentType = "audio/mpeg";
         Response.Headers.Append("Cache-Control", "no-cache");
-
-        bool headersSet = false;
-
-        void OnMetadataReady(TurnResponseMetadata metadata)
-        {
-            Response.Headers.Append("X-Response-Text", Uri.EscapeDataString(metadata.SpokenText));
-            Response.Headers.Append("X-Response-Type", metadata.ResponseType);
-            if (!string.IsNullOrWhiteSpace(metadata.FollowUpTarget))
-                Response.Headers.Append("X-Follow-Up-Target", metadata.FollowUpTarget);
-            if (!string.IsNullOrWhiteSpace(metadata.LanguageCode))
-                Response.Headers.Append("X-Language-Code", metadata.LanguageCode);
-            Response.Headers.Append("Access-Control-Expose-Headers",
-                "X-Response-Text, X-Response-Type, X-Follow-Up-Target, X-Language-Code");
-            headersSet = true;
-        }
+        Response.Headers.Append("X-Response-Type", "pending");
+        Response.Headers.Append("Access-Control-Expose-Headers",
+            "X-Response-Type, X-Follow-Up-Target, X-Language-Code");
 
         try
         {
+            long firstChunkMs = 0;
+            int totalChunks = 0;
+            long totalBytes = 0;
+
             await foreach (var chunk in _domainFacade.RespondToTurnAsync(
-                context, domainRequest, OnMetadataReady, HttpContext.RequestAborted))
+                context, domainRequest, HttpContext.RequestAborted))
             {
+                totalChunks++;
+                totalBytes += chunk.Length;
+                if (firstChunkMs == 0) firstChunkMs = requestSw.ElapsedMilliseconds;
+
                 await Response.Body.WriteAsync(chunk, HttpContext.RequestAborted);
                 await Response.Body.FlushAsync(HttpContext.RequestAborted);
             }
+
+            requestSw.Stop();
+            Console.WriteLine($"[INTERVIEW][TIMING][API] respond-to-turn complete: {requestSw.ElapsedMilliseconds}ms | ctx={ctxSw.ElapsedMilliseconds}ms, first_chunk={firstChunkMs}ms, chunks={totalChunks}, bytes={totalBytes}");
         }
         catch (Exception) when (Response.HasStarted)
         {
+            requestSw.Stop();
+            Console.WriteLine($"[INTERVIEW][TIMING][API] respond-to-turn aborted: {requestSw.ElapsedMilliseconds}ms");
             Response.Body.Close();
         }
     }

@@ -18,6 +18,7 @@ namespace Orchestrator.Domain;
 internal sealed class ElevenLabsTtsWebSocketManager : IDisposable
 {
     private readonly ServiceLocatorBase _serviceLocator;
+    private ClientWebSocket? _preConnectedWs;
     private bool _disposed;
 
     private const string TtsBaseUrl = "wss://api.elevenlabs.io/v1/text-to-speech";
@@ -27,6 +28,56 @@ internal sealed class ElevenLabsTtsWebSocketManager : IDisposable
     public ElevenLabsTtsWebSocketManager(ServiceLocatorBase serviceLocator)
     {
         _serviceLocator = serviceLocator ?? throw new ArgumentNullException(nameof(serviceLocator));
+    }
+
+    /// <summary>
+    /// LATENCY OPTIMIZATION: Opens the WebSocket connection and sends the INIT message
+    /// ahead of time, so the next SynthesizeAsync call skips the connection overhead.
+    /// </summary>
+    public async Task PreConnectAsync(
+        string? voiceId = null,
+        string outputFormat = FormatMp3,
+        CancellationToken cancellationToken = default)
+    {
+        var config = LoadConfig();
+        if (string.IsNullOrWhiteSpace(config.ApiKey))
+            throw new ElevenLabsConnectionException("ElevenLabs API key is not configured for TTS WebSocket");
+
+        var effectiveVoiceId = voiceId ?? config.DefaultVoiceId;
+        var modelId = config.TtsWebSocketModelId;
+        var url = $"{TtsBaseUrl}/{effectiveVoiceId}/stream-input?output_format={outputFormat}&model_id={modelId}";
+
+        Console.WriteLine($"[TTS-WS] Pre-connecting to ElevenLabs TTS: voice={effectiveVoiceId}, model={modelId}, format={outputFormat}");
+
+        var ws = new ClientWebSocket();
+        ws.Options.SetRequestHeader("xi-api-key", config.ApiKey);
+
+        try
+        {
+            await ws.ConnectAsync(new Uri(url), cancellationToken).ConfigureAwait(false);
+
+            var initMsg = new ElevenLabsTtsWsInitMessage
+            {
+                ApiKey = config.ApiKey,
+                VoiceSettings = new ElevenLabsTtsWsVoiceSettings
+                {
+                    Stability = 0.5,
+                    SimilarityBoost = 0.75,
+                    Style = 0,
+                    UseSpeakerBoost = true,
+                    Speed = 1.0
+                }
+            };
+            await SendJsonAsync(ws, initMsg, cancellationToken).ConfigureAwait(false);
+
+            Console.WriteLine("[TTS-WS] ✓ Pre-connected and initialized");
+            _preConnectedWs = ws;
+        }
+        catch
+        {
+            ws.Dispose();
+            throw;
+        }
     }
 
     /// <summary>
@@ -71,42 +122,53 @@ internal sealed class ElevenLabsTtsWebSocketManager : IDisposable
             throw new ElevenLabsConnectionException("ElevenLabs API key is not configured for TTS WebSocket");
         }
 
-        var effectiveVoiceId = voiceId ?? config.DefaultVoiceId;
-        var modelId = config.TtsWebSocketModelId;
-        var url = $"{TtsBaseUrl}/{effectiveVoiceId}/stream-input?output_format={outputFormat}&model_id={modelId}";
+        // Reuse pre-connected socket if available (from PreConnectAsync), otherwise connect fresh
+        var ws = _preConnectedWs;
+        _preConnectedWs = null;
 
-        Console.WriteLine($"[TTS-WS] Connecting to ElevenLabs TTS: voice={effectiveVoiceId}, model={modelId}, format={outputFormat}");
-
-        using var ws = new ClientWebSocket();
-        ws.Options.SetRequestHeader("xi-api-key", config.ApiKey);
-
-        try
+        if (ws == null)
         {
-            await ws.ConnectAsync(new Uri(url), cancellationToken).ConfigureAwait(false);
-            Console.WriteLine("[TTS-WS] ✓ Connected");
-        }
-        catch (WebSocketException ex)
-        {
-            Console.WriteLine($"[TTS-WS] ✗ Connection failed: {ex.Message}");
-            throw new ElevenLabsConnectionException($"Failed to connect to ElevenLabs TTS WebSocket: {ex.Message}", ex);
-        }
+            var effectiveVoiceId = voiceId ?? config.DefaultVoiceId;
+            var modelId = config.TtsWebSocketModelId;
+            var url = $"{TtsBaseUrl}/{effectiveVoiceId}/stream-input?output_format={outputFormat}&model_id={modelId}";
 
-        // 1. Send init message with voice settings
-        var initMsg = new ElevenLabsTtsWsInitMessage
-        {
-            ApiKey = config.ApiKey,
-            VoiceSettings = new ElevenLabsTtsWsVoiceSettings
+            Console.WriteLine($"[TTS-WS] Connecting to ElevenLabs TTS: voice={effectiveVoiceId}, model={modelId}, format={outputFormat}");
+
+            ws = new ClientWebSocket();
+            ws.Options.SetRequestHeader("xi-api-key", config.ApiKey);
+
+            try
             {
-                Stability = 0.5,
-                SimilarityBoost = 0.75,
-                Style = 0,
-                UseSpeakerBoost = true,
-                Speed = 1.0
+                await ws.ConnectAsync(new Uri(url), cancellationToken).ConfigureAwait(false);
+                Console.WriteLine("[TTS-WS] ✓ Connected");
             }
-        };
-        var initJson = JsonSerializer.Serialize(initMsg);
-        Console.WriteLine($"[TTS-WS] >>> INIT: {initJson}");
-        await SendJsonAsync(ws, initMsg, cancellationToken).ConfigureAwait(false);
+            catch (WebSocketException ex)
+            {
+                ws.Dispose();
+                Console.WriteLine($"[TTS-WS] ✗ Connection failed: {ex.Message}");
+                throw new ElevenLabsConnectionException($"Failed to connect to ElevenLabs TTS WebSocket: {ex.Message}", ex);
+            }
+
+            var initMsg = new ElevenLabsTtsWsInitMessage
+            {
+                ApiKey = config.ApiKey,
+                VoiceSettings = new ElevenLabsTtsWsVoiceSettings
+                {
+                    Stability = 0.5,
+                    SimilarityBoost = 0.75,
+                    Style = 0,
+                    UseSpeakerBoost = true,
+                    Speed = 1.0
+                }
+            };
+            var initJson = JsonSerializer.Serialize(initMsg);
+            Console.WriteLine($"[TTS-WS] >>> INIT: {initJson}");
+            await SendJsonAsync(ws, initMsg, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            Console.WriteLine("[TTS-WS] Using pre-warmed WebSocket connection");
+        }
 
         // 2. Send the text
         var textMsg = new ElevenLabsTtsWsTextMessage
@@ -154,7 +216,7 @@ internal sealed class ElevenLabsTtsWebSocketManager : IDisposable
 
             if (msgIndex <= 3 || response.IsFinal || !hasAudio)
             {
-                Console.WriteLine($"[TTS-WS] <<< MSG #{msgIndex}: isFinal={response.IsFinal}, hasAudio={hasAudio}, audioLen={response.Audio?.Length ?? 0}, raw={(message.Length > 200 ? message[..200] + "..." : message)}");
+                Console.WriteLine($"[TTS-WS] <<< MSG #{msgIndex}: isFinal={response.IsFinal}, hasAudio={hasAudio}, audioLen={response.Audio?.Length ?? 0}");
             }
 
             if (response.IsFinal)
@@ -182,6 +244,8 @@ internal sealed class ElevenLabsTtsWebSocketManager : IDisposable
                 // Already closed
             }
         }
+
+        ws.Dispose();
     }
 
     private static async Task SendJsonAsync<T>(ClientWebSocket ws, T message, CancellationToken cancellationToken)
@@ -232,6 +296,8 @@ internal sealed class ElevenLabsTtsWebSocketManager : IDisposable
 
     public void Dispose()
     {
+        _preConnectedWs?.Dispose();
+        _preConnectedWs = null;
         _disposed = true;
     }
 }

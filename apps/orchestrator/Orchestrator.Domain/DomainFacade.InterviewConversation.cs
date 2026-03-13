@@ -19,11 +19,10 @@ public sealed partial class DomainFacade
     public async IAsyncEnumerable<byte[]> RespondToTurnAsync(
         InterviewRuntimeContext context,
         RespondToTurnRequest request,
-        Action<TurnResponseMetadata> onMetadataReady,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await foreach (var chunk in InterviewConversationManager.RespondToTurnAsync(
-            context, request, onMetadataReady, cancellationToken).ConfigureAwait(false))
+            context, request, cancellationToken).ConfigureAwait(false))
         {
             yield return chunk;
         }

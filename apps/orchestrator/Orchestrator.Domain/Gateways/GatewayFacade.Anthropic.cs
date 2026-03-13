@@ -15,17 +15,27 @@ internal sealed partial class GatewayFacade
         IEnumerable<ConversationTurn> chatHistory,
         string? modelOverride = null,
         double? temperatureOverride = null,
-        int? maxTokensOverride = null)
+        int? maxTokensOverride = null,
+        bool enablePromptCaching = false,
+        string? systemPromptInterviewPart = null)
     {
-        return await AnthropicManager.GenerateCompletion(systemPrompt, chatHistory, modelOverride, temperatureOverride, maxTokensOverride).ConfigureAwait(false);
+        return await AnthropicManager.GenerateCompletion(
+            systemPrompt, chatHistory, modelOverride, temperatureOverride, maxTokensOverride,
+            enablePromptCaching, systemPromptInterviewPart).ConfigureAwait(false);
     }
 
     public async IAsyncEnumerable<string> StreamAnthropicCompletionAsync(
         string systemPrompt,
         IEnumerable<ConversationTurn> chatHistory,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        [EnumeratorCancellation] CancellationToken cancellationToken = default,
+        int? maxTokensOverride = null,
+        string? modelOverride = null,
+        bool enablePromptCaching = false,
+        string? systemPromptInterviewPart = null)
     {
-        await foreach (var token in AnthropicManager.StreamCompletionAsync(systemPrompt, chatHistory, cancellationToken).ConfigureAwait(false))
+        await foreach (var token in AnthropicManager.StreamCompletionAsync(
+            systemPrompt, chatHistory, cancellationToken, maxTokensOverride,
+            modelOverride, enablePromptCaching, systemPromptInterviewPart).ConfigureAwait(false))
         {
             yield return token;
         }

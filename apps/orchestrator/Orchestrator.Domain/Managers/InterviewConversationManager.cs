@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 
 namespace Orchestrator.Domain;
@@ -21,8 +23,26 @@ internal sealed class InterviewConversationManager : IDisposable
     private GatewayFacade? _gatewayFacade;
     private GatewayFacade GatewayFacade => _gatewayFacade ??= new GatewayFacade(_serviceLocator);
 
-    private static readonly Regex MetadataMarkerRegex = new(
+    private static readonly Regex MarkerLineRegex = new(
+        @"^\[(?:FOLLOW_UP:(\w+)|TRANSITION|REPEAT|OFF_TOPIC|LANGUAGE_SWITCH:(\w+)|END_INTERVIEW)\]$",
+        RegexOptions.Compiled);
+
+    private static readonly Regex MarkerLastRegex = new(
         @"\[(?:FOLLOW_UP:(\w+)|TRANSITION|REPEAT|OFF_TOPIC|LANGUAGE_SWITCH:(\w+)|END_INTERVIEW)\]\s*$",
+        RegexOptions.Compiled);
+
+    private static readonly Regex EvalLineRegex = new(
+        @"^\[EVAL:action=(\w+),result=(\w+)(?:,score=(\d))?\]$",
+        RegexOptions.Compiled);
+
+    /// <summary>Matches a leading [EVAL:...] line so it can be stripped from spoken text (avoids leaking internal eval to user).</summary>
+    private static readonly Regex LeadingEvalLineRegex = new(
+        @"^\[EVAL:[^\]]+\]\s*[\r\n]*",
+        RegexOptions.Compiled);
+
+    /// <summary>Matches any known response marker that may leak into spoken text sent to TTS.</summary>
+    private static readonly Regex AnyMarkerRegex = new(
+        @"\[(?:FOLLOW_UP:\w+|TRANSITION|REPEAT|OFF_TOPIC|LANGUAGE_SWITCH:\w+|END_INTERVIEW|EVAL:[^\]]+)\]",
         RegexOptions.Compiled);
 
     public InterviewConversationManager(ServiceLocatorBase serviceLocator)
@@ -31,309 +51,411 @@ internal sealed class InterviewConversationManager : IDisposable
     }
 
     /// <summary>
-    /// LATENCY-CRITICAL: Generates a conversational AI response and streams it as MP3 audio.
-    /// 1. Streams OpenAI tokens and buffers the full response (~1-3 sentences)
-    /// 2. Parses metadata marker ([FOLLOW_UP:target] or [TRANSITION])
-    /// 3. Invokes onMetadataReady so the controller can set HTTP headers before audio body
-    /// 4. Splits spoken text into sentences and synthesizes each via ElevenLabs WebSocket TTS
-    /// 5. Yields raw MP3 byte chunks for direct HTTP response streaming
+    /// LATENCY-CRITICAL: Concurrent conversation turn pipeline — streams LLM tokens and
+    /// TTS synthesis simultaneously via Channels. Audio chunks flow to the browser as soon
+    /// as TTS produces them, without waiting for the LLM to finish generating all tokens.
+    /// Sonnet evaluates AND responds in a single pass; no separate QuickEval call.
     /// </summary>
     public async IAsyncEnumerable<byte[]> RespondToTurnAsync(
         InterviewRuntimeContext context,
         RespondToTurnRequest request,
-        Action<TurnResponseMetadata> onMetadataReady,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var systemPrompt = context.Agent != null
-            ? new InterviewRuntimeManager(_serviceLocator).BuildInterviewSystemPrompt(
-                context.Agent, context.Template, context.Role, context.ApplicantName, context.JobTitle)
-            : "";
+        var turnSw = Stopwatch.StartNew();
 
-        // Fast eval gate: determine follow-up decision before generating the conversational response
-        var evalResult = await QuickEvaluateAsync(context, request, cancellationToken).ConfigureAwait(false);
-        string predeterminedDecision;
-        if (evalResult.FollowUpNeeded && evalResult.FollowUpTarget != null)
-            predeterminedDecision = $"follow_up:{evalResult.FollowUpTarget}";
-        else
-            predeterminedDecision = "transition";
-
-        Console.WriteLine($"[INTERVIEW][EVAL] Quick eval: score={evalResult.CompetencyScore}, action={evalResult.ActionQuality}, result={evalResult.ResultQuality} → decision={predeterminedDecision}");
-
-        var chatHistory = BuildChatHistory(request);
-        var userMessage = BuildConversationalPrompt(request, predeterminedDecision);
-        chatHistory.Add(new ConversationTurn { Role = "user", Content = userMessage });
-
-        // LATENCY: Buffer full LLM response so we can parse metadata and set HTTP headers
-        // before streaming audio. LLM output is 1-3 sentences (~300-600ms).
-        var fullResponse = new StringBuilder();
-        await foreach (var token in GatewayFacade.StreamAnthropicCompletionAsync(
-            systemPrompt, chatHistory, cancellationToken).ConfigureAwait(false))
+        string systemPromptStatic;
+        string? systemPromptInterview;
+        if (context.Agent != null)
         {
-            fullResponse.Append(token);
+            var parts = new InterviewRuntimeManager(_serviceLocator).BuildInterviewSystemPromptParts(
+                context.Agent, context.Template, context.Role, context.ApplicantName, context.JobTitle);
+            systemPromptStatic = parts.StaticPart;
+            systemPromptInterview = parts.InterviewPart;
+        }
+        else
+        {
+            systemPromptStatic = "";
+            systemPromptInterview = null;
         }
 
-        var rawResponse = fullResponse.ToString().Trim();
-        var metadata = ParseMetadata(rawResponse);
-        var spokenText = metadata.SpokenText;
-
-        Console.WriteLine($"[INTERVIEW][CONV] Response: type={metadata.ResponseType}, target={metadata.FollowUpTarget ?? "n/a"}, text=\"{(spokenText.Length > 100 ? spokenText[..100] + "..." : spokenText)}\"");
-
-        onMetadataReady(metadata);
-
-        if (string.IsNullOrWhiteSpace(spokenText))
-            yield break;
+        var chatHistory = BuildChatHistory(request);
+        var userMessage = BuildMergedPrompt(request);
+        chatHistory.Add(new ConversationTurn { Role = "user", Content = userMessage });
 
         var voiceId = context.Agent?.ElevenlabsVoiceId ?? "21m00Tcm4TlvDq8ikWAM";
 
-        // LATENCY-CRITICAL: Split into sentences and synthesize each via WebSocket TTS.
-        // Audio from sentence 1 streams to the browser while sentence 2 is being synthesized.
-        var sentences = SplitIntoSentences(spokenText);
-        foreach (var sentence in sentences)
-        {
-            if (string.IsNullOrWhiteSpace(sentence))
-                continue;
+        var audioChannel = Channel.CreateUnbounded<byte[]>();
 
-            using var ttsManager = GatewayFacade.CreateElevenLabsTtsWebSocketManager();
-            await foreach (var chunk in ttsManager.SynthesizeBytesAsync(
-                sentence, voiceId, ElevenLabsTtsWebSocketManager.FormatMp3, cancellationToken).ConfigureAwait(false))
+        var pipelineTask = RunLlmPipelineAsync(
+            audioChannel.Writer,
+            systemPromptStatic, systemPromptInterview, chatHistory, voiceId,
+            request.PreviousFollowUpTarget, cancellationToken);
+
+        await foreach (var chunk in audioChannel.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        {
+            yield return chunk;
+        }
+
+        await pipelineTask.ConfigureAwait(false);
+
+        turnSw.Stop();
+        Console.WriteLine($"[INTERVIEW][TIMING] Turn total: {turnSw.ElapsedMilliseconds}ms");
+    }
+
+    /// <summary>
+    /// Runs the LLM streaming → sentence detection → TTS pipeline. Audio chunks are written
+    /// to audioWriter concurrently via a drain task, so they flow to the HTTP response while
+    /// the LLM is still generating tokens. Handles both [EVAL:...] lines (on-topic) and
+    /// direct markers (edge cases) on line 1.
+    /// </summary>
+    private async Task RunLlmPipelineAsync(
+        ChannelWriter<byte[]> audioWriter,
+        string systemPromptStatic,
+        string? systemPromptInterview,
+        List<ConversationTurn> chatHistory,
+        string voiceId,
+        string? previousFollowUpTarget,
+        CancellationToken ct)
+    {
+        var sentenceChannel = Channel.CreateUnbounded<ChannelReader<byte[]>>();
+        var drainTask = DrainTtsToChannelAsync(sentenceChannel.Reader, audioWriter, ct);
+
+        try
+        {
+            var llmSw = Stopwatch.StartNew();
+            long firstTokenMs = 0;
+            var fullResponse = new StringBuilder();
+            var sentenceBuffer = new StringBuilder();
+            bool markerDetected = false;
+            TurnResponseMetadata? metadata = null;
+            int sentenceCount = 0;
+            Task<ElevenLabsTtsWebSocketManager>? preWarmTask = PreWarmTtsConnectionAsync(voiceId, ct);
+
+            await foreach (var token in GatewayFacade.StreamAnthropicCompletionAsync(
+                systemPromptStatic, chatHistory, ct, maxTokensOverride: 512,
+                enablePromptCaching: true,
+                systemPromptInterviewPart: systemPromptInterview).ConfigureAwait(false))
             {
-                yield return chunk;
+                if (firstTokenMs == 0) firstTokenMs = llmSw.ElapsedMilliseconds;
+                fullResponse.Append(token);
+
+                if (!markerDetected)
+                {
+                    var accumulated = fullResponse.ToString();
+                    var newlinePos = accumulated.IndexOf('\n');
+                    if (newlinePos >= 0)
+                    {
+                        var firstLine = accumulated.Substring(0, newlinePos).Trim();
+
+                        // Try [EVAL:action=X,result=Y,score=Z] first (on-topic response)
+                        var evalMatch = EvalLineRegex.Match(firstLine);
+                        if (evalMatch.Success)
+                        {
+                            markerDetected = true;
+                            var actionQuality = evalMatch.Groups[1].Value.ToLowerInvariant();
+                            var resultQuality = evalMatch.Groups[2].Value.ToLowerInvariant();
+                            var score = evalMatch.Groups[3].Success && int.TryParse(evalMatch.Groups[3].Value, out var s) ? s : 3;
+                            score = Math.Max(1, Math.Min(5, score));
+
+                            var evalResult = new HolisticEvaluationResult
+                            {
+                                CompetencyScore = score,
+                                ActionQuality = actionQuality,
+                                ResultQuality = resultQuality
+                            };
+                            InterviewRuntimeManager.EnforceFollowUpRules(evalResult, previousFollowUpTarget);
+
+                            string responseType;
+                            string? followUpTarget = null;
+                            if (evalResult.FollowUpNeeded && evalResult.FollowUpTarget != null)
+                            {
+                                responseType = "follow_up";
+                                followUpTarget = evalResult.FollowUpTarget;
+                            }
+                            else
+                            {
+                                responseType = "transition";
+                            }
+
+                            metadata = new TurnResponseMetadata
+                            {
+                                ResponseType = responseType,
+                                FollowUpTarget = followUpTarget,
+                                CompetencyScore = score,
+                                ActionQuality = actionQuality,
+                                ResultQuality = resultQuality
+                            };
+                            Console.WriteLine($"[INTERVIEW][TIMING] Marker detected at {llmSw.ElapsedMilliseconds}ms | eval: action={actionQuality},result={resultQuality},score={score} | decision={responseType}{(followUpTarget != null ? $":{followUpTarget}" : "")}");
+
+                            var afterMarker = accumulated.Substring(newlinePos + 1);
+                            if (afterMarker.Length > 0)
+                            {
+                                sentenceBuffer.Append(afterMarker);
+                                sentenceCount += QueueCompleteSentencesToChannel(sentenceBuffer, sentenceChannel.Writer, voiceId, ct, ref preWarmTask);
+                            }
+                            continue;
+                        }
+
+                        // Fall back to edge-case markers ([REPEAT], [TRANSITION], etc.)
+                        var markerMatch = MarkerLineRegex.Match(firstLine);
+                        if (markerMatch.Success)
+                        {
+                            markerDetected = true;
+                            metadata = BuildMetadataFromMatch(markerMatch);
+                            Console.WriteLine($"[INTERVIEW][TIMING] Marker detected at {llmSw.ElapsedMilliseconds}ms | type={metadata.ResponseType}, target={metadata.FollowUpTarget ?? "n/a"}");
+
+                            var afterMarker = accumulated.Substring(newlinePos + 1);
+                            if (afterMarker.Length > 0)
+                            {
+                                sentenceBuffer.Append(afterMarker);
+                                sentenceCount += QueueCompleteSentencesToChannel(sentenceBuffer, sentenceChannel.Writer, voiceId, ct, ref preWarmTask);
+                            }
+                        }
+                    }
+                    continue;
+                }
+
+                sentenceBuffer.Append(token);
+                sentenceCount += QueueCompleteSentencesToChannel(sentenceBuffer, sentenceChannel.Writer, voiceId, ct, ref preWarmTask);
             }
+            llmSw.Stop();
+
+            var remaining = sentenceBuffer.ToString().Trim();
+
+            if (!markerDetected)
+            {
+                var rawResponse = fullResponse.ToString().Trim();
+                metadata = ParseMetadata(rawResponse, previousFollowUpTarget);
+                metadata.SpokenText = StripMarkersFromSpokenText(metadata.SpokenText);
+                Console.WriteLine($"[INTERVIEW][TIMING] LLM (fallback parse): {llmSw.ElapsedMilliseconds}ms (first token: {firstTokenMs}ms, {rawResponse.Length} chars) | type={metadata.ResponseType}, target={metadata.FollowUpTarget ?? "n/a"}");
+
+                if (!string.IsNullOrWhiteSpace(metadata.SpokenText))
+                {
+                    ElevenLabsTtsWebSocketManager? preWarmed = null;
+                    if (preWarmTask != null)
+                    {
+                        try { preWarmed = await preWarmTask.ConfigureAwait(false); }
+                        catch { /* pre-warm failed, fall back to fresh connection */ }
+                        preWarmTask = null;
+                    }
+
+                    foreach (var sentence in SplitIntoSentences(metadata.SpokenText))
+                    {
+                        if (!string.IsNullOrWhiteSpace(sentence))
+                        {
+                            sentenceChannel.Writer.TryWrite(StartSentenceTts(sentence, voiceId, ct, preWarmed));
+                            preWarmed = null;
+                            sentenceCount++;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                Console.WriteLine($"[INTERVIEW][TIMING] LLM: {llmSw.ElapsedMilliseconds}ms (first token: {firstTokenMs}ms, {fullResponse.Length} chars) | type={metadata!.ResponseType}, target={metadata.FollowUpTarget ?? "n/a"}");
+
+                remaining = StripMarkersFromSpokenText(remaining);
+                if (!string.IsNullOrWhiteSpace(remaining))
+                {
+                    ElevenLabsTtsWebSocketManager? preWarmed = null;
+                    if (preWarmTask != null)
+                    {
+                        try { preWarmed = await preWarmTask.ConfigureAwait(false); }
+                        catch { /* pre-warm failed, fall back to fresh connection */ }
+                        preWarmTask = null;
+                    }
+                    sentenceChannel.Writer.TryWrite(StartSentenceTts(remaining, voiceId, ct, preWarmed));
+                    sentenceCount++;
+                }
+            }
+
+            if (preWarmTask != null)
+            {
+                try { (await preWarmTask.ConfigureAwait(false)).Dispose(); } catch { }
+            }
+
+            sentenceChannel.Writer.Complete();
+            await drainTask.ConfigureAwait(false);
+
+            if (metadata != null && fullResponse.ToString().Contains("[END_INTERVIEW]"))
+            {
+                metadata.ResponseType = "end_interview";
+                metadata.FollowUpTarget = null;
+            }
+
+            if (sentenceCount > 0)
+            {
+                string spokenText;
+                if (markerDetected)
+                {
+                    var raw = fullResponse.ToString();
+                    var nlPos = raw.IndexOf('\n');
+                    spokenText = nlPos >= 0 ? StripMarkersFromSpokenText(raw.Substring(nlPos + 1)) : "";
+                }
+                else
+                {
+                    spokenText = StripMarkersFromSpokenText(metadata!.SpokenText);
+                }
+
+                var trailerJson = JsonSerializer.Serialize(new
+                {
+                    spokenText,
+                    responseType = metadata?.ResponseType,
+                    followUpTarget = metadata?.FollowUpTarget,
+                    languageCode = metadata?.LanguageCode,
+                    competencyScore = metadata?.CompetencyScore,
+                    actionQuality = metadata?.ActionQuality,
+                    resultQuality = metadata?.ResultQuality
+                });
+                var jsonBytes = Encoding.UTF8.GetBytes(trailerJson);
+                var delimiter = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 };
+                var trailerBytes = new byte[delimiter.Length + jsonBytes.Length];
+                Buffer.BlockCopy(delimiter, 0, trailerBytes, 0, delimiter.Length);
+                Buffer.BlockCopy(jsonBytes, 0, trailerBytes, delimiter.Length, jsonBytes.Length);
+                await audioWriter.WriteAsync(trailerBytes, ct).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            sentenceChannel.Writer.TryComplete(ex);
+            try { await drainTask.ConfigureAwait(false); } catch { }
+            throw;
+        }
+        finally
+        {
+            audioWriter.TryComplete();
         }
     }
 
-    private static string BuildConversationalPrompt(RespondToTurnRequest request, string predeterminedDecision)
+    /// <summary>
+    /// Reads per-sentence ChannelReaders in order and forwards audio chunks to audioWriter
+    /// as they arrive from TTS. Each sentence's chunks stream through without waiting for
+    /// the full sentence to complete, but ordering between sentences is preserved.
+    /// </summary>
+    private static async Task DrainTtsToChannelAsync(
+        ChannelReader<ChannelReader<byte[]>> sentenceReader,
+        ChannelWriter<byte[]> audioWriter,
+        CancellationToken ct)
+    {
+        var ttsTotalSw = Stopwatch.StartNew();
+        long firstAudioChunkMs = 0;
+        int sentenceIndex = 0;
+
+        await foreach (var sentenceChunks in sentenceReader.ReadAllAsync(ct).ConfigureAwait(false))
+        {
+            var sentSw = Stopwatch.StartNew();
+            int chunkCount = 0;
+
+            await foreach (var chunk in sentenceChunks.ReadAllAsync(ct).ConfigureAwait(false))
+            {
+                if (firstAudioChunkMs == 0)
+                    firstAudioChunkMs = ttsTotalSw.ElapsedMilliseconds;
+                await audioWriter.WriteAsync(chunk, ct).ConfigureAwait(false);
+                chunkCount++;
+            }
+
+            sentSw.Stop();
+            Console.WriteLine($"[INTERVIEW][TIMING] TTS sentence {sentenceIndex}: {sentSw.ElapsedMilliseconds}ms ({chunkCount} chunks)");
+            sentenceIndex++;
+        }
+
+        ttsTotalSw.Stop();
+        if (sentenceIndex > 0)
+            Console.WriteLine($"[INTERVIEW][TIMING] TTS total: {ttsTotalSw.ElapsedMilliseconds}ms (first audio: {firstAudioChunkMs}ms, {sentenceIndex} sentences)");
+    }
+
+    private int QueueCompleteSentencesToChannel(
+        StringBuilder sentenceBuffer,
+        ChannelWriter<ChannelReader<byte[]>> sentenceWriter,
+        string voiceId,
+        CancellationToken ct,
+        ref Task<ElevenLabsTtsWebSocketManager>? preWarmTask)
+    {
+        int count = 0;
+        while (true)
+        {
+            var buffered = sentenceBuffer.ToString();
+            var end = SentenceBuffer.FindSentenceEnd(buffered);
+            if (end < 0) break;
+
+            var sentence = buffered.Substring(0, end + 1).Trim();
+            sentenceBuffer.Remove(0, end + 1);
+            sentence = StripMarkersFromSpokenText(sentence);
+            if (!string.IsNullOrWhiteSpace(sentence))
+            {
+                ElevenLabsTtsWebSocketManager? preWarmed = null;
+                if (preWarmTask != null)
+                {
+                    if (preWarmTask.IsCompletedSuccessfully)
+                    {
+                        preWarmed = preWarmTask.Result;
+                    }
+                    preWarmTask = null;
+                }
+                sentenceWriter.TryWrite(StartSentenceTts(sentence, voiceId, ct, preWarmed));
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private async Task<ElevenLabsTtsWebSocketManager> PreWarmTtsConnectionAsync(
+        string voiceId, CancellationToken ct)
+    {
+        var manager = GatewayFacade.CreateElevenLabsTtsWebSocketManager();
+        await manager.PreConnectAsync(voiceId, ElevenLabsTtsWebSocketManager.FormatMp3, ct).ConfigureAwait(false);
+        return manager;
+    }
+
+    /// <summary>
+    /// Kicks off TTS for a single sentence in the background. Returns a ChannelReader
+    /// that yields audio chunks as they arrive from ElevenLabs, enabling the drain task
+    /// to forward them to the HTTP response without waiting for the full sentence.
+    /// </summary>
+    private ChannelReader<byte[]> StartSentenceTts(
+        string sentence, string voiceId, CancellationToken ct,
+        ElevenLabsTtsWebSocketManager? preConnected = null)
+    {
+        var ch = Channel.CreateUnbounded<byte[]>();
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var mgr = preConnected ?? GatewayFacade.CreateElevenLabsTtsWebSocketManager();
+                await foreach (var chunk in mgr.SynthesizeBytesAsync(
+                    sentence, voiceId, ElevenLabsTtsWebSocketManager.FormatMp3, ct).ConfigureAwait(false))
+                {
+                    await ch.Writer.WriteAsync(chunk, ct).ConfigureAwait(false);
+                }
+            }
+            catch (Exception ex) { ch.Writer.TryComplete(ex); return; }
+            finally { ch.Writer.TryComplete(); }
+        }, ct);
+        return ch.Reader;
+    }
+
+    private static string BuildMergedPrompt(RespondToTurnRequest request)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("You are responding to a candidate's answer in a behavioral interview.");
-        sb.AppendLine();
 
         if (!string.IsNullOrWhiteSpace(request.Language))
-            sb.AppendLine($"LANGUAGE: The candidate has requested to conduct this interview in {request.Language}. You MUST respond entirely in {request.Language}.");
+            sb.AppendLine($"LANGUAGE: Respond entirely in {request.Language}.");
 
-        sb.AppendLine();
-        sb.AppendLine($"Competency being assessed: {request.CompetencyName}");
+        sb.AppendLine($"Competency: {request.CompetencyName}");
         sb.AppendLine($"Question asked: {request.CurrentQuestion}");
-        sb.AppendLine($"Follow-up count so far: {request.FollowUpCount} of 2 maximum");
+        sb.AppendLine($"Follow-up count: {request.FollowUpCount} of 2");
         sb.AppendLine($"Repeats remaining: {request.RepeatsRemaining}");
         if (!string.IsNullOrWhiteSpace(request.PreviousFollowUpTarget))
             sb.AppendLine($"Previous follow-up probed: {request.PreviousFollowUpTarget}");
+        if (request.IsLastCompetency)
+            sb.AppendLine("This is the LAST competency.");
         sb.AppendLine();
         sb.AppendLine("Candidate's response:");
         sb.AppendLine(request.CandidateTranscript);
         sb.AppendLine();
-
-        sb.AppendLine("## Step 1 — Classify the response");
-        sb.AppendLine("Before responding, check if the response matches any of these edge cases (in order). Stop at the first match:");
-        sb.AppendLine();
-        sb.AppendLine("1. **Language switch request** — The candidate asks to switch languages (e.g. \"can we do this in Spanish?\", \"puedo hablar en español?\").");
-        sb.AppendLine("   → Acknowledge warmly, restate the current question in the requested language, and append the marker.");
-        sb.AppendLine("   → Marker: [LANGUAGE_SWITCH:xx] where xx is the ISO 639-1 code (e.g. es, fr, zh, pt).");
-        sb.AppendLine();
-        sb.AppendLine("2. **Repeat / clarification request** — The candidate asks you to repeat the question, says they don't understand, or asks what it means (e.g. \"can you say that again?\", \"what was the question?\", \"what do you mean by that?\", \"I'm not sure I understand\").");
-        if (request.RepeatsRemaining > 0)
-        {
-            sb.AppendLine("   → Rephrase the question using DIFFERENT words and a DIFFERENT sentence structure. Do NOT repeat the previous phrasing. Use simpler, more conversational language and try a different angle to make the question easier to understand. Marker: [REPEAT]");
-        }
-        else
-        {
-            sb.AppendLine("   → You have already repeated this question the maximum number of times. Politely say you need to move forward and restate the question one final time. Marker: [REPEAT]");
-        }
-        sb.AppendLine();
-        sb.AppendLine("3. **Nervous deflection** — The candidate stalls, expresses uncertainty, or gives a tangential non-answer that seems anxiety-driven (e.g. \"That's a good question, let me think...\", \"I've never really thought about that\", \"Hmm I'm not sure where to start\").");
-        sb.AppendLine("   → Encourage warmly: \"Take your time — there's no rush. Just think of a specific situation where this came up for you at work, even a small one.\" Then briefly restate the question. Marker: [REPEAT]");
-        sb.AppendLine();
-        sb.AppendLine("4. **Process question** — The candidate asks about the interview process, data usage, recording, or who will see their answers (e.g. \"Is this being recorded?\", \"Who will see my answers?\", \"Why are you asking this?\").");
-        sb.AppendLine("   → Answer honestly and briefly, then redirect: \"This interview is part of your application. Your responses help the hiring team understand your experience. Now, back to the question —\" and briefly restate the question. Marker: [REPEAT]");
-        sb.AppendLine();
-        sb.AppendLine("5. **Off-topic** — The response is completely unrelated to the interview question and not explained by nervousness (e.g. asking about the weather, unrelated personal questions, random topics).");
-        sb.AppendLine("   → Politely redirect: \"I'm not able to help with that, but I'd love to hear your answer.\" Then briefly restate the question. Marker: [OFF_TOPIC]");
-        sb.AppendLine();
-        sb.AppendLine("6. **Disengagement / wants to end** — The candidate expresses frustration, fatigue, or a desire to stop the interview, end early, or skip the current question.");
-        sb.AppendLine("   Apply these sub-rules:");
-        sb.AppendLine("   a) **Explicit quit** — The candidate clearly says they want to stop or are done with the entire interview (e.g. \"I'm done with this interview\", \"I want to stop\", \"can we be done?\", \"I don't want to do this anymore\", \"end the interview\").");
-        sb.AppendLine("      → Acknowledge warmly (e.g. \"I completely understand, and I really appreciate your time today. Thank you for participating.\"). Do NOT restate the question. Marker: [END_INTERVIEW]");
-        sb.AppendLine("   b) **Frustration / skip** — The candidate expresses annoyance or wants to skip the current question but hasn't explicitly asked to end the whole interview (e.g. \"this is annoying\", \"let's just move on\", \"I'm over this question\", \"skip this one\").");
-        sb.AppendLine("      → Acknowledge empathetically and briefly (e.g. \"I completely understand, and I appreciate your time. Let's move on.\"). Do NOT restate the question. Marker: [TRANSITION]");
-        sb.AppendLine();
-        sb.AppendLine("7. **Adversarial** — The candidate makes a political statement, accuses the AI of bias, objects to being interviewed by an AI, or attempts to manipulate the interview.");
-        sb.AppendLine("   → De-escalate calmly. For bias accusations: \"I understand your concern. If you'd like to speak with someone from the hiring team directly, please contact them. I'm here to give you the opportunity to share your experience.\" For AI objections: \"I completely understand. You're welcome to contact the hiring team to arrange an alternative. If you'd like to continue, I'm ready when you are.\" For political requests: \"I'm not able to discuss that topic, but I'm here to learn more about your experience.\" Then briefly restate the question. Marker: [TRANSITION]");
-        sb.AppendLine();
-        sb.AppendLine("8. **Sensitive disclosure** — The candidate volunteers information about a protected characteristic, disability, medical condition, pregnancy, religion, or personal hardship that was NOT asked for.");
-        sb.AppendLine("   → Acknowledge warmly but briefly (e.g. \"Thank you for sharing that.\"). Do NOT ask follow-up questions about the disclosure. Do NOT reference the disclosure again at any point. Restate the interview question. Marker: [REPEAT]");
-        sb.AppendLine("   CRITICAL: Never repeat, summarize, or reference the content of a sensitive disclosure in any subsequent response.");
-        sb.AppendLine();
-        sb.AppendLine("9. **Tacit knowledge / can't elaborate** — The candidate indicates the behavior was automatic, instinctive, or they cannot explain the internal mechanism (e.g. \"I don't know, I just noticed it\", \"it's just something I do\", \"I can't really explain it\", \"that's just experience I guess\", \"I just saw it\", \"I don't know what you mean\").");
-        sb.AppendLine("   → Acknowledge warmly (e.g. \"That makes sense — sounds like it's second nature to you at this point.\") and transition. Marker: [TRANSITION]");
-        sb.AppendLine();
-        sb.AppendLine("10. **Pushback / refusal to elaborate** — The candidate indicates they have already answered, refuses to provide more detail, or expresses dismissive frustration at being re-asked (e.g. \"I already told you\", \"I just said that\", \"I feel like I already covered that\", \"I feel like I just told you that\", \"I already answered that\", \"I don't have anything else to add\", \"obviously\", \"that's silly\", \"that's a dumb question\", \"you already know that\", \"I literally just said that\", \"what do you think happened\").");
-        sb.AppendLine("   → Acknowledge politely (e.g. \"I appreciate your answer, thank you.\") and transition. Marker: [TRANSITION]");
-        sb.AppendLine();
-        sb.AppendLine("If none of the above match, the response is **on-topic**. Proceed to Step 2.");
-        sb.AppendLine();
-
-        sb.AppendLine("## Step 2 — Generate response (on-topic responses only)");
-        sb.AppendLine("The candidate's response has already been evaluated by a separate system. You MUST follow its predetermined decision exactly.");
-        sb.AppendLine($"**Predetermined decision: {predeterminedDecision}**");
-        sb.AppendLine();
-
-        if (predeterminedDecision == "transition")
-        {
-            if (request.IsLastCompetency)
-            {
-                sb.AppendLine("The answer is sufficient. Briefly and warmly acknowledge the candidate's answer. Do NOT mention moving to another question or suggest there are more questions coming.");
-            }
-            else
-            {
-                sb.AppendLine("The answer is sufficient. Briefly acknowledge the candidate's answer with warmth and move on.");
-            }
-            sb.AppendLine("Marker: [TRANSITION]");
-        }
-        else if (predeterminedDecision == "follow_up:action" && request.FollowUpCount < 2)
-        {
-            sb.AppendLine("The candidate hasn't described specific steps they took. Your job is to generate a natural follow-up question that asks what they specifically did.");
-            sb.AppendLine();
-            sb.AppendLine("Follow-up requirements:");
-            sb.AppendLine("- Start by acknowledging or paraphrasing something the candidate said (use their words)");
-            sb.AppendLine("- Then naturally ask for the missing evidence — what concrete steps they took");
-            sb.AppendLine("- NEVER use generic questions like \"Can you walk me through the steps?\" — always reference their specific answer");
-            sb.AppendLine("- The follow-up MUST probe evidence of the COMPETENCY being assessed, not tangential procedural details");
-            sb.AppendLine("- IMPORTANT: If the candidate already DEMONSTRATED the competency through their actions (e.g. they noticed a detail AND acted on it), that IS behavioral evidence. Do NOT ask them to explain the internal mechanism of how they noticed/decided/felt — that is meta-cognitive introspection, not behavioral evidence.");
-            sb.AppendLine("- Do NOT ask for information the candidate already provided in this response OR any earlier response");
-            sb.AppendLine("- Keep it to 1-2 natural sentences");
-            sb.AppendLine("Marker: [FOLLOW_UP:action]");
-        }
-        else if (predeterminedDecision == "follow_up:result" && request.FollowUpCount < 2)
-        {
-            sb.AppendLine("The candidate hasn't described the outcome. Your job is to generate a natural follow-up question that asks what happened as a result.");
-            sb.AppendLine();
-            sb.AppendLine("Follow-up requirements:");
-            sb.AppendLine("- Start by acknowledging or paraphrasing the actions the candidate described (use their words)");
-            sb.AppendLine("- Then naturally ask what the outcome or result was");
-            sb.AppendLine("- NEVER use generic questions like \"What was the outcome?\" — always reference specific details from their answer");
-            sb.AppendLine("- Do NOT ask for information the candidate already provided in this response OR any earlier response");
-            sb.AppendLine("- Keep it to 1-2 natural sentences");
-            sb.AppendLine("Marker: [FOLLOW_UP:result]");
-        }
-        else
-        {
-            if (request.IsLastCompetency)
-                sb.AppendLine("Maximum follow-ups reached or no further follow-up is possible. Briefly and warmly acknowledge the candidate's answer. Do NOT mention moving to another question.");
-            else
-                sb.AppendLine("Maximum follow-ups reached or no further follow-up is possible. Briefly acknowledge and move on.");
-            sb.AppendLine("Marker: [TRANSITION]");
-        }
-
-        sb.AppendLine();
-        sb.AppendLine("## Output rules");
-        sb.AppendLine("- Your spoken response MUST be natural conversational speech — no markdown, no bullet points");
-        sb.AppendLine("- Keep it to 1-3 sentences maximum");
-        sb.AppendLine("- The metadata marker MUST be on its own line at the very end");
-        sb.AppendLine("- Do NOT include the marker text in the spoken portion");
-        sb.AppendLine("- Exactly ONE marker per response. Valid markers: [FOLLOW_UP:action], [FOLLOW_UP:result], [TRANSITION], [REPEAT], [OFF_TOPIC], [LANGUAGE_SWITCH:xx], [END_INTERVIEW]");
+        sb.AppendLine("Apply the classification, evaluation, and follow-up rules from the system prompt.");
 
         return sb.ToString();
-    }
-
-    /// <summary>
-    /// LATENCY-OPTIMIZED: Runs a fast evaluation of the candidate's response using Haiku
-    /// to determine action/result quality and competency score. Returns a result with
-    /// EnforceFollowUpRules already applied so the caller gets a deterministic decision.
-    /// </summary>
-    private async Task<HolisticEvaluationResult> QuickEvaluateAsync(
-        InterviewRuntimeContext context,
-        RespondToTurnRequest request,
-        CancellationToken cancellationToken)
-    {
-        var prompt = BuildQuickEvalPrompt(request, context);
-        var history = new List<ConversationTurn> { new() { Role = "user", Content = prompt } };
-        var response = await GatewayFacade.GenerateAnthropicCompletion(
-            "", history,
-            modelOverride: "claude-haiku-4-5",
-            temperatureOverride: 0.2,
-            maxTokensOverride: 256
-        ).ConfigureAwait(false);
-        return ParseQuickEval(response, request.PreviousFollowUpTarget);
-    }
-
-    private static string BuildQuickEvalPrompt(RespondToTurnRequest request, InterviewRuntimeContext context)
-    {
-        var sb = new StringBuilder();
-        sb.AppendLine("You are evaluating a candidate's behavioral interview response. Return ONLY a JSON object.");
-        sb.AppendLine();
-        sb.AppendLine($"Competency: {request.CompetencyName}");
-        sb.AppendLine($"Role: {context.Role.RoleName} ({context.Role.Industry})");
-        sb.AppendLine($"Question asked: {request.CurrentQuestion}");
-        if (!string.IsNullOrWhiteSpace(request.PreviousFollowUpTarget))
-            sb.AppendLine($"Previous follow-up probed: {request.PreviousFollowUpTarget}");
-        sb.AppendLine();
-
-        sb.AppendLine("=== FULL ACCUMULATED CANDIDATE TRANSCRIPT ===");
-        sb.AppendLine($"\"{request.AccumulatedTranscript}\"");
-        sb.AppendLine();
-
-        sb.AppendLine("## Scoring (1-5)");
-        sb.AppendLine("1 — No evidence: Vague or can't articulate a relevant example");
-        sb.AppendLine("2 — Weak: Generic answer, no specifics, story is incomplete");
-        sb.AppendLine("3 — Adequate: Real example with some specifics, story mostly complete");
-        sb.AppendLine("4 — Strong: Concrete, specific, self-aware, complete story with clear actions and outcome");
-        sb.AppendLine("5 — Exceptional: Specific process, demonstrates mastery, connects actions to measurable impact");
-        sb.AppendLine();
-
-        sb.AppendLine("## Evidence Assessment — Action and Result ONLY");
-        sb.AppendLine("action_quality — Did the candidate describe specific, concrete steps THEY personally took?");
-        sb.AppendLine("  complete — Specific actions described clearly, even if brief (e.g. \"I inspected the oil, found metal, told the customer\")");
-        sb.AppendLine("  weak — Actions mentioned but vague (e.g. \"I helped them\")");
-        sb.AppendLine("  missing — No meaningful description of what they did");
-        sb.AppendLine("A concise list of concrete steps counts as complete. Do NOT require lengthy elaboration.");
-        sb.AppendLine();
-        sb.AppendLine("result_quality — Did the candidate describe a clear outcome? Check the FULL transcript, not just the latest response.");
-        sb.AppendLine("  complete — Clear, specific outcome at ANY point (e.g. \"she became a return customer\", \"the issue was resolved\")");
-        sb.AppendLine("  weak — Outcome vaguely implied (e.g. \"it worked out\")");
-        sb.AppendLine("  missing — No outcome described anywhere in the transcript");
-        sb.AppendLine();
-
-        sb.AppendLine("Respond with ONLY this JSON (no markdown, no explanation):");
-        sb.AppendLine("{\"competency_score\":<1-5>,\"action_quality\":\"<complete|weak|missing>\",\"result_quality\":\"<complete|weak|missing>\"}");
-
-        return sb.ToString();
-    }
-
-    private static HolisticEvaluationResult ParseQuickEval(string aiResponse, string? previousFollowUpTarget)
-    {
-        var result = new HolisticEvaluationResult();
-
-        try
-        {
-            var jsonStart = aiResponse.IndexOf('{');
-            var jsonEnd = aiResponse.LastIndexOf('}');
-            if (jsonStart >= 0 && jsonEnd > jsonStart)
-            {
-                var json = aiResponse.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                using var doc = JsonDocument.Parse(json);
-                var root = doc.RootElement;
-
-                if (root.TryGetProperty("competency_score", out var sc) && sc.ValueKind == JsonValueKind.Number && sc.TryGetInt32(out var score))
-                    result.CompetencyScore = Math.Max(1, Math.Min(5, score));
-                else
-                    result.CompetencyScore = 1;
-
-                result.ActionQuality = root.TryGetProperty("action_quality", out var aq) && aq.ValueKind == JsonValueKind.String
-                    ? aq.GetString() ?? "missing" : "missing";
-                result.ResultQuality = root.TryGetProperty("result_quality", out var rq) && rq.ValueKind == JsonValueKind.String
-                    ? rq.GetString() ?? "missing" : "missing";
-            }
-        }
-        catch (Exception ex) when (ex is JsonException || ex is InvalidOperationException)
-        {
-            Console.WriteLine($"[INTERVIEW][EVAL] Failed to parse quick eval JSON: {ex.Message}. Raw: {aiResponse}");
-            result.CompetencyScore = 1;
-            result.ActionQuality = "missing";
-            result.ResultQuality = "missing";
-        }
-
-        InterviewRuntimeManager.EnforceFollowUpRules(result, previousFollowUpTarget);
-        return result;
     }
 
     private static List<ConversationTurn> BuildChatHistory(RespondToTurnRequest request)
@@ -362,22 +484,101 @@ internal sealed class InterviewConversationManager : IDisposable
         return history;
     }
 
-    private static TurnResponseMetadata ParseMetadata(string rawResponse)
+    private static TurnResponseMetadata ParseMetadata(string rawResponse, string? previousFollowUpTarget = null)
     {
-        var match = MetadataMarkerRegex.Match(rawResponse);
-        if (!match.Success)
+        var nlPos = rawResponse.IndexOf('\n');
+        if (nlPos >= 0)
         {
-            return new TurnResponseMetadata
+            var firstLine = rawResponse.Substring(0, nlPos).Trim();
+
+            // Try eval line first (with or without score)
+            var evalMatch = EvalLineRegex.Match(firstLine);
+            if (evalMatch.Success)
             {
-                SpokenText = rawResponse,
-                ResponseType = "transition",
-                FollowUpTarget = null
-            };
+                var actionQuality = evalMatch.Groups[1].Value.ToLowerInvariant();
+                var resultQuality = evalMatch.Groups[2].Value.ToLowerInvariant();
+                var score = evalMatch.Groups[3].Success && int.TryParse(evalMatch.Groups[3].Value, out var s) ? s : 3;
+                score = Math.Max(1, Math.Min(5, score));
+
+                var evalResult = new HolisticEvaluationResult
+                {
+                    CompetencyScore = score,
+                    ActionQuality = actionQuality,
+                    ResultQuality = resultQuality
+                };
+                InterviewRuntimeManager.EnforceFollowUpRules(evalResult, previousFollowUpTarget);
+
+                string responseType;
+                string? followUpTarget = null;
+                if (evalResult.FollowUpNeeded && evalResult.FollowUpTarget != null)
+                {
+                    responseType = "follow_up";
+                    followUpTarget = evalResult.FollowUpTarget;
+                }
+                else
+                {
+                    responseType = "transition";
+                }
+
+                return new TurnResponseMetadata
+                {
+                    SpokenText = rawResponse.Substring(nlPos + 1).Trim(),
+                    ResponseType = responseType,
+                    FollowUpTarget = followUpTarget,
+                    CompetencyScore = score,
+                    ActionQuality = actionQuality,
+                    ResultQuality = resultQuality
+                };
+            }
+
+            var firstMatch = MarkerLineRegex.Match(firstLine);
+            if (firstMatch.Success)
+            {
+                var meta = BuildMetadataFromMatch(firstMatch);
+                meta.SpokenText = rawResponse.Substring(nlPos + 1).Trim();
+                return meta;
+            }
         }
 
-        var spokenText = rawResponse[..match.Index].Trim();
-        var markerText = match.Value.Trim();
+        var lastMatch = MarkerLastRegex.Match(rawResponse);
+        if (lastMatch.Success)
+        {
+            var meta = BuildMetadataFromMatch(lastMatch);
+            meta.SpokenText = rawResponse[..lastMatch.Index].Trim();
+            return meta;
+        }
 
+        return new TurnResponseMetadata
+        {
+            SpokenText = StripLeadingEvalLine(rawResponse),
+            ResponseType = "transition",
+            FollowUpTarget = null
+        };
+    }
+
+    /// <summary>Removes a leading [EVAL:...] line from text so it is never sent as spoken content to the user.</summary>
+    private static string StripLeadingEvalLine(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return text;
+        var match = LeadingEvalLineRegex.Match(text);
+        return match.Success ? text.Substring(match.Length).Trim() : text.Trim();
+    }
+
+    /// <summary>
+    /// Removes ALL known response markers from spoken text. Handles cases where the LLM
+    /// outputs markers within the spoken portion (e.g. [END_INTERVIEW] after an [EVAL:...] line).
+    /// </summary>
+    private static string StripMarkersFromSpokenText(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return text;
+        var cleaned = AnyMarkerRegex.Replace(text, "");
+        cleaned = Regex.Replace(cleaned, @"\s*[\r\n]+\s*", " ");
+        return cleaned.Trim();
+    }
+
+    private static TurnResponseMetadata BuildMetadataFromMatch(Match match)
+    {
+        var markerText = match.Value.Trim();
         string responseType;
         string? followUpTarget = null;
         string? languageCode = null;
@@ -411,7 +612,7 @@ internal sealed class InterviewConversationManager : IDisposable
 
         return new TurnResponseMetadata
         {
-            SpokenText = spokenText,
+            SpokenText = "",
             ResponseType = responseType,
             FollowUpTarget = followUpTarget,
             LanguageCode = languageCode
@@ -484,4 +685,10 @@ public class TurnResponseMetadata
     public string? FollowUpTarget { get; set; }
     /// <summary>ISO 639-1 language code when ResponseType is "language_switch", null otherwise</summary>
     public string? LanguageCode { get; set; }
+    /// <summary>Competency score (1-5) from eval line, null for edge-case responses</summary>
+    public int? CompetencyScore { get; set; }
+    /// <summary>"complete", "weak", or "missing" from eval line, null for edge-case responses</summary>
+    public string? ActionQuality { get; set; }
+    /// <summary>"complete", "weak", or "missing" from eval line, null for edge-case responses</summary>
+    public string? ResultQuality { get; set; }
 }

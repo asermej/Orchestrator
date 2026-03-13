@@ -42,7 +42,7 @@ internal sealed class ElevenLabsTtsWsVoiceSettings
 internal sealed class ElevenLabsTtsWsGenerationConfig
 {
     [JsonPropertyName("chunk_length_schedule")]
-    public int[] ChunkLengthSchedule { get; set; } = [120, 160, 250, 290];
+    public int[] ChunkLengthSchedule { get; set; } = [80, 120, 200, 290];
 }
 
 /// <summary>

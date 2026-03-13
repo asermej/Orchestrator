@@ -11,6 +11,8 @@ const API_BASE =
  * Response metadata (text, type, follow-up target) is returned in headers.
  */
 export async function POST(request: NextRequest) {
+  const proxyStart = performance.now();
+
   try {
     const body = await request.json().catch(() => ({}));
     const { interviewId, ...turnPayload } = body;
@@ -22,15 +24,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const fetchStart = performance.now();
     const url = `${API_BASE}/api/v1/Interview/${interviewId}/runtime/respond-to-turn`;
     const backendResponse = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(turnPayload),
     });
+    const headersReceivedMs = Math.round(performance.now() - fetchStart);
 
     if (!backendResponse.ok) {
       const errorData = await backendResponse.json().catch(() => ({}));
+      console.error(`[TIMING][proxy] respond-to-turn backend error: ${backendResponse.status} after ${headersReceivedMs}ms`);
       return NextResponse.json(
         { error: errorData.error ?? `Backend error: ${backendResponse.status}` },
         { status: backendResponse.status }
@@ -45,18 +50,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const responseText = backendResponse.headers.get("X-Response-Text") || "";
     const responseType = backendResponse.headers.get("X-Response-Type") || "transition";
     const followUpTarget = backendResponse.headers.get("X-Follow-Up-Target") || "";
     const languageCode = backendResponse.headers.get("X-Language-Code") || "";
 
+    console.log(
+      `[TIMING][proxy] respond-to-turn headers received: ${headersReceivedMs}ms | type=${responseType} | parse=${Math.round(performance.now() - proxyStart)}ms`
+    );
+
     const headers: Record<string, string> = {
       "Content-Type": "audio/mpeg",
       "Cache-Control": "no-cache",
-      "X-Response-Text": responseText,
       "X-Response-Type": responseType,
       "Access-Control-Expose-Headers":
-        "X-Response-Text, X-Response-Type, X-Follow-Up-Target, X-Language-Code",
+        "X-Response-Type, X-Follow-Up-Target, X-Language-Code",
     };
 
     if (followUpTarget) {
@@ -69,9 +76,10 @@ export async function POST(request: NextRequest) {
 
     return new NextResponse(responseBody, { status: 200, headers });
   } catch (error) {
+    const elapsed = Math.round(performance.now() - proxyStart);
     const errorMessage =
       error instanceof Error ? error.message : "Internal server error";
-    console.error("[voice/respond-to-turn] Error:", errorMessage);
+    console.error(`[TIMING][proxy] respond-to-turn error after ${elapsed}ms:`, errorMessage);
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
