@@ -19,6 +19,18 @@ namespace Orchestrator.Domain;
 /// </summary>
 internal sealed class InterviewConversationManager : IDisposable
 {
+    /// <summary>Populated for <c>[INTERVIEW][METRICS_ROW]</c> JSON logs (join with FE via <see cref="RespondToTurnRequest.CorrelationId"/>).</summary>
+    private sealed class RespondToTurnPipelineMetrics
+    {
+        public long? FirstTokenMs { get; set; }
+        public long? MarkerDetectedMs { get; set; }
+        public long LlmTotalMs { get; set; }
+        public bool UsedFallbackParse { get; set; }
+        public long TtsFirstAudioMs { get; set; }
+        public long TtsTotalMs { get; set; }
+        public int TtsSentenceCount { get; set; }
+    }
+
     private readonly ServiceLocatorBase _serviceLocator;
     private GatewayFacade? _gatewayFacade;
     private GatewayFacade GatewayFacade => _gatewayFacade ??= new GatewayFacade(_serviceLocator);
@@ -96,10 +108,28 @@ internal sealed class InterviewConversationManager : IDisposable
             yield return chunk;
         }
 
-        await pipelineTask.ConfigureAwait(false);
+        var pipelineMetrics = await pipelineTask.ConfigureAwait(false);
 
         turnSw.Stop();
         Console.WriteLine($"[INTERVIEW][TIMING] Turn total: {turnSw.ElapsedMilliseconds}ms");
+
+        var metricsRow = new
+        {
+            schema = "interview.respond_to_turn.pipeline",
+            interviewId = context.Interview.Id,
+            correlationId = request.CorrelationId,
+            competencyId = request.CompetencyId,
+            phase = request.Phase,
+            turnTotalMs = turnSw.ElapsedMilliseconds,
+            firstTokenMs = pipelineMetrics.FirstTokenMs,
+            markerDetectedMs = pipelineMetrics.MarkerDetectedMs,
+            llmTotalMs = pipelineMetrics.LlmTotalMs,
+            usedFallbackParse = pipelineMetrics.UsedFallbackParse,
+            ttsFirstAudioMs = pipelineMetrics.TtsFirstAudioMs,
+            ttsTotalMs = pipelineMetrics.TtsTotalMs,
+            ttsSentenceCount = pipelineMetrics.TtsSentenceCount
+        };
+        Console.WriteLine($"[INTERVIEW][METRICS_ROW] {JsonSerializer.Serialize(metricsRow)}");
     }
 
     /// <summary>
@@ -108,7 +138,7 @@ internal sealed class InterviewConversationManager : IDisposable
     /// the LLM is still generating tokens. Handles both [EVAL:...] lines (on-topic) and
     /// direct markers (edge cases) on line 1.
     /// </summary>
-    private async Task RunLlmPipelineAsync(
+    private async Task<RespondToTurnPipelineMetrics> RunLlmPipelineAsync(
         ChannelWriter<byte[]> audioWriter,
         string systemPromptStatic,
         string? systemPromptInterview,
@@ -117,13 +147,15 @@ internal sealed class InterviewConversationManager : IDisposable
         string? previousFollowUpTarget,
         CancellationToken ct)
     {
+        var metrics = new RespondToTurnPipelineMetrics();
         var sentenceChannel = Channel.CreateUnbounded<ChannelReader<byte[]>>();
-        var drainTask = DrainTtsToChannelAsync(sentenceChannel.Reader, audioWriter, ct);
+        var drainTask = DrainTtsToChannelAsync(sentenceChannel.Reader, audioWriter, metrics, ct);
 
         try
         {
             var llmSw = Stopwatch.StartNew();
             long firstTokenMs = 0;
+            long? markerDetectedAtMs = null;
             var fullResponse = new StringBuilder();
             var sentenceBuffer = new StringBuilder();
             bool markerDetected = false;
@@ -152,6 +184,7 @@ internal sealed class InterviewConversationManager : IDisposable
                         if (evalMatch.Success)
                         {
                             markerDetected = true;
+                            markerDetectedAtMs = llmSw.ElapsedMilliseconds;
                             var actionQuality = evalMatch.Groups[1].Value.ToLowerInvariant();
                             var resultQuality = evalMatch.Groups[2].Value.ToLowerInvariant();
                             var score = evalMatch.Groups[3].Success && int.TryParse(evalMatch.Groups[3].Value, out var s) ? s : 3;
@@ -187,6 +220,8 @@ internal sealed class InterviewConversationManager : IDisposable
                             };
                             Console.WriteLine($"[INTERVIEW][TIMING] Marker detected at {llmSw.ElapsedMilliseconds}ms | eval: action={actionQuality},result={resultQuality},score={score} | decision={responseType}{(followUpTarget != null ? $":{followUpTarget}" : "")}");
 
+                            await WriteEarlyMetadataAsync(audioWriter, metadata, ct).ConfigureAwait(false);
+
                             var afterMarker = accumulated.Substring(newlinePos + 1);
                             if (afterMarker.Length > 0)
                             {
@@ -201,8 +236,11 @@ internal sealed class InterviewConversationManager : IDisposable
                         if (markerMatch.Success)
                         {
                             markerDetected = true;
+                            markerDetectedAtMs = llmSw.ElapsedMilliseconds;
                             metadata = BuildMetadataFromMatch(markerMatch);
                             Console.WriteLine($"[INTERVIEW][TIMING] Marker detected at {llmSw.ElapsedMilliseconds}ms | type={metadata.ResponseType}, target={metadata.FollowUpTarget ?? "n/a"}");
+
+                            await WriteEarlyMetadataAsync(audioWriter, metadata, ct).ConfigureAwait(false);
 
                             var afterMarker = accumulated.Substring(newlinePos + 1);
                             if (afterMarker.Length > 0)
@@ -219,11 +257,15 @@ internal sealed class InterviewConversationManager : IDisposable
                 sentenceCount += QueueCompleteSentencesToChannel(sentenceBuffer, sentenceChannel.Writer, voiceId, ct, ref preWarmTask);
             }
             llmSw.Stop();
+            metrics.FirstTokenMs = firstTokenMs > 0 ? firstTokenMs : null;
+            metrics.MarkerDetectedMs = markerDetectedAtMs;
+            metrics.LlmTotalMs = llmSw.ElapsedMilliseconds;
 
             var remaining = sentenceBuffer.ToString().Trim();
 
             if (!markerDetected)
             {
+                metrics.UsedFallbackParse = true;
                 var rawResponse = fullResponse.ToString().Trim();
                 metadata = ParseMetadata(rawResponse, previousFollowUpTarget);
                 metadata.SpokenText = StripMarkersFromSpokenText(metadata.SpokenText);
@@ -297,6 +339,8 @@ internal sealed class InterviewConversationManager : IDisposable
                     spokenText = StripMarkersFromSpokenText(metadata!.SpokenText);
                 }
 
+                FixTransitionFollowUpMismatch(metadata!, spokenText);
+
                 var trailerJson = JsonSerializer.Serialize(new
                 {
                     spokenText,
@@ -314,6 +358,8 @@ internal sealed class InterviewConversationManager : IDisposable
                 Buffer.BlockCopy(jsonBytes, 0, trailerBytes, delimiter.Length, jsonBytes.Length);
                 await audioWriter.WriteAsync(trailerBytes, ct).ConfigureAwait(false);
             }
+
+            return metrics;
         }
         catch (Exception ex)
         {
@@ -327,6 +373,25 @@ internal sealed class InterviewConversationManager : IDisposable
         }
     }
 
+    /// Sends an early metadata signal to the frontend before any TTS audio, so the client
+    /// can begin pre-generating the next competency question while transition audio plays.
+    private static async Task WriteEarlyMetadataAsync(
+        ChannelWriter<byte[]> audioWriter, TurnResponseMetadata metadata, CancellationToken ct)
+    {
+        var json = JsonSerializer.Serialize(new
+        {
+            responseType = metadata.ResponseType,
+            followUpTarget = metadata.FollowUpTarget,
+            early = true
+        });
+        var jsonBytes = Encoding.UTF8.GetBytes(json);
+        var delimiter = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 };
+        var chunk = new byte[delimiter.Length + jsonBytes.Length];
+        Buffer.BlockCopy(delimiter, 0, chunk, 0, delimiter.Length);
+        Buffer.BlockCopy(jsonBytes, 0, chunk, delimiter.Length, jsonBytes.Length);
+        await audioWriter.WriteAsync(chunk, ct).ConfigureAwait(false);
+    }
+
     /// <summary>
     /// Reads per-sentence ChannelReaders in order and forwards audio chunks to audioWriter
     /// as they arrive from TTS. Each sentence's chunks stream through without waiting for
@@ -335,6 +400,7 @@ internal sealed class InterviewConversationManager : IDisposable
     private static async Task DrainTtsToChannelAsync(
         ChannelReader<ChannelReader<byte[]>> sentenceReader,
         ChannelWriter<byte[]> audioWriter,
+        RespondToTurnPipelineMetrics metrics,
         CancellationToken ct)
     {
         var ttsTotalSw = Stopwatch.StartNew();
@@ -360,6 +426,9 @@ internal sealed class InterviewConversationManager : IDisposable
         }
 
         ttsTotalSw.Stop();
+        metrics.TtsFirstAudioMs = firstAudioChunkMs;
+        metrics.TtsTotalMs = ttsTotalSw.ElapsedMilliseconds;
+        metrics.TtsSentenceCount = sentenceIndex;
         if (sentenceIndex > 0)
             Console.WriteLine($"[INTERVIEW][TIMING] TTS total: {ttsTotalSw.ElapsedMilliseconds}ms (first audio: {firstAudioChunkMs}ms, {sentenceIndex} sentences)");
     }
@@ -520,7 +589,7 @@ internal sealed class InterviewConversationManager : IDisposable
                     responseType = "transition";
                 }
 
-                return new TurnResponseMetadata
+                var meta = new TurnResponseMetadata
                 {
                     SpokenText = rawResponse.Substring(nlPos + 1).Trim(),
                     ResponseType = responseType,
@@ -529,6 +598,8 @@ internal sealed class InterviewConversationManager : IDisposable
                     ActionQuality = actionQuality,
                     ResultQuality = resultQuality
                 };
+                FixTransitionFollowUpMismatch(meta, meta.SpokenText);
+                return meta;
             }
 
             var firstMatch = MarkerLineRegex.Match(firstLine);
@@ -554,6 +625,32 @@ internal sealed class InterviewConversationManager : IDisposable
             ResponseType = "transition",
             FollowUpTarget = null
         };
+    }
+
+    /// <summary>
+    /// Guards against the LLM generating a follow-up question in its spoken text while
+    /// the eval-based rules determined a transition (no follow-up). If the spoken text
+    /// ends with a question mark but the response type is "transition", the candidate
+    /// would hear a question but the system would immediately move on. Override to
+    /// "follow_up" so the frontend waits for the candidate's answer.
+    /// </summary>
+    private static void FixTransitionFollowUpMismatch(TurnResponseMetadata metadata, string spokenText)
+    {
+        if (metadata.ResponseType != "transition") return;
+        if (string.IsNullOrWhiteSpace(spokenText)) return;
+
+        var trimmed = spokenText.TrimEnd();
+        if (!trimmed.EndsWith('?')) return;
+
+        string? inferredTarget = null;
+        if (metadata.ActionQuality is "weak" or "missing")
+            inferredTarget = "action";
+        else if (metadata.ResultQuality is "weak" or "missing")
+            inferredTarget = "result";
+
+        metadata.ResponseType = "follow_up";
+        metadata.FollowUpTarget = inferredTarget;
+        Console.WriteLine($"[INTERVIEW] Overriding transition→follow_up: spoken text ends with '?' | target={inferredTarget ?? "null"}");
     }
 
     /// <summary>Removes a leading [EVAL:...] line from text so it is never sent as spoken content to the user.</summary>
@@ -671,6 +768,9 @@ public class RespondToTurnRequest
     public string? PreviousAiResponse { get; set; }
     /// <summary>True when this is the final competency in the interview; prevents "let's move on" phrasing in the transition.</summary>
     public bool IsLastCompetency { get; set; }
+
+    /// <summary>Optional client id to correlate FE and API timing logs.</summary>
+    public string? CorrelationId { get; set; }
 }
 
 /// <summary>

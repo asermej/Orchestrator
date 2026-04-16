@@ -6,6 +6,7 @@ using Orchestrator.Api.Mappers;
 using Orchestrator.Api.Common;
 using Orchestrator.Api.Middleware;
 using System.Diagnostics;
+using System.Text.Json;
 
 namespace Orchestrator.Api.Controllers;
 
@@ -998,7 +999,8 @@ public class InterviewController : ControllerBase
             RepeatsRemaining = request.RepeatsRemaining,
             Language = request.Language,
             PreviousAiResponse = request.PreviousAiResponse,
-            IsLastCompetency = request.IsLastCompetency
+            IsLastCompetency = request.IsLastCompetency,
+            CorrelationId = request.CorrelationId
         };
 
         Response.ContentType = "audio/mpeg";
@@ -1026,6 +1028,20 @@ public class InterviewController : ControllerBase
 
             requestSw.Stop();
             Console.WriteLine($"[INTERVIEW][TIMING][API] respond-to-turn complete: {requestSw.ElapsedMilliseconds}ms | ctx={ctxSw.ElapsedMilliseconds}ms, first_chunk={firstChunkMs}ms, chunks={totalChunks}, bytes={totalBytes}");
+            var apiMetrics = new
+            {
+                schema = "interview.respond_to_turn.api",
+                interviewId = id,
+                correlationId = request.CorrelationId,
+                competencyId = request.CompetencyId,
+                phase = request.Phase,
+                ctxMs = ctxSw.ElapsedMilliseconds,
+                firstChunkMs = firstChunkMs,
+                totalMs = requestSw.ElapsedMilliseconds,
+                totalChunks,
+                totalBytes
+            };
+            Console.WriteLine($"[INTERVIEW][METRICS_ROW] {JsonSerializer.Serialize(apiMetrics)}");
         }
         catch (Exception) when (Response.HasStarted)
         {

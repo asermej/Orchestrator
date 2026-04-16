@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
 interface DeepgramSttOptions {
-  onFinalTranscript: (text: string) => void;
+  onFinalTranscript: (text: string, lastSpeechAt: number) => void;
   onInterimTranscript?: (text: string) => void;
   onBargeIn?: () => void;
   onError?: (error: string) => void;
@@ -52,6 +52,7 @@ export function useDeepgramStt({
 
   const bargeInFiredRef = useRef(false);
   const accumulatedTranscriptRef = useRef("");
+  const lastSpeechAtRef = useRef<number>(0);
   const isStoppingRef = useRef(false);
   const isListeningRef = useRef(false);
   const isPausedRef = useRef(false);
@@ -216,16 +217,20 @@ export function useDeepgramStt({
       }
     }
 
-    // speech_final (endpointing=800ms) is the primary turn-completion signal.
-    // UtteranceEnd (utterance_end_ms=2000ms) is the fallback for noisy environments
-    // where endpointing doesn't trigger cleanly.
+    // speech_final (endpointing) is the primary turn-completion signal.
+    // Interview candidates naturally pause to think mid-answer (1-2s is common),
+    // so endpointing must be generous to avoid cutting them off.
+    // Bounded experiment: 700ms (was 800) — revert if cut-offs increase (see interview-voice-metrics.md).
+    // UtteranceEnd (utterance_end_ms) is the fallback for noisy environments
+    // where the VAD can't detect sufficient silence to trigger endpointing.
     const params = new URLSearchParams({
       model: "nova-3",
       encoding: "linear16",
       sample_rate: String(SAMPLE_RATE),
       interim_results: "true",
-      endpointing: "1100",
-      utterance_end_ms: "2000",
+      endpointing: "700",
+      utterance_end_ms: "1500",
+      vad_events: "true",
       channels: "1",
     });
 
@@ -251,8 +256,11 @@ export function useDeepgramStt({
         if (data.type === "UtteranceEnd") {
           const fullTranscript = accumulatedTranscriptRef.current.trim();
           if (fullTranscript) {
-            console.log(`[TIMING][STT] UtteranceEnd fallback fired — ${fullTranscript.split(/\s+/).length} words`);
-            onFinalTranscriptRef.current(fullTranscript);
+            const endpointingMs = lastSpeechAtRef.current > 0
+              ? Math.round(performance.now() - lastSpeechAtRef.current)
+              : null;
+            console.log(`[TIMING][STT] UtteranceEnd fallback fired — ${fullTranscript.split(/\s+/).length} words${endpointingMs != null ? `, ${endpointingMs}ms after last speech (endpointing overhead)` : ""}`);
+            onFinalTranscriptRef.current(fullTranscript, lastSpeechAtRef.current);
             stopListening();
           }
           return;
@@ -264,12 +272,17 @@ export function useDeepgramStt({
         const isFinal: boolean = data.is_final === true;
         const speechFinal: boolean = data.speech_final === true;
 
+        if (isFinal && transcript) {
+          console.log(`[STT][diag] is_final=true speech_final=${speechFinal} transcript="${transcript}"`);
+        }
+
         if (transcript.trim().length >= BARGE_IN_MIN_CHARS && !bargeInFiredRef.current) {
           bargeInFiredRef.current = true;
           onBargeInRef.current?.();
         }
 
         if (isFinal && transcript) {
+          lastSpeechAtRef.current = performance.now();
           accumulatedTranscriptRef.current += (accumulatedTranscriptRef.current ? " " : "") + transcript;
           onInterimTranscriptRef.current?.(accumulatedTranscriptRef.current);
         } else if (!isFinal && transcript) {
@@ -282,8 +295,11 @@ export function useDeepgramStt({
         if (speechFinal) {
           const fullTranscript = accumulatedTranscriptRef.current.trim();
           if (fullTranscript) {
-            console.log(`[TIMING][STT] speech_final fired — ${fullTranscript.split(/\s+/).length} words`);
-            onFinalTranscriptRef.current(fullTranscript);
+            const endpointingMs = lastSpeechAtRef.current > 0
+              ? Math.round(performance.now() - lastSpeechAtRef.current)
+              : null;
+            console.log(`[TIMING][STT] speech_final fired — ${fullTranscript.split(/\s+/).length} words${endpointingMs != null ? `, ${endpointingMs}ms after last speech (endpointing overhead)` : ""}`);
+            onFinalTranscriptRef.current(fullTranscript, lastSpeechAtRef.current);
             stopListening();
           }
         }
@@ -306,7 +322,7 @@ export function useDeepgramStt({
         if (isListeningRef.current && !isPausedRef.current) {
           const fullTranscript = accumulatedTranscriptRef.current.trim();
           if (fullTranscript) {
-            onFinalTranscriptRef.current(fullTranscript);
+            onFinalTranscriptRef.current(fullTranscript, lastSpeechAtRef.current);
           }
           isListeningRef.current = false;
           setIsListening(false);
@@ -335,6 +351,7 @@ export function useDeepgramStt({
     setError(null);
     bargeInFiredRef.current = false;
     accumulatedTranscriptRef.current = "";
+    lastSpeechAtRef.current = 0;
     isStoppingRef.current = false;
 
     const connected = await ensureConnection();

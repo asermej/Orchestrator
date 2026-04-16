@@ -44,4 +44,7 @@ public class RespondToTurnResource
 
     /// <summary>True when this is the final competency in the interview; prevents "let's move on" phrasing.</summary>
     public bool IsLastCompetency { get; set; }
+
+    /// <summary>Optional client-generated id to join FE and API timing logs for the same turn.</summary>
+    public string? CorrelationId { get; set; }
 }

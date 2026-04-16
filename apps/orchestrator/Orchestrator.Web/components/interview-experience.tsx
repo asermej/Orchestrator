@@ -209,8 +209,14 @@ export function InterviewExperience({
   const ttsUnavailableRef = useRef(false);
 
   // ───── Pipelining: pre-generate first question + TTS during greeting ─────
-  const pregenQuestionRef = useRef<{ competencyIndex: number; text: string } | null>(null);
+  const pregenQuestionRef = useRef<{ competencyIndex: number; text: string; audioUrl?: string } | null>(null);
   const pregenQuestionAbortRef = useRef<AbortController | null>(null);
+  const pregenQuestionPromiseRef = useRef<Promise<void> | null>(null);
+
+  // ───── Pipelining: pre-generate closing template TTS during last competency ─────
+  const closingAudioRef = useRef<{ url: string; text: string } | null>(null);
+  const closingAbortRef = useRef<AbortController | null>(null);
+  const lastTransitionEndRef = useRef<number>(0);
 
   const stateMachine = useInterviewStateMachine();
   const { state } = stateMachine;
@@ -218,6 +224,34 @@ export function InterviewExperience({
   useEffect(() => { stateRef.current = state; }, [state]);
 
   const supportsMediaSource = typeof window !== "undefined" && "MediaSource" in window;
+
+  // Dev-only: expected abort/reset errors from navigation or stream teardown spam the console during latency tuning.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    const isBenignNetworkNoise = (msg: string) =>
+      /aborted|ECONNRESET|ERR_INCOMPLETE_CHUNKED_ENCODING|network error/i.test(msg);
+    const onWindowError = (ev: ErrorEvent) => {
+      const m = `${ev.message ?? ""}${(ev.error as Error)?.message ?? ""}`;
+      if (isBenignNetworkNoise(m)) {
+        ev.preventDefault();
+        console.debug("[interview] suppressed benign error:", ev.message);
+      }
+    };
+    const onRejection = (ev: PromiseRejectionEvent) => {
+      const r = ev.reason;
+      const msg = r instanceof Error ? r.message : String(r ?? "");
+      if (isBenignNetworkNoise(msg)) {
+        ev.preventDefault();
+        console.debug("[interview] suppressed benign rejection:", msg);
+      }
+    };
+    window.addEventListener("error", onWindowError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("error", onWindowError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, []);
 
   const questionsArray = questions || [];
   const allQuestions = [...questionsArray, ...followUpQuestions];
@@ -251,13 +285,44 @@ export function InterviewExperience({
     return `Hello ${applicantName}! I'm ${agentName}, and I'll be conducting your interview today. Let's get started with our first question. ${question?.text || "Tell me about yourself."}`;
   }, [applicantName, agentName, jobTitle, questionsArray, openingTemplate, isCompetencyMode]);
 
+  // ───── Unified AI-Speaks Timing ─────
+
+  interface AiSpeakEvent {
+    source: "pre-generated" | "respond-to-turn";
+    delayMs: number;
+    perceivedDelayMs: number | null;
+    label: string;
+    competency?: string;
+    responseType?: string;
+  }
+
+  const aiSpeakEventsRef = useRef<AiSpeakEvent[]>([]);
+  const streamContextRef = useRef<{ competency: string; phase: string } | null>(null);
+
+  function logAiSpeaks(event: AiSpeakEvent) {
+    aiSpeakEventsRef.current.push(event);
+    const perceived = event.perceivedDelayMs != null
+      ? `, perceived=${event.perceivedDelayMs}ms`
+      : "";
+    console.log(
+      `[TIMING][FE] AI SPEAKS — source=${event.source}, delay=${event.delayMs}ms${perceived} (${event.label})`
+    );
+  }
+
+  function updateLastAiSpeakEvent(updates: Partial<AiSpeakEvent>) {
+    const events = aiSpeakEventsRef.current;
+    if (events.length === 0) return;
+    const last = events[events.length - 1];
+    Object.assign(last, updates);
+  }
+
   // ───── Transcript Handling (Deepgram Nova-3 STT) ─────
 
   const stopPlaybackRef = useRef<(() => void) | null>(null);
 
-  const turnTimingRef = useRef<{ sttDoneAt: number } | null>(null);
+  const turnTimingRef = useRef<{ sttDoneAt: number; lastSpeechAt: number; correlationId: string } | null>(null);
 
-  const handleDeepgramFinal = useCallback((text: string) => {
+  const handleDeepgramFinal = useCallback((text: string, lastSpeechAt: number) => {
     if (silenceHandledRef.current) return;
     silenceHandledRef.current = true;
 
@@ -267,8 +332,14 @@ export function InterviewExperience({
       return;
     }
 
-    turnTimingRef.current = { sttDoneAt: performance.now() };
-    console.log("[TIMING][FE] STT final received — processing starts");
+    const now = performance.now();
+    const correlationId =
+      typeof globalThis.crypto !== "undefined" && "randomUUID" in globalThis.crypto
+        ? globalThis.crypto.randomUUID()
+        : `turn-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    turnTimingRef.current = { sttDoneAt: now, lastSpeechAt, correlationId };
+    const endpointingOverhead = lastSpeechAt > 0 ? Math.round(now - lastSpeechAt) : null;
+    console.log(`[TIMING][FE] ──── TURN START ──── STT final received at ${Math.round(now)}ms${endpointingOverhead != null ? ` | endpointing overhead: ${endpointingOverhead}ms` : ""}`);
 
     transcriptRef.current = message;
     setTranscript(message);
@@ -415,11 +486,15 @@ export function InterviewExperience({
       abortControllerRef.current?.abort();
       pregenAbortRef.current?.abort();
       pregenQuestionAbortRef.current?.abort();
+      closingAbortRef.current?.abort();
       if (mediaSourceRef.current?.readyState === "open") {
         try { mediaSourceRef.current.endOfStream(); } catch (e) {}
       }
       if (pregenAudioRef.current?.url) {
         URL.revokeObjectURL(pregenAudioRef.current.url);
+      }
+      if (closingAudioRef.current?.url) {
+        URL.revokeObjectURL(closingAudioRef.current.url);
       }
     };
   }, []);
@@ -450,7 +525,7 @@ export function InterviewExperience({
       }
 
       stateMachine.onTTSEnd();
-      setTimeout(() => startListeningRef.current?.(), 100);
+      startListeningRef.current?.();
     };
   }, [state, stateMachine, isPlaying, isCompetencyMode]);
 
@@ -534,18 +609,28 @@ export function InterviewExperience({
       language?: string;
       previousAiResponse?: string;
       isLastCompetency?: boolean;
+      correlationId?: string;
     },
     onMetadata?: (meta: { responseText: string; responseType: string; followUpTarget?: string; languageCode?: string }) => void,
   ): Promise<{ responseText: string; responseType: string; followUpTarget?: string; languageCode?: string }> => {
     const fetchStart = performance.now();
     const sttDoneAt = turnTimingRef.current?.sttDoneAt ?? fetchStart;
+    const lastSpeechAt = turnTimingRef.current?.lastSpeechAt ?? 0;
+    const correlationId =
+      turnPayload.correlationId ?? turnTimingRef.current?.correlationId ?? "";
 
-    console.log(`[TIMING][FE] fetch start — ${Math.round(fetchStart - sttDoneAt)}ms after STT final`);
+    let slowReplyTimer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      slowReplyTimer = setTimeout(() => {
+        setProcessingMessage("Still working — almost ready...");
+      }, 8000);
+
+      console.log(`[TIMING][FE] fetch start — ${Math.round(fetchStart - sttDoneAt)}ms after STT final`);
 
     const response = await fetch("/api/voice/respond-to-turn", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(turnPayload),
+      body: JSON.stringify({ ...turnPayload, correlationId: correlationId || undefined }),
     });
 
     const headersMs = Math.round(performance.now() - fetchStart);
@@ -554,6 +639,8 @@ export function InterviewExperience({
       console.error(`[TIMING][FE] respond-to-turn failed: ${response.status} after ${headersMs}ms`);
       throw new Error(`respond-to-turn failed: ${response.status}`);
     }
+
+    setProcessingMessage("Generating reply...");
 
     let responseType = response.headers.get("X-Response-Type") || "transition";
     let followUpTarget: string | undefined = response.headers.get("X-Follow-Up-Target") || undefined;
@@ -566,6 +653,11 @@ export function InterviewExperience({
     }
 
     let parsedResponseText = "";
+    /** First MP3 buffer appended to MediaSource (ms from fetch / STT final). */
+    let feFirstAudioFromFetchMs: number | null = null;
+    let feFirstAudioFromSttMs: number | null = null;
+    let fePlayFromFetchMs: number | null = null;
+    let fePlayFromSttMs: number | null = null;
 
     if (response.body && supportsMediaSource && audioRef.current) {
       streamingOwnsPlaybackRef.current = true;
@@ -590,7 +682,26 @@ export function InterviewExperience({
         const onPlaybackEnded = () => {
           const totalMs = Math.round(performance.now() - fetchStart);
           const e2eMs = Math.round(performance.now() - sttDoneAt);
-          console.log(`[TIMING][FE] playback ended — fetch=${totalMs}ms, e2e(STT→playback_end)=${e2eMs}ms`);
+          const endpointingMs = lastSpeechAt > 0 ? Math.round(sttDoneAt - lastSpeechAt) : null;
+          const perceivedMs = lastSpeechAt > 0 ? Math.round(performance.now() - lastSpeechAt) : null;
+          console.log(`[TIMING][FE] playback ended — fetch=${totalMs}ms, e2e(STT→playback_end)=${e2eMs}ms, audio.duration=${audio.duration?.toFixed(2)}s, audio.currentTime=${audio.currentTime?.toFixed(2)}s`);
+          console.log(
+            `[TIMING][METRICS_ROW] ${JSON.stringify({
+              schema: "interview.respond_to_turn.fe",
+              correlationId: correlationId || undefined,
+              interviewId: turnPayload.interviewId,
+              competencyId: turnPayload.competencyId,
+              phase: turnPayload.phase,
+              endpointingMs,
+              fetchToHeadersMs: headersMs,
+              fetchToFirstAudioMs: feFirstAudioFromFetchMs,
+              sttToFirstAudioMs: feFirstAudioFromSttMs,
+              fetchToPlayMs: fePlayFromFetchMs,
+              pipelineDelayMs: fePlayFromSttMs,
+              perceivedDelayMs: perceivedMs,
+              sttToPlaybackEndMs: e2eMs,
+            })}`
+          );
           safeResolve();
         };
         audio.addEventListener("ended", onPlaybackEnded);
@@ -605,6 +716,12 @@ export function InterviewExperience({
             const lastChunks: Uint8Array[] = [];
             let carryOver: Uint8Array | null = null;
             const DELIM_LEN = 8;
+
+            const recordFirstAudioBuffer = () => {
+              if (feFirstAudioFromFetchMs != null) return;
+              feFirstAudioFromFetchMs = Math.round(performance.now() - fetchStart);
+              feFirstAudioFromSttMs = Math.round(performance.now() - sttDoneAt);
+            };
 
             while (true) {
               let { done, value } = await reader.read();
@@ -639,6 +756,7 @@ export function InterviewExperience({
                   if (sourceBuffer.updating) {
                     await new Promise<void>(r => sourceBuffer.addEventListener("updateend", () => r(), { once: true }));
                   }
+                  recordFirstAudioBuffer();
                   sourceBuffer.appendBuffer(audioSlice);
                   // Ensure last slice is decoded before we call endOfStream later
                   await new Promise<void>(r => sourceBuffer.addEventListener("updateend", () => r(), { once: true }));
@@ -646,6 +764,15 @@ export function InterviewExperience({
                 try {
                   const trailerStr = new TextDecoder().decode(value.slice(trailerStart + DELIM_LEN));
                   const trailer = JSON.parse(trailerStr);
+                  if (trailer.early) {
+                    if (trailer.responseType) {
+                      responseType = trailer.responseType;
+                      followUpTarget = trailer.followUpTarget || undefined;
+                      languageCode = trailer.languageCode || undefined;
+                      onMetadata?.({ responseText: "", responseType, followUpTarget, languageCode });
+                    }
+                    continue;
+                  }
                   parsedResponseText = trailer.spokenText || "";
                   setCurrentSpokenText(parsedResponseText);
                   if (trailer.responseType) {
@@ -682,11 +809,25 @@ export function InterviewExperience({
               if (sourceBuffer.updating) {
                 await new Promise<void>(r => sourceBuffer.addEventListener("updateend", () => r(), { once: true }));
               }
+              recordFirstAudioBuffer();
               sourceBuffer.appendBuffer(value);
               if (!playbackStarted && audio) {
                 await new Promise<void>(r => sourceBuffer.addEventListener("updateend", () => r(), { once: true }));
                 const playStartMs = Math.round(performance.now() - fetchStart);
-                console.log(`[TIMING][FE] audio.play() called: ${playStartMs}ms from fetch`);
+                const playStartE2e = Math.round(performance.now() - sttDoneAt);
+                fePlayFromFetchMs = playStartMs;
+                fePlayFromSttMs = playStartE2e;
+                console.log(`[TIMING][FE] audio.play() called: ${playStartMs}ms from fetch, ${playStartE2e}ms from STT final ◀◀ AI STARTS SPEAKING`);
+                const ctx = streamContextRef.current;
+                const perceivedMs = lastSpeechAt > 0 ? Math.round(performance.now() - lastSpeechAt) : null;
+                logAiSpeaks({
+                  source: "respond-to-turn",
+                  delayMs: playStartE2e,
+                  perceivedDelayMs: perceivedMs,
+                  label: ctx ? `pending: ${ctx.competency}` : "pending",
+                  competency: ctx?.competency,
+                  responseType: "pending",
+                });
                 try {
                   await audio.play();
                 } catch (playErr) {
@@ -731,11 +872,14 @@ export function InterviewExperience({
             }
 
             const streamDoneMs = Math.round(performance.now() - fetchStart);
-            console.log(`[TIMING][FE] stream done: ${streamDoneMs}ms, ${chunkCount} audio chunks, playFailed=${playFailed}, text=${parsedResponseText ? "ok" : "MISSING"}`);
+            const streamDoneE2e = Math.round(performance.now() - sttDoneAt);
+            console.log(`[TIMING][FE] stream done: ${streamDoneMs}ms from fetch, ${streamDoneE2e}ms from STT, ${chunkCount} audio chunks, playFailed=${playFailed}, text=${parsedResponseText ? "ok" : "MISSING"}`);
+            console.log(`[TIMING][FE] stream done audio state: duration=${audio.duration?.toFixed(2)}s, currentTime=${audio.currentTime?.toFixed(2)}s, remaining=${((audio.duration || 0) - (audio.currentTime || 0)).toFixed(2)}s, paused=${audio.paused}, readyState=${audio.readyState}`);
             if (sourceBuffer.updating) {
               await new Promise<void>(r => sourceBuffer.addEventListener("updateend", () => r(), { once: true }));
             }
             if (mediaSource.readyState === "open") mediaSource.endOfStream();
+            console.log(`[TIMING][FE] endOfStream() called — duration now ${audio.duration?.toFixed(2)}s, remaining=${((audio.duration || 0) - (audio.currentTime || 0)).toFixed(2)}s`);
 
             // When the proxy buffers the entire response, audio + trailer can
             // arrive in a single read().  The trailer branch uses `continue`,
@@ -743,6 +887,8 @@ export function InterviewExperience({
             if (!playbackStarted && !playFailed && audio) {
               try {
                 await audio.play();
+                fePlayFromFetchMs = Math.round(performance.now() - fetchStart);
+                fePlayFromSttMs = Math.round(performance.now() - sttDoneAt);
                 playbackStarted = true;
               } catch (playErr) {
                 console.error("[TIMING][FE] audio.play() FAILED (post-stream):", playErr);
@@ -796,6 +942,17 @@ export function InterviewExperience({
         }
       }
       if (parsedResponseText) {
+        const fallbackE2e = Math.round(performance.now() - sttDoneAt);
+        const fallbackPerceived = lastSpeechAt > 0 ? Math.round(performance.now() - lastSpeechAt) : null;
+        const ctx = streamContextRef.current;
+        logAiSpeaks({
+          source: "respond-to-turn",
+          delayMs: fallbackE2e,
+          perceivedDelayMs: fallbackPerceived,
+          label: ctx ? `pending (no-mediasource): ${ctx.competency}` : "pending (no-mediasource)",
+          competency: ctx?.competency,
+          responseType: responseType || "pending",
+        });
         setCurrentSpokenText(parsedResponseText);
         setIsPlaying(true);
         const readingTime = Math.max(2000, parsedResponseText.length * 50);
@@ -806,7 +963,10 @@ export function InterviewExperience({
     }
 
     return { responseText: parsedResponseText, responseType, followUpTarget, languageCode };
-  }, [supportsMediaSource]);
+    } finally {
+      if (slowReplyTimer) clearTimeout(slowReplyTimer);
+    }
+  }, [supportsMediaSource, setProcessingMessage]);
 
   // ───── Competency Mode: Process Response ─────
 
@@ -878,7 +1038,7 @@ export function InterviewExperience({
     // ───── Primary response ─────
     if (competencyPhase === "primary" || competencyPhase === "generating") {
       setCompetencyPrimaryResponse(message);
-      setProcessingMessage("Thinking...");
+      setProcessingMessage("Received — preparing response...");
       setCompetencyPhase("evaluating");
 
       // LATENCY-CRITICAL: Try streaming respond-to-turn endpoint first.
@@ -889,9 +1049,15 @@ export function InterviewExperience({
         try {
           // Transition to AI_SPEAKING BEFORE audio plays so the <audio> onended handler
           // fires in the correct state and can transition back to LISTENING.
+          const preStreamAt = performance.now();
+          const sttRef = turnTimingRef.current?.sttDoneAt ?? preStreamAt;
+          console.log(`[TIMING][FE] pre-stream setup — ${Math.round(preStreamAt - sttRef)}ms after STT final`);
           stateMachine.finishThinking(false);
           await new Promise<void>(resolve => queueMicrotask(resolve));
+          console.log(`[TIMING][FE] state transition done — ${Math.round(performance.now() - sttRef)}ms after STT final`);
 
+          let pregenTriggered = false;
+          streamContextRef.current = { competency: comp.name, phase: "primary" };
           const { responseText, responseType, followUpTarget, languageCode } = await streamRespondToTurn({
             interviewId,
             candidateTranscript: message,
@@ -905,13 +1071,19 @@ export function InterviewExperience({
             language: interviewLanguageRef.current,
             previousAiResponse: lastAiResponseRef.current || undefined,
             isLastCompetency,
+            correlationId: turnTimingRef.current?.correlationId,
           }, (meta) => {
-            if (meta.responseType === "transition" && !isLastCompetency) {
+            if (meta.responseType === "transition" && !isLastCompetency && !pregenTriggered) {
+              pregenTriggered = true;
               pregenFirstQuestionRef.current?.(currentCompetencyIndex + 1, true);
             }
           });
           if (responseText) lastAiResponseRef.current = responseText;
+          const streamResolvedAt = performance.now();
+          lastTransitionEndRef.current = streamResolvedAt;
+          console.log(`[TIMING][FE] streamRespondToTurn resolved — ${Math.round(streamResolvedAt - sttRef)}ms after STT final, type=${responseType}`);
           console.log("[StreamingTurn]", comp.name, responseType, followUpTarget);
+          updateLastAiSpeakEvent({ responseType, label: `${responseType}: ${comp.name}` });
 
           if (languageCode) {
             interviewLanguageRef.current = languageCode;
@@ -930,8 +1102,10 @@ export function InterviewExperience({
             setTranscript("");
             transcriptRef.current = "";
             if (responseText) addAiMessage(responseText, true);
+            console.log(`[TIMING][FE] onTTSEnd (repeat) — ${Math.round(performance.now() - sttRef)}ms after STT final`);
             stateMachine.onTTSEnd();
-            setTimeout(() => startListeningRef.current?.(), 100);
+            console.log(`[TIMING][FE] ──── TURN END ──── startListening (repeat) — ${Math.round(performance.now() - sttRef)}ms after STT final`);
+            startListeningRef.current?.();
           } else if (responseType === "off_topic") {
             const compId = comp.competencyId;
             const current = redirectCountRef.current.get(compId) ?? 0;
@@ -950,8 +1124,10 @@ export function InterviewExperience({
               setTranscript("");
               transcriptRef.current = "";
               if (responseText) addAiMessage(responseText, true);
+              console.log(`[TIMING][FE] onTTSEnd (off_topic) — ${Math.round(performance.now() - sttRef)}ms after STT final`);
               stateMachine.onTTSEnd();
-              setTimeout(() => startListeningRef.current?.(), 100);
+              console.log(`[TIMING][FE] ──── TURN END ──── startListening (off_topic) — ${Math.round(performance.now() - sttRef)}ms after STT final`);
+              startListeningRef.current?.();
             }
           } else if (responseType === "language_switch") {
             setCompetencyPhase("primary");
@@ -959,8 +1135,10 @@ export function InterviewExperience({
             setTranscript("");
             transcriptRef.current = "";
             if (responseText) addAiMessage(responseText, true);
+            console.log(`[TIMING][FE] onTTSEnd (language_switch) — ${Math.round(performance.now() - sttRef)}ms after STT final`);
             stateMachine.onTTSEnd();
-            setTimeout(() => startListeningRef.current?.(), 100);
+            console.log(`[TIMING][FE] ──── TURN END ──── startListening (language_switch) — ${Math.round(performance.now() - sttRef)}ms after STT final`);
+            startListeningRef.current?.();
           } else if (responseType === "follow_up") {
             const evaluation: CompetencyEvaluation = {
               competencyScore: 0,
@@ -975,9 +1153,12 @@ export function InterviewExperience({
             setTranscript("");
             transcriptRef.current = "";
             if (responseText) addAiMessage(responseText, true);
+            console.log(`[TIMING][FE] onTTSEnd (follow_up) — ${Math.round(performance.now() - sttRef)}ms after STT final`);
             stateMachine.onTTSEnd();
-            setTimeout(() => startListeningRef.current?.(), 100);
+            console.log(`[TIMING][FE] ──── TURN END ──── startListening (follow_up) — ${Math.round(performance.now() - sttRef)}ms after STT final`);
+            startListeningRef.current?.();
           } else {
+            console.log(`[TIMING][FE] transition path — ${Math.round(performance.now() - sttRef)}ms after STT final, entering scoreAndFinishCompetency`);
             if (responseText) {
               addAiMessage(responseText, false);
             }
@@ -1044,7 +1225,7 @@ export function InterviewExperience({
       setCompetencyFollowUps(updatedFollowUps);
 
       if (competencyFollowUpCount < 2) {
-        setProcessingMessage("Thinking...");
+        setProcessingMessage("Received — preparing response...");
         const allResponses = [competencyPrimaryResponse, ...updatedFollowUps.map(fu => fu.response)];
         const accumulatedTranscript = allResponses.join("\n\n");
         const previousTarget = latestEvaluation?.followUpTarget ?? undefined;
@@ -1052,9 +1233,14 @@ export function InterviewExperience({
         // LATENCY-CRITICAL: Try streaming endpoint for follow-ups too
         if (interviewId) {
           try {
+            const fuSttRef = turnTimingRef.current?.sttDoneAt ?? performance.now();
+            console.log(`[TIMING][FE] followup pre-stream setup — ${Math.round(performance.now() - fuSttRef)}ms after STT final`);
             stateMachine.finishThinking(false);
             await new Promise<void>(resolve => queueMicrotask(resolve));
+            console.log(`[TIMING][FE] followup state transition done — ${Math.round(performance.now() - fuSttRef)}ms after STT final`);
 
+            let fuPregenTriggered = false;
+            streamContextRef.current = { competency: comp.name, phase: "followup" };
             const { responseText, responseType, followUpTarget, languageCode } = await streamRespondToTurn({
               interviewId,
               candidateTranscript: message,
@@ -1069,13 +1255,18 @@ export function InterviewExperience({
               language: interviewLanguageRef.current,
               previousAiResponse: lastAiResponseRef.current || undefined,
               isLastCompetency,
+              correlationId: turnTimingRef.current?.correlationId,
             }, (meta) => {
-              if (meta.responseType === "transition" && !isLastCompetency) {
+              if (meta.responseType === "transition" && !isLastCompetency && !fuPregenTriggered) {
+                fuPregenTriggered = true;
                 pregenFirstQuestionRef.current?.(currentCompetencyIndex + 1, true);
               }
             });
             if (responseText) lastAiResponseRef.current = responseText;
+            lastTransitionEndRef.current = performance.now();
+            console.log(`[TIMING][FE] followup streamRespondToTurn resolved — ${Math.round(performance.now() - fuSttRef)}ms after STT final, type=${responseType}`);
             console.log("[StreamingTurn followup]", comp.name, responseType, followUpTarget);
+            updateLastAiSpeakEvent({ responseType, label: `${responseType}: ${comp.name}` });
 
             if (languageCode) {
               interviewLanguageRef.current = languageCode;
@@ -1093,8 +1284,10 @@ export function InterviewExperience({
               setTranscript("");
               transcriptRef.current = "";
               if (responseText) addAiMessage(responseText, true);
+              console.log(`[TIMING][FE] onTTSEnd (followup/repeat) — ${Math.round(performance.now() - fuSttRef)}ms after STT final`);
               stateMachine.onTTSEnd();
-              setTimeout(() => startListeningRef.current?.(), 100);
+              console.log(`[TIMING][FE] ──── TURN END ──── startListening (followup/repeat) — ${Math.round(performance.now() - fuSttRef)}ms after STT final`);
+              startListeningRef.current?.();
             } else if (responseType === "off_topic") {
               const compId = comp.competencyId;
               const current = redirectCountRef.current.get(compId) ?? 0;
@@ -1112,16 +1305,20 @@ export function InterviewExperience({
                 setTranscript("");
                 transcriptRef.current = "";
                 if (responseText) addAiMessage(responseText, true);
+                console.log(`[TIMING][FE] onTTSEnd (followup/off_topic) — ${Math.round(performance.now() - fuSttRef)}ms after STT final`);
                 stateMachine.onTTSEnd();
-                setTimeout(() => startListeningRef.current?.(), 100);
+                console.log(`[TIMING][FE] ──── TURN END ──── startListening (followup/off_topic) — ${Math.round(performance.now() - fuSttRef)}ms after STT final`);
+                startListeningRef.current?.();
               }
             } else if (responseType === "language_switch") {
               setCompetencyFollowUps(competencyFollowUps);
               setTranscript("");
               transcriptRef.current = "";
               if (responseText) addAiMessage(responseText, true);
+              console.log(`[TIMING][FE] onTTSEnd (followup/language_switch) — ${Math.round(performance.now() - fuSttRef)}ms after STT final`);
               stateMachine.onTTSEnd();
-              setTimeout(() => startListeningRef.current?.(), 100);
+              console.log(`[TIMING][FE] ──── TURN END ──── startListening (followup/language_switch) — ${Math.round(performance.now() - fuSttRef)}ms after STT final`);
+              startListeningRef.current?.();
             } else if (responseType === "follow_up") {
               const evaluation: CompetencyEvaluation = {
                 competencyScore: 0,
@@ -1135,9 +1332,12 @@ export function InterviewExperience({
               setTranscript("");
               transcriptRef.current = "";
               if (responseText) addAiMessage(responseText, true);
+              console.log(`[TIMING][FE] onTTSEnd (followup/follow_up) — ${Math.round(performance.now() - fuSttRef)}ms after STT final`);
               stateMachine.onTTSEnd();
-              setTimeout(() => startListeningRef.current?.(), 100);
+              console.log(`[TIMING][FE] ──── TURN END ──── startListening (followup/follow_up) — ${Math.round(performance.now() - fuSttRef)}ms after STT final`);
+              startListeningRef.current?.();
             } else {
+              console.log(`[TIMING][FE] followup transition path — ${Math.round(performance.now() - fuSttRef)}ms after STT final, entering scoreAndFinishCompetency`);
               if (responseText) {
                 addAiMessage(responseText, false);
               }
@@ -1243,7 +1443,7 @@ export function InterviewExperience({
     skipScoreWait = false,
     alreadyTransitioned = false,
   ) => {
-    setProcessingMessage("Thinking...");
+    setProcessingMessage("Scoring your response...");
     setCompetencyPhase("scoring");
 
     const nextIndex = currentCompetencyIndex + 1;
@@ -1324,23 +1524,86 @@ export function InterviewExperience({
     lastAiResponseRef.current = null;
   }, []);
 
+  const preGenerateClosingAudio = useCallback(async () => {
+    if (!agentId || ttsUnavailableRef.current) return;
+    const closing = closingTemplate
+      ? substituteTemplateVariables(closingTemplate, { applicantName, agentName, jobTitle })
+      : `Thank you for completing this interview, ${applicantName}! We appreciate your time and will be in touch soon with next steps. Have a great day!`;
+
+    if (closingAudioRef.current?.text === closing) return;
+
+    closingAbortRef.current?.abort();
+    closingAbortRef.current = new AbortController();
+    console.log(`[TIMING][FE] closing template — pre-generating TTS in background`);
+    try {
+      const response = await fetch("/api/voice/speak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentId, text: closing }),
+        signal: closingAbortRef.current!.signal,
+      });
+      if (!response.ok) return;
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      closingAudioRef.current = { url: audioUrl, text: closing };
+      console.log(`[TIMING][FE] closing template — pre-generated TTS ready`);
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
+      console.warn("Closing template pre-generation failed (will fall back to live TTS):", err);
+    }
+  }, [agentId, closingTemplate, applicantName, agentName, jobTitle]);
+
   const startNextCompetency = useCallback(async (index: number, skipTransition = false) => {
     const comp = competencies![index];
-    setProcessingMessage("Thinking...");
+    const questionStartMs = performance.now();
+    setProcessingMessage("Loading next question...");
+
+    const isThisLastCompetency = index >= (competencies?.length ?? 0) - 1;
+    if (isThisLastCompetency) {
+      preGenerateClosingAudio();
+    }
 
     const isFirstCompetency = index === 0;
     const needsTransition = !isFirstCompetency && !skipTransition;
     const previousCompetencyName = !isFirstCompetency ? competencies![index - 1]?.name : undefined;
     let question = comp.primaryQuestion;
 
-    // Check if we already pre-generated the question during greeting playback
-    const pregen = pregenQuestionRef.current;
+    // Check if we already pre-generated the question during greeting/transition audio playback
+    let pregen = pregenQuestionRef.current;
+    if (!pregen && pregenQuestionPromiseRef.current) {
+      console.log(`[TIMING][FE] question pre-gen in-flight — awaiting promise for competency=${comp.name}`);
+      await pregenQuestionPromiseRef.current;
+      pregen = pregenQuestionRef.current;
+    }
+
+    let pregenAudioUrl: string | undefined;
+    let questionTextObtained = false;
+
     if (pregen && pregen.competencyIndex === index && pregen.text) {
+      console.log(`[TIMING][FE] question text pre-generated HIT — competency=${comp.name}, index=${index}`);
       question = pregen.text;
+      questionTextObtained = true;
+
+      if (!pregen.audioUrl && pregenQuestionPromiseRef.current) {
+        console.log(`[TIMING][FE] question audio in-flight — waiting up to 2000ms for competency=${comp.name}`);
+        await Promise.race([
+          pregenQuestionPromiseRef.current,
+          new Promise(r => setTimeout(r, 2000))
+        ]);
+        if (pregenQuestionRef.current?.competencyIndex === index) {
+          pregenAudioUrl = pregenQuestionRef.current.audioUrl;
+        }
+      } else {
+        pregenAudioUrl = pregen.audioUrl;
+      }
+
       pregenQuestionRef.current = null;
     } else if (onGenerateQuestion) {
+      console.log(`[TIMING][FE] question text pre-generated MISS — competency=${comp.name}, index=${index}, generating fresh`);
       try {
         question = await onGenerateQuestion(comp.competencyId, needsTransition, previousCompetencyName);
+        questionTextObtained = true;
+        console.log(`[TIMING][FE] question text generated — ${Math.round(performance.now() - questionStartMs)}ms`);
       } catch (err) {
         console.warn("Failed to generate question, using canonical example:", err);
       }
@@ -1350,27 +1613,34 @@ export function InterviewExperience({
     setCompetencyPhase("primary");
     addAiMessage(question, true);
 
-    // Check if we already pre-generated the TTS audio for this question
-    if (pregenAudioRef.current && pregenAudioRef.current.text === question) {
-      const pregenUrl = pregenAudioRef.current.url;
-      pregenAudioRef.current = null;
+    // Check pre-generated audio: first from question pre-gen ref, then from shared pre-gen ref
+    const audioUrlToPlay = pregenAudioUrl ?? (pregenAudioRef.current?.text === question ? pregenAudioRef.current.url : undefined);
+    if (pregenAudioRef.current?.text === question) pregenAudioRef.current = null;
+
+    if (audioUrlToPlay) {
+      console.log(`[TIMING][FE] question audio pre-generated HIT — competency=${comp.name}, playing immediately`);
+      logAiSpeaks({ source: "pre-generated", delayMs: Math.round(performance.now() - questionStartMs), perceivedDelayMs: null, label: `competency question: ${comp.name}`, competency: comp.name });
       try {
         setCurrentSpokenText(question);
         setIsPlaying(true);
         if (audioRef.current) {
-          audioRef.current.src = pregenUrl;
+          audioRef.current.src = audioUrlToPlay;
           await audioRef.current.play();
         }
+        console.log(`[TIMING][FE] question playback ended — competency=${comp.name}, ${Math.round(performance.now() - questionStartMs)}ms total`);
         return;
       } catch (err) {
         console.warn("Pre-generated audio play() failed, falling back to speakText:", err);
         setIsPlaying(false);
         setCurrentSpokenText(null);
       }
+    } else {
+      console.log(`[TIMING][FE] question audio pre-generated MISS — competency=${comp.name}, generating fresh TTS`);
+      logAiSpeaks({ source: "pre-generated", delayMs: Math.round(performance.now() - questionStartMs), perceivedDelayMs: null, label: `competency question: ${comp.name} (fresh)`, competency: comp.name });
     }
 
-    // Try combined generate-and-stream endpoint for non-pre-generated questions
-    if (interviewId && agentId && !pregen) {
+    // Combined endpoint only when we have NO question text at all (avoids duplicate generation)
+    if (interviewId && agentId && !questionTextObtained) {
       try {
         const res = await fetch("/api/voice/generate-and-stream", {
           method: "POST",
@@ -1414,7 +1684,7 @@ export function InterviewExperience({
     }
 
     await speakText(question);
-  }, [competencies, onGenerateQuestion, addAiMessage, interviewId, agentId]);
+  }, [competencies, onGenerateQuestion, addAiMessage, interviewId, agentId, preGenerateClosingAudio]);
 
   useEffect(() => { startNextCompetencyRef.current = startNextCompetency; }, [startNextCompetency]);
   useEffect(() => { currentCompetencyIndexRef.current = currentCompetencyIndex; }, [currentCompetencyIndex]);
@@ -1422,7 +1692,7 @@ export function InterviewExperience({
   // ───── Question Mode: Process Response ─────
 
   const processQuestionResponse = useCallback(async (message: string) => {
-    setProcessingMessage("Thinking...");
+    setProcessingMessage("Received — preparing response...");
 
     const isFollowUp = currentQuestion.isFollowUp || false;
     const followUpTemplateId = currentQuestion.followUpTemplateId;
@@ -1508,6 +1778,12 @@ export function InterviewExperience({
   }, [currentQuestionIndex, questionsArray, stateMachine, addAiMessage]);
 
   const handleComplete = useCallback(async () => {
+    const closingStartMs = performance.now();
+    const gapFromTransition = lastTransitionEndRef.current > 0
+      ? Math.round(closingStartMs - lastTransitionEndRef.current)
+      : null;
+    console.log(`[TIMING][FE] closing template — handleComplete entered${gapFromTransition != null ? `, ${gapFromTransition}ms after last transition audio ended` : ""}`);
+
     destroyDeepgramConnection();
 
     const completePromise = onComplete().catch(err => {
@@ -1520,16 +1796,81 @@ export function InterviewExperience({
 
     addAiMessage(closing);
 
-    // Prevent the global audio "ended" handler from firing onTTSPlaybackComplete
-    // (which would transition to LISTENING and try to start the mic). We own
-    // this playback lifecycle and will call stateMachine.complete() ourselves.
     streamingOwnsPlaybackRef.current = true;
     try {
-      await speakText(closing);
+      if (closingAudioRef.current && closingAudioRef.current.text === closing) {
+        console.log(`[TIMING][FE] closing template — pre-generated audio HIT, playing immediately (${Math.round(performance.now() - closingStartMs)}ms setup)`);
+        logAiSpeaks({ source: "pre-generated", delayMs: Math.round(performance.now() - closingStartMs), perceivedDelayMs: null, label: "closing" });
+        const closingUrl = closingAudioRef.current.url;
+        closingAudioRef.current = null;
+        setCurrentSpokenText(closing);
+        setIsPlaying(true);
+        if (audioRef.current) {
+          const audio = audioRef.current;
+          audio.src = closingUrl;
+          await new Promise<void>((resolve) => {
+            const onEnded = () => { audio.removeEventListener("ended", onEnded); resolve(); };
+            audio.addEventListener("ended", onEnded);
+            audio.play().catch(() => resolve());
+          });
+        }
+        setIsPlaying(false);
+        setCurrentSpokenText(null);
+        console.log(`[TIMING][FE] closing template — playback ended, ${Math.round(performance.now() - closingStartMs)}ms total`);
+      } else {
+        console.log(`[TIMING][FE] closing template — pre-generated audio MISS, generating fresh TTS (${Math.round(performance.now() - closingStartMs)}ms setup)`);
+        logAiSpeaks({ source: "pre-generated", delayMs: Math.round(performance.now() - closingStartMs), perceivedDelayMs: null, label: "closing (fresh)" });
+        await speakText(closing);
+        console.log(`[TIMING][FE] closing template — playback ended, ${Math.round(performance.now() - closingStartMs)}ms total`);
+      }
     } finally {
       streamingOwnsPlaybackRef.current = false;
     }
     await completePromise;
+
+    // ── Interview Timing Summary ──
+    const events = aiSpeakEventsRef.current;
+    if (events.length > 0) {
+      const pregens = events.filter(e => e.source === "pre-generated");
+      const responds = events.filter(e => e.source === "respond-to-turn");
+      const pct = (n: number) => Math.round((n / events.length) * 100);
+
+      const lines: string[] = [
+        `[TIMING][FE] Interview timing summary:`,
+        `  Total AI speech events: ${events.length}`,
+        `  Pre-generated (instant): ${pregens.length} (${pct(pregens.length)}%)`,
+        `  Respond-to-turn: ${responds.length} (${pct(responds.length)}%)`,
+      ];
+
+      if (responds.length > 0) {
+        const delays = responds.map(e => e.delayMs);
+        const avg = Math.round(delays.reduce((a, b) => a + b, 0) / delays.length);
+        const min = Math.min(...delays);
+        const max = Math.max(...delays);
+        const variance = delays.reduce((sum, d) => sum + (d - avg) ** 2, 0) / delays.length;
+        const stddev = Math.round(Math.sqrt(variance));
+        lines.push(`    Pipeline delay (STT final -> audio): avg=${avg}ms | min=${min}ms | max=${max}ms | stddev=${stddev}ms`);
+
+        const perceived = responds.filter(e => e.perceivedDelayMs != null).map(e => e.perceivedDelayMs!);
+        if (perceived.length > 0) {
+          const pAvg = Math.round(perceived.reduce((a, b) => a + b, 0) / perceived.length);
+          const pMin = Math.min(...perceived);
+          const pMax = Math.max(...perceived);
+          lines.push(`    Perceived delay (last speech -> audio): avg=${pAvg}ms | min=${pMin}ms | max=${pMax}ms`);
+          lines.push(`    Endpointing overhead (baked into perceived): avg=${Math.round(pAvg - avg)}ms`);
+        }
+
+        const types = responds.reduce((acc, e) => {
+          const t = e.responseType || "unknown";
+          acc[t] = (acc[t] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        lines.push(`    By type: ${Object.entries(types).map(([t, n]) => `${t}=${n}`).join(", ")}`);
+      }
+
+      console.log(lines.join("\n"));
+    }
+
     stateMachine.complete();
   }, [applicantName, agentName, jobTitle, closingTemplate, onComplete, stateMachine, addAiMessage, destroyDeepgramConnection]);
 
@@ -1874,7 +2215,7 @@ export function InterviewExperience({
 
   // ───── Pipelining: pre-generate question + TTS during greeting ─────
 
-  const pregenFirstQuestionForCompetency = useCallback(async (index: number, skipTransition = false) => {
+  const pregenFirstQuestionForCompetency = useCallback((index: number, skipTransition = false) => {
     if (!onGenerateQuestion || !competencies || index >= competencies.length) return;
     pregenQuestionAbortRef.current?.abort();
     pregenQuestionAbortRef.current = new AbortController();
@@ -1883,17 +2224,51 @@ export function InterviewExperience({
     const isFirst = index === 0;
     const needsTransition = !isFirst && !skipTransition;
     const previousCompetencyName = !isFirst ? competencies[index - 1]?.name : undefined;
-    try {
-      const question = await onGenerateQuestion(comp.competencyId, needsTransition, previousCompetencyName);
-      if (pregenQuestionAbortRef.current?.signal.aborted) return;
-      pregenQuestionRef.current = { competencyIndex: index, text: question };
-      preGenerateAudio(question);
-    } catch (err) {
-      console.warn("Pre-generation of first question failed (will retry in startNextCompetency):", err);
-    }
-  }, [competencies, onGenerateQuestion, preGenerateAudio]);
+    const promise = (async () => {
+      try {
+        const question = await onGenerateQuestion(comp.competencyId, needsTransition, previousCompetencyName);
+        if (pregenQuestionAbortRef.current?.signal.aborted) return;
+        pregenQuestionRef.current = { competencyIndex: index, text: question };
+
+        if (agentId && !ttsUnavailableRef.current) {
+          try {
+            const response = await fetch("/api/voice/speak", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ agentId, text: question }),
+              signal: pregenQuestionAbortRef.current!.signal,
+            });
+            if (response.ok && !pregenQuestionAbortRef.current?.signal.aborted) {
+              const audioBlob = await response.blob();
+              const audioUrl = URL.createObjectURL(audioBlob);
+              if (pregenQuestionRef.current?.competencyIndex === index) {
+                pregenQuestionRef.current = { ...pregenQuestionRef.current, audioUrl };
+              }
+            }
+          } catch (err) {
+            if (err instanceof Error && err.name === "AbortError") return;
+          }
+        }
+      } catch (err) {
+        console.warn("Pre-generation of first question failed (will retry in startNextCompetency):", err);
+      } finally {
+        pregenQuestionPromiseRef.current = null;
+      }
+    })();
+    pregenQuestionPromiseRef.current = promise;
+  }, [competencies, onGenerateQuestion, agentId]);
 
   useEffect(() => { pregenFirstQuestionRef.current = pregenFirstQuestionForCompetency; }, [pregenFirstQuestionForCompetency]);
+
+  // Trigger first question pre-gen as early as possible (while user reads prep screen).
+  // Guards on actual pre-gen state (not a persistent flag) so it retries after failures
+  // and survives Fast Refresh correctly.
+  useEffect(() => {
+    if (isCompetencyMode && onGenerateQuestion && competencies?.length && agentId
+        && !pregenQuestionRef.current && !pregenQuestionPromiseRef.current) {
+      pregenFirstQuestionForCompetency(0);
+    }
+  }, [isCompetencyMode, onGenerateQuestion, competencies, agentId, pregenFirstQuestionForCompetency]);
 
   // ───── Begin Conversation ─────
 
@@ -1907,11 +2282,14 @@ export function InterviewExperience({
     addAiMessage(greeting);
 
     // Pipeline: start generating the first competency question while the greeting plays
-    if (isCompetencyMode) {
+    if (isCompetencyMode && !pregenQuestionRef.current && !pregenQuestionPromiseRef.current) {
       pregenFirstQuestionForCompetency(0);
     }
 
+    const greetingStartMs = performance.now();
     if (pregenAudioRef.current && pregenAudioRef.current.text === greeting) {
+      console.log(`[TIMING][FE] greeting playback starting (pre-generated audio HIT)`);
+      logAiSpeaks({ source: "pre-generated", delayMs: Math.round(performance.now() - greetingStartMs), perceivedDelayMs: null, label: "greeting" });
       setCurrentSpokenText(greeting);
       setIsPlaying(true);
       if (audioRef.current) {
@@ -1919,24 +2297,26 @@ export function InterviewExperience({
         await audioRef.current.play();
       }
       pregenAudioRef.current = null;
+      console.log(`[TIMING][FE] greeting playback ended — ${Math.round(performance.now() - greetingStartMs)}ms`);
       if (onBegin) onBegin().catch(err => console.error("onBegin callback failed:", err));
       if (isCompetencyMode) greetingDoneRef.current = true;
       return;
     }
 
+    console.log(`[TIMING][FE] greeting playback starting (pre-generated audio MISS — generating fresh TTS)`);
+    logAiSpeaks({ source: "pre-generated", delayMs: Math.round(performance.now() - greetingStartMs), perceivedDelayMs: null, label: "greeting (fresh)" });
     if (onBegin) onBegin().catch(err => console.error("onBegin callback failed:", err));
 
     try {
       if (isCompetencyMode) greetingDoneRef.current = true;
       await speakText(greeting);
+      console.log(`[TIMING][FE] greeting playback ended — ${Math.round(performance.now() - greetingStartMs)}ms`);
     } catch (err) {
       console.error("All speech methods failed for greeting, switching to text mode:", err);
       setIsPlaying(false);
       setCurrentSpokenText(null);
       setIsTextResponseMode(true);
       isTextResponseModeRef.current = true;
-      // greetingDoneRef is left true so onTTSPlaybackCompleteRef detects competency
-      // greeting and starts the first competency question instead of just listening.
       onTTSPlaybackCompleteRef.current?.();
     }
   };
@@ -2119,7 +2499,7 @@ export function InterviewExperience({
                   }`}>
                     {state === InterviewState.AI_SPEAKING ? "Speaking..." :
                      state === InterviewState.LISTENING ? "Listening..." :
-                     "Thinking..."}
+                     (processingMessage || "Working on your answer...")}
                   </p>
                 </div>
               </div>
@@ -2220,14 +2600,17 @@ export function InterviewExperience({
                   </div>
                 )}
 
-                {/* Thinking indicator */}
+                {/* Thinking / processing indicator */}
                 {state === InterviewState.AI_THINKING && (
                   <div className="flex gap-3 mb-3">
                     <span className="text-amber-400 text-xs font-medium shrink-0 mt-0.5 w-16 text-right">{agentName.split(" ")[0]}</span>
-                    <div className="flex gap-1 items-center">
-                      <div className="w-1.5 h-1.5 rounded-full bg-amber-400/60 animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <div className="w-1.5 h-1.5 rounded-full bg-amber-400/60 animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <div className="w-1.5 h-1.5 rounded-full bg-amber-400/60 animate-bounce" style={{ animationDelay: "300ms" }} />
+                    <div className="flex flex-col gap-1">
+                      <div className="flex gap-1 items-center">
+                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400/60 animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400/60 animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400/60 animate-bounce" style={{ animationDelay: "300ms" }} />
+                      </div>
+                      <p className="text-amber-200/80 text-xs max-w-[min(100%,280px)]">{processingMessage}</p>
                     </div>
                   </div>
                 )}

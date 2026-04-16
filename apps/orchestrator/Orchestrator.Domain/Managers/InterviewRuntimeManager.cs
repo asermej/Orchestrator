@@ -51,6 +51,19 @@ internal sealed class InterviewRuntimeManager : IDisposable
         staticSb.AppendLine("Ask one question at a time. Wait for the candidate to finish before responding.");
         staticSb.AppendLine();
 
+        staticSb.AppendLine("## Speech Pacing (MANDATORY)");
+        staticSb.AppendLine("Your spoken responses are streamed sentence-by-sentence to text-to-speech.");
+        staticSb.AppendLine("The FIRST sentence you speak in every turn MUST be exactly 3 to 5 words. No exceptions.");
+        staticSb.AppendLine("This short opener lets audio playback start instantly while you generate the rest.");
+        staticSb.AppendLine();
+        staticSb.AppendLine("First-sentence patterns (vary these — NEVER repeat the same opener twice in a row):");
+        staticSb.AppendLine("- Acknowledge a detail: \"Smart move on that.\" / \"Good eye catching that.\" / \"Solid work there.\"");
+        staticSb.AppendLine("- React naturally: \"That makes total sense.\" / \"Fair enough on that.\" / \"Interesting approach there.\"");
+        staticSb.AppendLine("- Affirm briefly: \"Right, got it.\" / \"Makes sense to me.\" / \"That tracks, yeah.\"");
+        staticSb.AppendLine();
+        staticSb.AppendLine("Put the follow-up question or additional comment in the SECOND sentence.");
+        staticSb.AppendLine();
+
         staticSb.AppendLine("## Scoring Framework — Behavioral Competency Scoring (Universal 1-5 Scale)");
         staticSb.AppendLine("Each competency is scored holistically on a 1-5 scale based on the overall quality of behavioral evidence.");
         staticSb.AppendLine("Scores are assigned after the candidate answers the primary question and any follow-ups.");
@@ -156,6 +169,7 @@ internal sealed class InterviewRuntimeManager : IDisposable
         sb.AppendLine("If both action and result are complete, score should be at least 3.");
         sb.AppendLine();
         sb.AppendLine("Line 1 of your output MUST be exactly: [EVAL:action=<complete|weak|missing>,result=<complete|weak|missing>,score=<1-5>]");
+        sb.AppendLine("When the response is on-topic (Step 2), the **first character** of your entire output must be `[` (start of `[EVAL:`). Do not output spaces, newlines, preamble, or any other text before that line.");
         sb.AppendLine();
 
         // ── Follow-up decision branches (model selects based on user-message state) ──
@@ -184,7 +198,7 @@ internal sealed class InterviewRuntimeManager : IDisposable
         // ── Transition guidance ──
         sb.AppendLine("### Transition guidance");
         sb.AppendLine("**When acknowledging (transition):**");
-        sb.AppendLine("- One short sentence warmly acknowledging one specific detail from their answer.");
+        sb.AppendLine("- One short sentence (2-4 words) warmly acknowledging one specific detail from their answer.");
         sb.AppendLine("- If is_last_competency = true: Do NOT mention moving to another question or suggest there are more questions coming.");
         sb.AppendLine("- If is_last_competency = false: Do NOT say phrases like \"let's move on\", \"let's go to the next question\", or any forward-looking transition.");
         sb.AppendLine();
@@ -205,7 +219,7 @@ internal sealed class InterviewRuntimeManager : IDisposable
         sb.AppendLine("### Output rules");
         sb.AppendLine("- Line 1: the [EVAL:...] tag (for on-topic) or an edge-case marker, alone on the first line");
         sb.AppendLine("- Line 2+: your spoken response — natural conversational speech, no markdown, no bullet points");
-        sb.AppendLine("- CRITICAL — first sentence rule: your FIRST sentence MUST be under 8 words. Use it to acknowledge one specific detail (e.g. \"Nice catch on that oil filter.\" or \"That took real initiative.\"). Then put the rest (follow-up question or additional comment) in the second sentence.");
+        sb.AppendLine("- First sentence after line 1: 2-4 words ONLY (see Speech Pacing rules above). Vary your openers — do not reuse the same phrase.");
         sb.AppendLine("- Keep the full spoken response to 1-2 sentences (under 25 words total)");
         sb.AppendLine("- Write the way a real person talks — short, punchy phrases. Do NOT chain clauses with em dashes, commas, or semicolons into one long sentence");
         sb.AppendLine("- Do NOT include any marker text in the spoken portion");
@@ -268,6 +282,8 @@ internal sealed class InterviewRuntimeManager : IDisposable
         if (includeTransition)
         {
             sb.AppendLine("You are transitioning from the previous competency to a new one.");
+            sb.AppendLine("IMPORTANT: This is the MIDDLE of an ongoing interview, NOT the beginning. The candidate has already been greeted and has answered previous questions.");
+            sb.AppendLine("Do NOT use opening or introductory language (e.g. \"let's kick things off\", \"let's get started\", \"let's begin\", \"welcome\", \"thanks for joining\").");
             if (!string.IsNullOrWhiteSpace(previousCompetencyName))
                 sb.AppendLine($"The candidate just finished discussing: {previousCompetencyName}.");
             sb.AppendLine("Begin with a brief, warm one-sentence acknowledgment of the topic just discussed.");
@@ -312,7 +328,7 @@ internal sealed class InterviewRuntimeManager : IDisposable
         if (includeTransition)
             sb.AppendLine("Respond with the transition acknowledgment followed by the question. Nothing else.");
         else
-            sb.AppendLine("Respond with ONLY the single question to ask, nothing else. No quotes, no preamble.");
+            sb.AppendLine("Respond with ONLY the single question to ask, nothing else. No quotes, no preamble, no introductory phrases (e.g. no \"let's kick things off\", \"let's get started\").");
         return sb.ToString();
     }
 
